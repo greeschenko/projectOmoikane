@@ -1,0 +1,37 @@
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    command: npx next dev --webpack
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+
+  # playwright service disabled: network too slow to download Chromium in Docker.
+  # To re-enable, uncomment below or run: docker compose -f docker/docker-compose.yml run --rm playwright
+  # Build context at docker/playwright/Dockerfile uses node:22-alpine + apk chromium.
+  #playwright:
+  #  build:
+  #    context: ./playwright
+  #    dockerfile: Dockerfile
+  #  working_dir: /e2e
+  #  volumes:
+  #    - ../frontend/e2e:/e2e
+  #  command: npx playwright test
+  #  depends_on:
+  #    - nginx
+  #  environment:
+  #    - BASE_URL=http://nginx:80
