@@ -103,6 +103,8 @@ test.describe("Admin Users", () => {
       await page.getByLabel(/^Password\b/).fill("SecurePass123!");
       await page.getByLabel("Confirm Password").fill("SecurePass123!");
       await page.getByRole("button", { name: /save|create|submit/i }).click();
+      await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10000 });
+      await page.waitForTimeout(500);
       const newRowCount = await page.locator("table tbody tr").count();
       expect(newRowCount).toBe(rowCount + 1);
       await expect(page.getByRole("table")).toContainText(/jane@example.com/i);
@@ -150,6 +152,7 @@ test.describe("Admin Users", () => {
   test.describe("User delete", () => {
     test("delete button shows a confirmation dialog", async ({ page }) => {
       await page.goto("/admin/users");
+      await expect(page.locator("table tbody tr")).not.toHaveCount(0);
       const firstRow = page.locator("table tbody tr").first();
       await firstRow.getByRole("button", { name: /delete|remove|trash/i }).click();
       await expect(page.getByRole("dialog")).toBeVisible();

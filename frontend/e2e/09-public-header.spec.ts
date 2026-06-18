@@ -45,7 +45,7 @@ test.describe("Authenticated Header", () => {
   test("shows user menu when logged in", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/");
-    const trigger = page.getByRole("banner", { name: /public/i }).getByRole("button").first();
+    const trigger = page.getByRole("banner", { name: /public/i }).getByLabel("user menu");
     await expect(trigger).toBeVisible();
     await trigger.click();
     await expect(page.getByRole("menu")).toBeVisible();
@@ -54,7 +54,7 @@ test.describe("Authenticated Header", () => {
   test("menu has Settings and Exit for regular user", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/");
-    const trigger = page.getByRole("banner", { name: /public/i }).getByRole("button").first();
+    const trigger = page.getByRole("banner", { name: /public/i }).getByLabel("user menu");
     await trigger.click();
     await expect(page.getByRole("menuitem", { name: /settings/i })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: /exit|logout/i })).toBeVisible();
@@ -63,14 +63,14 @@ test.describe("Authenticated Header", () => {
   test("menu has Admin Panel for admin", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/");
-    await page.getByRole("banner", { name: /public/i }).getByRole("button").first().click();
+    await page.getByRole("banner", { name: /public/i }).getByLabel("user menu").click();
     await expect(page.getByRole("menuitem", { name: /admin panel|panel|admin/i })).toBeVisible();
   });
 
   test("Exit logs out and shows Login button", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/");
-    await page.getByRole("banner", { name: /public/i }).getByRole("button").first().click();
+    await page.getByRole("banner", { name: /public/i }).getByLabel("user menu").click();
     await page.getByRole("menuitem", { name: /exit|logout/i }).click();
     await page.waitForURL("/");
     const banner = page.getByRole("banner", { name: /public/i });
@@ -131,5 +131,37 @@ test.describe("Main Menu Widget", () => {
     const banner = page.getByRole("banner", { name: /public/i });
     const nav = banner.getByRole("navigation");
     await expect(nav).toBeVisible();
+  });
+});
+
+test.describe("Message widget on main page", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.request.delete("/api/messages");
+  });
+
+  test("bell icon is visible on the main page when logged in", async ({ page }) => {
+    await page.goto("/");
+    const banner = page.getByRole("banner", { name: /public/i });
+    await expect(banner.getByLabel(/notifications/i)).toBeVisible();
+  });
+
+  test("bell shows unread count badge on the main page", async ({ page }) => {
+    await page.request.post("/api/messages", {
+      data: { title: "Test notification", content: "Test content" },
+    });
+    await page.goto("/");
+    const bell = page.getByRole("banner", { name: /public/i }).getByLabel(/notifications/i);
+    await expect(bell).toContainText(/1/);
+  });
+
+  test("clicking bell opens message dropdown on the main page", async ({ page }) => {
+    await page.request.post("/api/messages", {
+      data: { title: "System message", content: "Important update" },
+    });
+    await page.goto("/");
+    await page.getByRole("banner", { name: /public/i }).getByLabel(/notifications/i).click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await expect(page.getByText(/system message/i)).toBeVisible();
   });
 });

@@ -5,17 +5,24 @@ export function isMobile(): boolean {
 }
 
 export async function loginAsAdmin(page: Page) {
-  // Create admin user if setup not already completed
-  await page.request.post("/api/setup", {
-    data: { email: "admin@example.com", password: "SecurePass123!" },
-  });
-  // Login via browser form to set session cookie properly
-  await page.goto("/login", { waitUntil: "networkidle" });
-  await page.getByLabel("Email").fill("admin@example.com");
-  await page.getByLabel("Password").fill("SecurePass123!");
-  await page.getByRole("button", { name: /sign in/i }).click();
-  // Give the client-side fetch/router.push time to finish, then navigate directly
-  await page.waitForTimeout(2000);
+  // Try known admin passwords in order
+  const passwords = ["SecurePass123!", "NewPass123!"];
+  let loggedIn = false;
+  for (const pw of passwords) {
+    const loginRes = await page.request.post("/api/auth/login", {
+      data: { email: "admin@example.com", password: pw },
+    });
+    if (loginRes.ok()) {
+      loggedIn = true;
+      break;
+    }
+  }
+  if (!loggedIn) {
+    // Recreate admin via setup (only works if no users exist)
+    await page.request.post("/api/setup", {
+      data: { email: "admin@example.com", password: "SecurePass123!" },
+    });
+  }
   await page.goto("/admin", { waitUntil: "networkidle" });
   await expect(page).toHaveURL(/\/admin/);
   // Reset and seed sample pages via API
