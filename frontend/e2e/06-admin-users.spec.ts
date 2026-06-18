@@ -37,6 +37,13 @@ test.describe("Admin Users", () => {
       await expect(firstRow.getByRole("button", { name: /edit|pencil/i })).toBeVisible();
       await expect(firstRow.getByRole("button", { name: /delete|remove|trash/i })).toBeVisible();
     });
+
+    test("shows empty state when filter matches no users", async ({ page }) => {
+      await page.goto("/admin/users");
+      await expect(page.locator("table tbody tr")).not.toHaveCount(0);
+      await page.getByPlaceholder(/filter|search/i).fill("zzzzthisdoesnotmatch");
+      await expect(page.getByRole("table")).toContainText(/no users? found/i);
+    });
   });
 
   test.describe("User creation form", () => {
@@ -96,6 +103,7 @@ test.describe("Admin Users", () => {
     test("successful submission adds user to table", async ({ page }) => {
       await page.goto("/admin/users");
       await expect(page.locator("table tbody tr")).not.toHaveCount(0);
+      await expect(page.getByRole("table")).toContainText(/@example\.com/);
       const rowCount = await page.locator("table tbody tr").count();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await page.getByLabel("Name").fill("Jane Doe");
@@ -113,6 +121,7 @@ test.describe("Admin Users", () => {
     test("cancel closes the form without adding a user", async ({ page }) => {
       await page.goto("/admin/users");
       await expect(page.locator("table tbody tr")).not.toHaveCount(0);
+      await expect(page.getByRole("table")).toContainText(/@example\.com/);
       const rowCount = await page.locator("table tbody tr").count();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await page.getByRole("button", { name: /cancel/i }).click();
@@ -161,11 +170,13 @@ test.describe("Admin Users", () => {
     test("confirming delete removes the user from the table", async ({ page }) => {
       await page.goto("/admin/users");
       await expect(page.locator("table tbody tr")).not.toHaveCount(0);
+      await expect(page.getByRole("table")).toContainText(/@example\.com/);
       const rowCount = await page.locator("table tbody tr").count();
       const firstRow = page.locator("table tbody tr").first();
       await firstRow.getByRole("button", { name: /delete|remove|trash/i }).click();
       await page.getByRole("button", { name: /confirm|yes|delete/i }).click();
       await expect(page.locator("[role='dialog']")).not.toBeVisible();
+      await page.waitForTimeout(500);
       const afterCount = await page.locator("table tbody tr").count();
       expect(afterCount).toBe(rowCount - 1);
     });
@@ -173,6 +184,7 @@ test.describe("Admin Users", () => {
     test("cancelling delete keeps the user in the table", async ({ page }) => {
       await page.goto("/admin/users");
       await expect(page.locator("table tbody tr")).not.toHaveCount(0);
+      await expect(page.getByRole("table")).toContainText(/@example\.com/);
       const rowCount = await page.locator("table tbody tr").count();
       const firstRow = page.locator("table tbody tr").first();
       await firstRow.getByRole("button", { name: /delete|remove|trash/i }).click();

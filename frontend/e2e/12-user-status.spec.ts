@@ -86,9 +86,7 @@ test.describe("User Status", () => {
   test("filter input also filters by status", async ({ page }) => {
     await page.goto("/admin/users");
     await page.getByPlaceholder(/filter|search/i).fill("banned");
-    const rows = page.locator("table tbody tr");
-    // If no banned users, the filter should show no rows
-    const count = await rows.count();
-    expect(count).toBe(0);
+    // Should show empty state since no user name/email contains "banned"
+    await expect(page.getByRole("table")).toContainText(/no users? found/i);
   });
 });

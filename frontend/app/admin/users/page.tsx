@@ -142,7 +142,14 @@ export default function AdminUsers() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filtered.map((user) => (
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                  No users found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
@@ -160,8 +167,8 @@ export default function AdminUsers() {
                   <Button size="small" color="error" onClick={() => setDeleteTarget(user)}>Delete</Button>
                 </TableCell>
               </TableRow>
-            ))}
-          </TableBody>
+            )))
+          }</TableBody>
         </Table>
       </TableContainer>
 

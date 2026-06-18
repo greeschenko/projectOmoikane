@@ -22,6 +22,10 @@ export async function loginAsAdmin(page: Page) {
     await page.request.post("/api/setup", {
       data: { email: "admin@example.com", password: "SecurePass123!" },
     });
+    // Login with the password we just set
+    await page.request.post("/api/auth/login", {
+      data: { email: "admin@example.com", password: "SecurePass123!" },
+    });
   }
   await page.goto("/admin", { waitUntil: "networkidle" });
   await expect(page).toHaveURL(/\/admin/);
