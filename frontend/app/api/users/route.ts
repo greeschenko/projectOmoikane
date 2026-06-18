@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await request.json();
-  const { name, email, password, role } = body;
+  const { name, email, password, role, status } = body;
   if (!name || !email || !password) {
     return NextResponse.json({ error: "All fields required" }, { status: 400 });
   }
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     email,
     password,
     role: role || "user",
+    status,
   });
   return NextResponse.json(user, { status: 201 });
 }

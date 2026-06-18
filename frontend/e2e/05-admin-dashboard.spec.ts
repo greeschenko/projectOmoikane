@@ -23,3 +23,28 @@ test.describe("Dashboard", () => {
     await expect(page.locator("h1")).toContainText(/dashboard/i);
   });
 });
+
+test.describe("Admin Header", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto("/admin");
+  });
+
+  test("has a header AppBar with user widget", async ({ page }) => {
+    const header = page.getByRole("banner", { name: /admin|appbar/i }).first();
+    await expect(header).toBeVisible();
+    await expect(header.getByRole("button", { name: /user|avatar|account/i })).toBeVisible();
+  });
+
+  test("header has message notification bell", async ({ page }) => {
+    const header = page.getByRole("banner", { name: /admin|appbar/i }).first();
+    await expect(header.getByLabel(/messages|notifications|bell/i)).toBeVisible();
+  });
+
+  test("user menu has Settings and Exit options", async ({ page }) => {
+    const header = page.getByRole("banner", { name: /admin|appbar/i }).first();
+    await header.getByRole("button", { name: /user|avatar|account/i }).click();
+    await expect(page.getByRole("menuitem", { name: /settings/i })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /exit|logout/i })).toBeVisible();
+  });
+});

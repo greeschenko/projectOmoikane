@@ -36,7 +36,7 @@ test.describe("Admin Pages", () => {
       await expect(page.getByRole("dialog")).toBeVisible();
     });
 
-    test("form has title, slug, content, meta fields, parent selector, and published toggle", async ({ page }) => {
+    test("form has title, slug, content, meta fields, parent selector, status, and menu toggle", async ({ page }) => {
       await page.goto("/admin/pages");
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
       await expect(page.getByLabel(/^Title\b/i)).toBeVisible();
@@ -45,14 +45,15 @@ test.describe("Admin Pages", () => {
       await expect(page.getByLabel("Meta Title")).toBeVisible();
       await expect(page.getByLabel("Meta Description")).toBeVisible();
       await expect(page.getByLabel("Meta Keywords")).toBeVisible();
-      await expect(page.getByRole("combobox")).toBeVisible();
-      await expect(page.getByLabel("Published")).toBeVisible();
+      await expect(page.getByRole("combobox").first()).toBeVisible();
+      await expect(page.getByText("Status").first()).toBeVisible();
+      await expect(page.getByLabel(/show in menu|in menu|menu/i)).toBeVisible();
     });
 
     test("parent page selector lists existing pages", async ({ page }) => {
       await page.goto("/admin/pages");
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
-      await page.getByRole("combobox").click();
+      await page.getByRole("combobox").first().click();
       const options = page.getByRole("option");
       expect(await options.count()).toBeGreaterThanOrEqual(1);
     });

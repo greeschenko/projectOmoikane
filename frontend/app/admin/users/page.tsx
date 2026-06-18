@@ -5,7 +5,7 @@ import {
   Container, Typography, Button, TextField, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Select, MenuItem, FormControl, InputLabel, Alert,
+  Box, Select, MenuItem, FormControl, InputLabel, Alert, Chip,
   TableSortLabel,
 } from "@mui/material";
 
@@ -14,6 +14,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  status: "active" | "banned";
   createdAt: string;
 }
 
@@ -25,7 +26,7 @@ export default function AdminUsers() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
-  const [formData, setFormData] = useState({ name: "", email: "", password: "", confirmPassword: "", role: "user" });
+  const [formData, setFormData] = useState({ name: "", email: "", password: "", confirmPassword: "", role: "user", status: "active" });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const fetchUsers = useCallback(async () => {
@@ -57,14 +58,14 @@ export default function AdminUsers() {
 
   function openCreate() {
     setEditingUser(null);
-    setFormData({ name: "", email: "", password: "", confirmPassword: "", role: "user" });
+    setFormData({ name: "", email: "", password: "", confirmPassword: "", role: "user", status: "active" });
     setFormErrors({});
     setFormOpen(true);
   }
 
   function openEdit(user: User) {
     setEditingUser(user);
-    setFormData({ name: user.name, email: user.email, password: "", confirmPassword: "", role: user.role });
+    setFormData({ name: user.name, email: user.email, password: "", confirmPassword: "", role: user.role, status: user.status || "active" });
     setFormErrors({});
     setFormOpen(true);
   }
@@ -89,7 +90,7 @@ export default function AdminUsers() {
     if (!validateForm()) return;
     const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users";
     const method = editingUser ? "PUT" : "POST";
-    const body: Record<string, string> = { name: formData.name, email: formData.email, role: formData.role };
+    const body: Record<string, string> = { name: formData.name, email: formData.email, role: formData.role, status: formData.status };
     if (formData.password) body.password = formData.password;
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (res.ok) {
@@ -122,12 +123,16 @@ export default function AdminUsers() {
         <Table>
           <TableHead>
             <TableRow>
-              {(["name", "email", "role", "createdAt"] as const).map((field) => (
-                <TableCell key={field}>
+              {(["name", "email", "role", "status", "createdAt"] as const).map((field) => (
+                <TableCell
+                  key={field}
+                  aria-sort={sortField === field ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
+                  sx={{ cursor: "pointer" }}
+                  onClick={() => handleSort(field)}
+                >
                   <TableSortLabel
                     active={sortField === field}
                     direction={sortField === field ? sortDir : "asc"}
-                    onClick={() => handleSort(field)}
                   >
                     {field.charAt(0).toUpperCase() + field.slice(1)}
                   </TableSortLabel>
@@ -142,6 +147,13 @@ export default function AdminUsers() {
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{user.role}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={user.status || "active"}
+                    color={user.status === "banned" ? "error" : "success"}
+                    size="small"
+                  />
+                </TableCell>
                 <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Button size="small" onClick={() => openEdit(user)}>Edit</Button>
@@ -178,6 +190,16 @@ export default function AdminUsers() {
               <MenuItem value="user">user</MenuItem>
             </Select>
           </FormControl>
+          {editingUser && (
+            <FormControl fullWidth margin="dense">
+              <InputLabel>Status</InputLabel>
+              <Select label="Status" value={formData.status || "active"}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+                <MenuItem value="active">active</MenuItem>
+                <MenuItem value="banned">banned</MenuItem>
+              </Select>
+            </FormControl>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setFormOpen(false)}>Cancel</Button>

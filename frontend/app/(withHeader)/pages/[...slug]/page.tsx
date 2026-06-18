@@ -27,7 +27,7 @@ export default async function PublicPage({
 }) {
   const { slug } = await params;
   const page = store.resolvePageByPath(slug);
-  if (!page) notFound();
+  if (!page || page.status !== "published") notFound();
 
   const breadcrumbs: { label: string; href: string }[] = [];
   let currentId: string | null = null;

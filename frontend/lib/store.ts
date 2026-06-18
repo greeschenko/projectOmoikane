@@ -6,6 +6,7 @@ export interface User {
   email: string;
   password: string;
   role: "admin" | "user";
+  status: "active" | "banned";
   createdAt: string;
   updatedAt: string;
 }
@@ -20,9 +21,18 @@ export interface Page {
   metaKeywords?: string;
   parentId: string | null;
   sortOrder: number;
-  published: boolean;
+  status: "draft" | "published";
+  inMenu: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Message {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  readBy: string[];
 }
 
 function hashPassword(password: string): string {
@@ -45,6 +55,9 @@ function stripPassword(user: User): Omit<User, "password"> {
 class InMemoryStore {
   private users = new Map<string, User>();
   private pages = new Map<string, Page>();
+  private messages = new Map<string, Message>();
+
+  // --- Users ---
 
   getUsers(): Omit<User, "password">[] {
     return Array.from(this.users.values()).map(stripPassword);
@@ -66,6 +79,7 @@ class InMemoryStore {
     email: string;
     password: string;
     role: "admin" | "user";
+    status?: "active" | "banned";
   }): Omit<User, "password"> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -75,6 +89,7 @@ class InMemoryStore {
       email: data.email,
       password: hashPassword(data.password),
       role: data.role,
+      status: data.status ?? "active",
       createdAt: now,
       updatedAt: now,
     };
@@ -106,8 +121,16 @@ class InMemoryStore {
     return this.users.size;
   }
 
+  // --- Pages ---
+
   getPages(): Page[] {
     return Array.from(this.pages.values());
+  }
+
+  getMenuPages(): Page[] {
+    return Array.from(this.pages.values()).filter(
+      (p) => p.inMenu && p.status === "published"
+    );
   }
 
   getPage(id: string): Page | undefined {
@@ -130,6 +153,8 @@ class InMemoryStore {
     metaKeywords?: string;
     parentId?: string | null;
     published?: boolean;
+    status?: "draft" | "published";
+    inMenu?: boolean;
   }): Page {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -143,7 +168,8 @@ class InMemoryStore {
       metaKeywords: data.metaKeywords,
       parentId: data.parentId ?? null,
       sortOrder: 0,
-      published: data.published ?? false,
+      status: data.status ?? (data.published ? "published" : "draft"),
+      inMenu: data.inMenu ?? false,
       createdAt: now,
       updatedAt: now,
     };
@@ -153,13 +179,15 @@ class InMemoryStore {
 
   updatePage(
     id: string,
-    data: Partial<Omit<Page, "id" | "createdAt">>
+    data: Partial<Omit<Page, "id" | "createdAt"> & { published?: boolean }>
   ): Page | undefined {
     const page = this.pages.get(id);
     if (!page) return undefined;
     const updated: Page = {
       ...page,
       ...data,
+      status: data.status ?? (data.published !== undefined ? (data.published ? "published" : "draft") : page.status),
+      inMenu: data.inMenu ?? page.inMenu,
       updatedAt: new Date().toISOString(),
     };
     this.pages.set(id, updated);
@@ -183,6 +211,79 @@ class InMemoryStore {
     }
     return parentId ? this.getPage(parentId!) : undefined;
   }
+
+  // --- Messages ---
+
+  getMessages(): Message[] {
+    return Array.from(this.messages.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  createMessage(data: { title: string; content: string }): Message {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const message: Message = { id, title: data.title, content: data.content, createdAt: now, readBy: [] };
+    this.messages.set(id, message);
+    return message;
+  }
+
+  markAsRead(messageId: string, userId: string): Message | undefined {
+    const msg = this.messages.get(messageId);
+    if (!msg) return undefined;
+    if (!msg.readBy.includes(userId)) {
+      msg.readBy.push(userId);
+    }
+    return msg;
+  }
+
+  getUnreadCount(userId: string): number {
+    let count = 0;
+    for (const msg of this.messages.values()) {
+      if (!msg.readBy.includes(userId)) count++;
+    }
+    return count;
+  }
+
+  clearMessages(): void {
+    this.messages.clear();
+  }
+
+  markAllAsRead(userId: string): void {
+    for (const msg of this.messages.values()) {
+      if (!msg.readBy.includes(userId)) {
+        msg.readBy.push(userId);
+      }
+    }
+  }
+
+  // --- Dashboard Stats ---
+
+  getDashboardStats() {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const usersArray = Array.from(this.users.values());
+    const recentUsers = usersArray.filter((u) => new Date(u.createdAt) >= sevenDaysAgo);
+    const registrationsByDay: Record<string, number> = {};
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10);
+      registrationsByDay[key] = 0;
+    }
+    for (const u of recentUsers) {
+      const key = u.createdAt.slice(0, 10);
+      if (registrationsByDay[key] !== undefined) {
+        registrationsByDay[key]++;
+      }
+    }
+    return {
+      userCount: this.users.size,
+      pageCount: this.pages.size,
+      recentRegistrations: Object.entries(registrationsByDay)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, count]) => ({ date, count })),
+    };
+  }
 }
 
 const GLOBAL_KEY = "__omoikane_store__";
@@ -195,7 +296,6 @@ function getGlobalStore(): InMemoryStore {
     (globalThis as any)[GLOBAL_KEY] = store;
     return store;
   }
-  // Fallback for environments without globalThis (edge)
   const store = new InMemoryStore();
   return store;
 }

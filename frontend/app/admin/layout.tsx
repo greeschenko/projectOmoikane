@@ -11,5 +11,5 @@ export default async function AdminRootLayout({
   if (!session || session.role !== "admin") {
     redirect("/login");
   }
-  return <AdminLayout>{children}</AdminLayout>;
+  return <AdminLayout session={session}>{children}</AdminLayout>;
 }

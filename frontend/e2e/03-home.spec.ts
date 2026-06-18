@@ -6,7 +6,7 @@ test("displays the project title", async ({ page, request }) => {
     data: { email: "admin@example.com", password: "SecurePass123!" },
   });
   await page.goto("/");
-  await expect(page.getByRole("heading")).toContainText("projectOmoikane");
+  await expect(page.locator("h1")).toContainText("projectOmoikane");
 });
 
 test("shows Get Started and Learn More buttons", async ({ page, request }) => {

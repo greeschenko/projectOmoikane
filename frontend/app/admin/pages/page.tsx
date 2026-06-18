@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 interface Page {
   id: string;
@@ -19,7 +20,8 @@ interface Page {
   metaDescription?: string;
   metaKeywords?: string;
   parentId: string | null;
-  published: boolean;
+  status: "draft" | "published";
+  inMenu: boolean;
 }
 
 export default function AdminPages() {
@@ -30,7 +32,7 @@ export default function AdminPages() {
   const [formData, setFormData] = useState({
     title: "", slug: "", content: "",
     metaTitle: "", metaDescription: "", metaKeywords: "",
-    parentId: "", published: false,
+    parentId: "", status: "draft" as "draft" | "published", inMenu: false,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -54,7 +56,7 @@ export default function AdminPages() {
 
   function openCreate(parentId?: string) {
     setEditingPage(null);
-    setFormData({ title: "", slug: "", content: "", metaTitle: "", metaDescription: "", metaKeywords: "", parentId: parentId || "", published: false });
+    setFormData({ title: "", slug: "", content: "", metaTitle: "", metaDescription: "", metaKeywords: "", parentId: parentId || "", status: "draft", inMenu: false });
     setFormErrors({});
     setFormOpen(true);
   }
@@ -69,7 +71,8 @@ export default function AdminPages() {
       metaDescription: page.metaDescription || "",
       metaKeywords: page.metaKeywords || "",
       parentId: page.parentId || "",
-      published: page.published,
+      status: page.status || "draft",
+      inMenu: page.inMenu || false,
     });
     setFormErrors({});
     setFormOpen(true);
@@ -158,10 +161,18 @@ export default function AdminPages() {
                 ))}
             </Select>
           </FormControl>
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Status</InputLabel>
+            <Select label="Status" value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as "draft" | "published" })}>
+              <MenuItem value="draft">Draft</MenuItem>
+              <MenuItem value="published">Published</MenuItem>
+            </Select>
+          </FormControl>
           <FormControlLabel
-            control={<Switch checked={formData.published}
-              onChange={(e) => setFormData({ ...formData, published: e.target.checked })} />}
-            label="Published"
+            control={<Switch checked={formData.inMenu}
+              onChange={(e) => setFormData({ ...formData, inMenu: e.target.checked })} />}
+            label="Show in menu"
             sx={{ mt: 1 }}
           />
         </DialogContent>
@@ -195,10 +206,31 @@ function PageTreeItem({
   onDelete: (p: Page) => void;
 }) {
   const children = pages.filter((p) => p.parentId === page.id);
+
+  function buildViewUrl(p: Page): string {
+    const segments: string[] = [p.slug];
+    let current = p;
+    while (current.parentId) {
+      const parent = pages.find((pp) => pp.id === current.parentId);
+      if (!parent) break;
+      segments.unshift(parent.slug);
+      current = parent;
+    }
+    return "/pages/" + segments.join("/");
+  }
+
   return (
     <li style={{ marginLeft: depth * 24 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
         <Typography sx={{ flexGrow: 1 }}>{page.title}</Typography>
+        <IconButton
+          size="small"
+          onClick={() => window.open(buildViewUrl(page), '_blank', 'noopener')}
+          aria-label="view"
+          data-href={buildViewUrl(page)}
+        >
+          <OpenInNewIcon fontSize="small" />
+        </IconButton>
         <IconButton size="small" onClick={() => onEdit(page)} aria-label="edit">
           <EditIcon fontSize="small" />
         </IconButton>

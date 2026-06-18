@@ -13,6 +13,9 @@ export async function POST(request: Request) {
   if (!user || !verifyPassword(password, user.password)) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
+  if (user.status === "banned") {
+    return NextResponse.json({ error: "Account is banned" }, { status: 403 });
+  }
   await setSession(user.id, user.role);
   return NextResponse.json({ success: true, role: user.role });
 }

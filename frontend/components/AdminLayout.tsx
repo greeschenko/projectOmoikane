@@ -9,6 +9,7 @@ import {
   useMediaQuery, useTheme,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import AdminAppBar from "./AdminAppBar";
 
 const navItems = [
   { label: "Dashboard", href: "/admin" },
@@ -16,7 +17,13 @@ const navItems = [
   { label: "Pages", href: "/admin/pages" },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+  session,
+}: {
+  children: React.ReactNode;
+  session: { userId: string; role: string };
+}) {
   const pathname = usePathname();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -40,41 +47,44 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-    <Box sx={{ display: "flex" }}>
-      {isMobile && (
-        <AppBar position="fixed">
-          <Toolbar>
-            <IconButton
-              color="inherit"
-              edge="start"
-              aria-label="toggle sidebar"
-              onClick={() => setMobileOpen(!mobileOpen)}
-            >
-              <MenuIcon />
-            </IconButton>
-            <Typography variant="h6" sx={{ ml: 2 }}>
-              Admin
-            </Typography>
-          </Toolbar>
-        </AppBar>
-      )}
-      {isMobile ? (
-        <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
-          <Box sx={{ width: 250 }} role="navigation">
-            {sidebarContent}
-          </Box>
-        </Drawer>
-      ) : (
-        <Drawer variant="permanent" sx={{ width: 240, flexShrink: 0 }}>
-          <Toolbar />
-          <Box role="navigation">{sidebarContent}</Box>
-        </Drawer>
-      )}
-      <Box
-        component="main"
-        sx={{ flexGrow: 1, p: 3, mt: isMobile ? 8 : 0 }}
-      >
-        {children}
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <AdminAppBar session={session} />
+      <Box sx={{ display: "flex", flex: 1 }}>
+        {isMobile && (
+          <AppBar position="fixed">
+            <Toolbar>
+              <IconButton
+                color="inherit"
+                edge="start"
+                aria-label="toggle sidebar"
+                onClick={() => setMobileOpen(!mobileOpen)}
+              >
+                <MenuIcon />
+              </IconButton>
+              <Typography variant="h6" sx={{ ml: 2 }}>
+                Admin
+              </Typography>
+            </Toolbar>
+          </AppBar>
+        )}
+        <Box
+          component="main"
+          sx={{ flexGrow: 1, p: 3, mt: isMobile ? 8 : 0, order: { md: 1 } }}
+        >
+          {children}
+        </Box>
+        {isMobile ? (
+          <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
+            <Box sx={{ width: 250 }} role="navigation">
+              {sidebarContent}
+            </Box>
+          </Drawer>
+        ) : (
+          <Drawer variant="permanent" sx={{ width: 240, flexShrink: 0, order: { md: -1 } }}>
+            <Toolbar />
+            <Box role="navigation">{sidebarContent}</Box>
+          </Drawer>
+        )}
       </Box>
     </Box>
   );
