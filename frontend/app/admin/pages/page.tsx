@@ -10,6 +10,9 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import PreviewIcon from "@mui/icons-material/Preview";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import RichTextEditor from "@/components/RichTextEditor";
 
 interface Page {
   id: string;
@@ -20,8 +23,10 @@ interface Page {
   metaDescription?: string;
   metaKeywords?: string;
   parentId: string | null;
+  sortOrder: number;
   status: "draft" | "published";
   inMenu: boolean;
+  previewToken: string;
 }
 
 export default function AdminPages() {
@@ -35,6 +40,7 @@ export default function AdminPages() {
     parentId: "", status: "draft" as "draft" | "published", inMenu: false,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const fetchPages = useCallback(async () => {
     const res = await fetch("/api/pages");
@@ -43,16 +49,22 @@ export default function AdminPages() {
 
   useEffect(() => { fetchPages(); }, [fetchPages]);
 
-  const rootPages = pages.filter((p) => !p.parentId);
-
-  function renderTree(parentId: string | null, depth = 0): Page[] {
+  function getChildren(parentId: string | null): Page[] {
     return pages
       .filter((p) => p.parentId === parentId)
-      .sort((a, b) => a.slug.localeCompare(b.slug))
-      .flatMap((p) => [p, ...renderTree(p.id, depth + 1)]);
+      .sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
-  const treeItems = renderTree(null);
+  const rootPages = getChildren(null);
+
+  async function handleReorder(parentId: string | null, pageIds: string[]) {
+    await fetch("/api/pages/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentId, pageIds }),
+    });
+    fetchPages();
+  }
 
   function openCreate(parentId?: string) {
     setEditingPage(null);
@@ -113,21 +125,20 @@ export default function AdminPages() {
         <Button variant="contained" onClick={() => openCreate()}>New Page</Button>
       </Box>
       <Paper sx={{ p: 2 }}>
-        {treeItems.length === 0 ? (
+        {pages.length === 0 ? (
           <Typography color="text.secondary">No pages yet.</Typography>
         ) : (
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {rootPages.map((page) => (
-              <PageTreeItem
-                key={page.id}
-                page={page}
-                pages={pages}
-                depth={0}
-                onEdit={openEdit}
-                onDelete={setDeleteTarget}
-              />
-            ))}
-          </ul>
+          <PageTreeList
+            parentId={null}
+            pages={pages}
+            getChildren={getChildren}
+            onEdit={openEdit}
+            onDelete={setDeleteTarget}
+            onReorder={handleReorder}
+            dragOverId={dragOverId}
+            setDragOverId={setDragOverId}
+            depth={0}
+          />
         )}
       </Paper>
 
@@ -140,9 +151,12 @@ export default function AdminPages() {
           <TextField label="Slug" fullWidth margin="dense" value={formData.slug}
             onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
             error={!!formErrors.slug} helperText={formErrors.slug} required />
-          <TextField label="Content" fullWidth margin="dense" multiline rows={4} value={formData.content}
-            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-            error={!!formErrors.content} helperText={formErrors.content} required />
+          <RichTextEditor
+            value={formData.content}
+            onChange={(html) => setFormData({ ...formData, content: html })}
+            error={!!formErrors.content}
+            helperText={formErrors.content}
+          />
           <TextField label="Meta Title" fullWidth margin="dense" value={formData.metaTitle}
             onChange={(e) => setFormData({ ...formData, metaTitle: e.target.value })} />
           <TextField label="Meta Description" fullWidth margin="dense" value={formData.metaDescription}
@@ -178,6 +192,14 @@ export default function AdminPages() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setFormOpen(false)}>Cancel</Button>
+          {editingPage && (
+            <Button
+              startIcon={<PreviewIcon />}
+              onClick={() => window.open(`/preview/${editingPage.id}?token=${editingPage.previewToken}`, '_blank', 'noopener')}
+            >
+              Preview
+            </Button>
+          )}
           <Button onClick={handleSubmit} variant="contained">{editingPage ? "Save" : "Create"}</Button>
         </DialogActions>
       </Dialog>
@@ -196,38 +218,125 @@ export default function AdminPages() {
   );
 }
 
+function PageTreeList({
+  parentId, pages, getChildren, onEdit, onDelete, onReorder, dragOverId, setDragOverId, depth,
+}: {
+  parentId: string | null;
+  pages: Page[];
+  getChildren: (pid: string | null) => Page[];
+  onEdit: (p: Page) => void;
+  onDelete: (p: Page) => void;
+  onReorder: (pid: string | null, ids: string[]) => void;
+  dragOverId: string | null;
+  setDragOverId: (id: string | null) => void;
+  depth: number;
+}) {
+  const children = getChildren(parentId);
+  if (children.length === 0) return null;
+
+  return (
+    <ul style={{ listStyle: "none", padding: 0 }}>
+      {children.map((page) => (
+        <PageTreeItem
+          key={page.id}
+          page={page}
+          pages={pages}
+          getChildren={getChildren}
+          depth={depth}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onReorder={onReorder}
+          dragOverId={dragOverId}
+          setDragOverId={setDragOverId}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function buildViewUrl(p: Page, pages: Page[]): string {
+  const segments: string[] = [p.slug];
+  let current = p;
+  while (current.parentId) {
+    const parent = pages.find((pp) => pp.id === current.parentId);
+    if (!parent) break;
+    segments.unshift(parent.slug);
+    current = parent;
+  }
+  return "/pages/" + segments.join("/");
+}
+
 function PageTreeItem({
-  page, pages, depth, onEdit, onDelete,
+  page, pages, getChildren, depth, onEdit, onDelete, onReorder, dragOverId, setDragOverId,
 }: {
   page: Page;
   pages: Page[];
+  getChildren: (pid: string | null) => Page[];
   depth: number;
   onEdit: (p: Page) => void;
   onDelete: (p: Page) => void;
+  onReorder: (pid: string | null, ids: string[]) => void;
+  dragOverId: string | null;
+  setDragOverId: (id: string | null) => void;
 }) {
-  const children = pages.filter((p) => p.parentId === page.id);
+  const siblings = getChildren(page.parentId);
 
-  function buildViewUrl(p: Page): string {
-    const segments: string[] = [p.slug];
-    let current = p;
-    while (current.parentId) {
-      const parent = pages.find((pp) => pp.id === current.parentId);
-      if (!parent) break;
-      segments.unshift(parent.slug);
-      current = parent;
-    }
-    return "/pages/" + segments.join("/");
+  function handleDragStart(e: React.DragEvent) {
+    e.dataTransfer.setData("text/plain", page.id);
+    e.dataTransfer.effectAllowed = "move";
   }
 
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverId(page.id);
+  }
+
+  function handleDragLeave() {
+    setDragOverId(null);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOverId(null);
+    const draggedId = e.dataTransfer.getData("text/plain");
+    if (draggedId === page.id) return;
+    const draggedPage = pages.find((p) => p.id === draggedId);
+    if (!draggedPage) return;
+
+    const reordered = siblings.filter((p) => p.id !== draggedId);
+    const dropIndex = reordered.findIndex((p) => p.id === page.id);
+    reordered.splice(dropIndex, 0, draggedPage);
+
+    onReorder(page.parentId, reordered.map((p) => p.id));
+  }
+
+  const isDragOver = dragOverId === page.id;
+
   return (
-    <li style={{ marginLeft: depth * 24 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+    <li>
+      <Box
+        draggable
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        sx={{
+          display: "flex", alignItems: "center", gap: 1, py: 0.5, pl: depth * 24,
+          bgcolor: isDragOver ? "action.hover" : "transparent",
+          borderTop: isDragOver ? 2 : 0,
+          borderColor: "primary.main",
+          cursor: "grab",
+          "&:active": { cursor: "grabbing" },
+        }}
+      >
+        <DragIndicatorIcon fontSize="small" color="disabled" sx={{ cursor: "grab" }} />
         <Typography sx={{ flexGrow: 1 }}>{page.title}</Typography>
         <IconButton
           size="small"
-          onClick={() => window.open(buildViewUrl(page), '_blank', 'noopener')}
+          onClick={() => window.open(buildViewUrl(page, pages), '_blank', 'noopener')}
           aria-label="view"
-          data-href={buildViewUrl(page)}
+          data-href={buildViewUrl(page, pages)}
         >
           <OpenInNewIcon fontSize="small" />
         </IconButton>
@@ -238,13 +347,17 @@ function PageTreeItem({
           <DeleteIcon fontSize="small" />
         </IconButton>
       </Box>
-      {children.length > 0 && (
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {children.map((child) => (
-            <PageTreeItem key={child.id} page={child} pages={pages} depth={depth + 1} onEdit={onEdit} onDelete={onDelete} />
-          ))}
-        </ul>
-      )}
+      <PageTreeList
+        parentId={page.id}
+        pages={pages}
+        getChildren={getChildren}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onReorder={onReorder}
+        dragOverId={dragOverId}
+        setDragOverId={setDragOverId}
+        depth={depth + 1}
+      />
     </li>
   );
 }

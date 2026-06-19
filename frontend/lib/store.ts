@@ -23,6 +23,7 @@ export interface Page {
   sortOrder: number;
   status: "draft" | "published";
   inMenu: boolean;
+  previewToken: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,6 +34,15 @@ export interface Message {
   content: string;
   createdAt: string;
   readBy: string[];
+}
+
+export interface MediaItem {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  data: string;
+  createdAt: string;
 }
 
 function hashPassword(password: string): string {
@@ -56,6 +66,7 @@ class InMemoryStore {
   private users = new Map<string, User>();
   private pages = new Map<string, Page>();
   private messages = new Map<string, Message>();
+  private medias = new Map<string, MediaItem>();
 
   // --- Users ---
 
@@ -170,6 +181,7 @@ class InMemoryStore {
       sortOrder: 0,
       status: data.status ?? (data.published ? "published" : "draft"),
       inMenu: data.inMenu ?? false,
+      previewToken: crypto.randomUUID(),
       createdAt: now,
       updatedAt: now,
     };
@@ -188,6 +200,7 @@ class InMemoryStore {
       ...data,
       status: data.status ?? (data.published !== undefined ? (data.published ? "published" : "draft") : page.status),
       inMenu: data.inMenu ?? page.inMenu,
+      previewToken: page.previewToken,
       updatedAt: new Date().toISOString(),
     };
     this.pages.set(id, updated);
@@ -210,6 +223,16 @@ class InMemoryStore {
       parentId = page.id;
     }
     return parentId ? this.getPage(parentId!) : undefined;
+  }
+
+  reorderPages(parentId: string | null, pageIds: string[]): void {
+    for (let i = 0; i < pageIds.length; i++) {
+      const page = this.pages.get(pageIds[i]);
+      if (page && page.parentId === parentId) {
+        page.sortOrder = i;
+        page.updatedAt = new Date().toISOString();
+      }
+    }
   }
 
   // --- Messages ---
@@ -255,6 +278,31 @@ class InMemoryStore {
         msg.readBy.push(userId);
       }
     }
+  }
+
+  // --- Media ---
+
+  getMedia(): MediaItem[] {
+    return Array.from(this.medias.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  createMedia(data: {
+    filename: string;
+    mimeType: string;
+    size: number;
+    data: string;
+  }): MediaItem {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const item: MediaItem = { id, ...data, createdAt: now };
+    this.medias.set(id, item);
+    return item;
+  }
+
+  deleteMedia(id: string): boolean {
+    return this.medias.delete(id);
   }
 
   // --- Dashboard Stats ---

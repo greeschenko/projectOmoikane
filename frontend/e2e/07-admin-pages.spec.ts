@@ -138,4 +138,74 @@ test.describe("Admin Pages", () => {
       await expect(page.locator("main ul")).toContainText(title?.trim() ?? "");
     });
   });
+
+  test.describe("Rich text editor", () => {
+    test("content editor has formatting toolbar with Bold, Italic, and Insert Image buttons", async ({ page }) => {
+      await page.goto("/admin/pages");
+      await page.getByRole("button", { name: /new page|add page|create page/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await expect(page.getByRole("button", { name: /bold|format_bold/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /italic|format_italic/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /insert image|image/i })).toBeVisible();
+    });
+  });
+
+  test.describe("Page preview", () => {
+    test("edit dialog has Preview button", async ({ page }) => {
+      await page.goto("/admin/pages");
+      const firstItem = page.locator("main li").first();
+      await firstItem.getByRole("button", { name: /edit|pencil/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await expect(page.getByRole("button", { name: /preview/i })).toBeVisible();
+    });
+
+    test("Preview opens page content in new tab", async ({ page }) => {
+      await page.goto("/admin/pages");
+      const firstItem = page.locator("main li").first();
+      const title = await firstItem.textContent();
+      await firstItem.getByRole("button", { name: /edit|pencil/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+
+      const [newPage] = await Promise.all([
+        page.waitForEvent("popup"),
+        page.getByRole("button", { name: /preview/i }).click(),
+      ]);
+      await newPage.waitForLoadState();
+      await expect(newPage.getByText(title?.trim() ?? "")).toBeVisible();
+      await newPage.close();
+    });
+  });
+
+  test.describe("Page reordering", () => {
+    test("page tree items have drag handles", async ({ page }) => {
+      await page.goto("/admin/pages");
+      await expect(page.locator("main ul").first()).toBeVisible();
+      const dragIcons = page.locator("main [data-testid='DragIndicatorIcon']");
+      expect(await dragIcons.count()).toBeGreaterThanOrEqual(1);
+    });
+
+    test("reorder API updates sort order", async ({ page }) => {
+      const res1 = await page.request.post("/api/pages", {
+        data: { title: "Reorder A", slug: "reorder-a", content: "A" },
+      });
+      const pageA = await res1.json();
+      const res2 = await page.request.post("/api/pages", {
+        data: { title: "Reorder B", slug: "reorder-b", content: "B" },
+      });
+      const pageB = await res2.json();
+
+      const reorderRes = await page.request.put("/api/pages/reorder", {
+        data: { parentId: null, pageIds: [pageB.id, pageA.id] },
+      });
+      expect(reorderRes.ok()).toBeTruthy();
+
+      const pagesRes = await page.request.get("/api/pages");
+      const allPages: any[] = await pagesRes.json();
+      const reordered = allPages
+        .filter((p: any) => p.id === pageA.id || p.id === pageB.id)
+        .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+      expect(reordered[0].id).toBe(pageB.id);
+      expect(reordered[1].id).toBe(pageA.id);
+    });
+  });
 });
