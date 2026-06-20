@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Omoikane — Frontend
 
-## Getting Started
+Next.js 16 App Router CMS frontend.
 
-First, run the development server:
+## Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+app/
+  (withHeader)/    Public pages (home, pages, preview, settings)
+  admin/           Admin panel (dashboard, users, pages, media, messages, settings)
+  api/             API routes (auth, pages, media, messages, users, settings, setup)
+  layout.tsx       Root layout (MUI ThemeRegistry, OG/Twitter metadata)
+  sitemap.ts       /sitemap.xml generation
+  robots.ts        /robots.txt generation
+components/        Shared React components
+lib/
+  store.ts         InMemoryStore (singleton on globalThis)
+  auth.ts          Session management (cookie-based)
+e2e/               Playwright tests (20 spec files, 171 test items)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Testing
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# From repo root (restarts Docker, waits for health, runs tests):
+make test
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Run a single file (from this directory):
+PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test \
+  --config=e2e/playwright.config.ts --project=desktop e2e/20-structured-data.spec.ts
+```
 
-## Learn More
+## Key Conventions
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **In-memory store** — data lives on `globalThis.__omoikane_store__`, lost on restart
+- **Docker node_modules** — anonymous volume; install new packages via `docker exec`
+- **Auth** — session cookie set by `/api/auth/login`, checked via `getSession()` server-side
+- **Settings** — `SiteSettings` object with siteName, tagline, logo, favicon; fetched by branding components
+- **Profile** — User object with name, email, avatar (base64); edited via `/settings`

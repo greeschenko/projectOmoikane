@@ -17,6 +17,7 @@ const navItems = [
   { label: "Pages", href: "/admin/pages" },
   { label: "Messages", href: "/admin/messages" },
   { label: "Media", href: "/admin/media" },
+  { label: "Settings", href: "/admin/settings" },
 ];
 
 export default function AdminLayout({

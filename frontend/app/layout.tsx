@@ -5,6 +5,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Omoikane",
   description: "Project Omoikane",
+  openGraph: {
+    title: "Omoikane",
+    description: "Project Omoikane",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Omoikane",
+    description: "Project Omoikane",
+  },
 };
 
 export default function RootLayout({

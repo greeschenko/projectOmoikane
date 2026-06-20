@@ -21,7 +21,7 @@ test.describe("Password change", () => {
     await page.getByLabel(/^Current Password\b/).fill("WrongPassword123!");
     await page.getByLabel(/^New Password\b/).fill("NewPass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("NewPass123!");
-    await page.getByRole("button", { name: /change|update|save/i }).click();
+    await page.getByRole("button", { name: /^change password$/i }).click();
     await expect(page.getByText(/current password.*(incorrect|wrong|invalid|not match)/i)).toBeVisible();
   });
 
@@ -31,7 +31,7 @@ test.describe("Password change", () => {
     await page.getByLabel(/^Current Password\b/).fill("SecurePass123!");
     await page.getByLabel(/^New Password\b/).fill("NewPass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("DifferentPass1!");
-    await page.getByRole("button", { name: /change|update|save/i }).click();
+    await page.getByRole("button", { name: /^change password$/i }).click();
     await expect(page.getByText(/passwords? do not match|passwords? must match/i)).toBeVisible();
   });
 
@@ -41,12 +41,12 @@ test.describe("Password change", () => {
     await page.getByLabel(/^Current Password\b/).fill("SecurePass123!");
     await page.getByLabel(/^New Password\b/).fill("NewPass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("NewPass123!");
-    await page.getByRole("button", { name: /change|update|save/i }).click();
+    await page.getByRole("button", { name: /^change password$/i }).click();
     await expect(page.getByText(/password.*(changed|updated|success)/i)).toBeVisible();
     await page.getByLabel(/^Current Password\b/).fill("NewPass123!");
     await page.getByLabel(/^New Password\b/).fill("SecurePass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("SecurePass123!");
-    await page.getByRole("button", { name: /change|update|save/i }).click();
+    await page.getByRole("button", { name: /^change password$/i }).click();
     await expect(page.getByText(/password.*(changed|updated|success)/i)).toBeVisible();
   });
 
@@ -56,7 +56,7 @@ test.describe("Password change", () => {
     await page.getByLabel(/^Current Password\b/).fill("SecurePass123!");
     await page.getByLabel(/^New Password\b/).fill("NewPass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("NewPass123!");
-    await page.getByRole("button", { name: /change|update|save/i }).click();
+    await page.getByRole("button", { name: /^change password$/i }).click();
     await expect(page.getByText(/password.*(changed|updated|success)/i)).toBeVisible();
 
     await page.context().clearCookies();

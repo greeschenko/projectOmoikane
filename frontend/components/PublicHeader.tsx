@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   AppBar, Toolbar, Typography, Button,
@@ -15,6 +15,27 @@ export default function PublicHeader({
   session: { userId: string; role: string } | null;
 }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [siteName, setSiteName] = useState("Omoikane");
+  const [logo, setLogo] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.siteName) setSiteName(data.siteName);
+        if (data.logo) setLogo(data.logo);
+      })
+      .catch(() => {});
+    if (session) {
+      fetch("/api/settings/profile")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.avatar) setAvatarUrl(data.avatar);
+        })
+        .catch(() => {});
+    }
+  }, [session]);
 
   async function handleLogout() {
     setAnchorEl(null);
@@ -25,9 +46,10 @@ export default function PublicHeader({
   return (
     <AppBar position="static" sx={{ bgcolor: "background.paper", color: "text.primary" }} aria-label="Public header">
       <Toolbar>
-        <Typography variant="h6" sx={{ flexShrink: 0, mr: 2 }}>
+        <Typography variant="h6" sx={{ flexShrink: 0, mr: 2, display: "flex", alignItems: "center", gap: 1 }}>
+          {logo && <Box component="img" src={logo} alt="" sx={{ height: 32, width: "auto" }} />}
           <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>
-            Omoikane
+            {siteName}
           </Link>
         </Typography>
         <MainMenu />
@@ -40,7 +62,10 @@ export default function PublicHeader({
               onClick={(e) => setAnchorEl(e.currentTarget)}
               aria-label="user menu"
             >
-              <Avatar sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}>
+              <Avatar
+                src={avatarUrl || undefined}
+                sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}
+              >
                 {session.role[0].toUpperCase()}
               </Avatar>
             </IconButton>

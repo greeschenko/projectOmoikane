@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   AppBar, Toolbar, Typography, IconButton, Avatar,
@@ -14,6 +14,23 @@ export default function AdminAppBar({
   session: { userId: string; role: string };
 }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [siteName, setSiteName] = useState("Omoikane");
+  const [avatarUrl, setAvatarUrl] = useState("");
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.siteName) setSiteName(data.siteName);
+      })
+      .catch(() => {});
+    fetch("/api/settings/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.avatar) setAvatarUrl(data.avatar);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleLogout() {
     setAnchorEl(null);
@@ -25,7 +42,7 @@ export default function AdminAppBar({
     <AppBar position="sticky" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }} aria-label="Admin header">
       <Toolbar>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          Omoikane Admin
+          {siteName} Admin
         </Typography>
         <MessageWidget sessionUserId={session.userId} />
         <IconButton
@@ -33,7 +50,10 @@ export default function AdminAppBar({
           onClick={(e) => setAnchorEl(e.currentTarget)}
           aria-label="account"
         >
-          <Avatar sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}>
+          <Avatar
+            src={avatarUrl || undefined}
+            sx={{ width: 32, height: 32, bgcolor: "secondary.main" }}
+          >
             {session.role[0].toUpperCase()}
           </Avatar>
         </IconButton>

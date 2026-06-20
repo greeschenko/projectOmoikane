@@ -7,6 +7,7 @@ export interface User {
   password: string;
   role: "admin" | "user";
   status: "active" | "banned";
+  avatar?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +35,13 @@ export interface Message {
   content: string;
   createdAt: string;
   readBy: string[];
+}
+
+export interface SiteSettings {
+  siteName: string;
+  tagline: string;
+  logo: string;
+  favicon: string;
 }
 
 export interface MediaItem {
@@ -67,6 +75,12 @@ class InMemoryStore {
   private pages = new Map<string, Page>();
   private messages = new Map<string, Message>();
   private medias = new Map<string, MediaItem>();
+  private settings: SiteSettings = {
+    siteName: "Omoikane",
+    tagline: "A modern CMS",
+    logo: "",
+    favicon: "",
+  };
 
   // --- Users ---
 
@@ -303,6 +317,17 @@ class InMemoryStore {
 
   deleteMedia(id: string): boolean {
     return this.medias.delete(id);
+  }
+
+  // --- Site Settings ---
+
+  getSettings(): SiteSettings {
+    return { ...this.settings };
+  }
+
+  updateSettings(data: Partial<SiteSettings>): SiteSettings {
+    this.settings = { ...this.settings, ...data };
+    return { ...this.settings };
   }
 
   // --- Dashboard Stats ---
