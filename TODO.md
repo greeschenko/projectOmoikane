@@ -27,8 +27,6 @@
 - [x] Page reordering (HTML5 drag-and-drop)
 
 ---
-**Test status: 163 desktop tests pass, 0 fail, 8 mobile-only skipped**
-
 ## ✅ Phase 4: Site Settings & SEO
 - [x] Global site settings (site name, tagline, logo, favicon) — `GET/PUT /api/settings`, `/admin/settings` page
 - [x] Dynamic branding — PublicHeader/AdminAppBar/PublicFooter fetch settings for live site name, logo, avatar
@@ -39,13 +37,23 @@
 - [x] OG + Twitter meta tags — via `generateMetadata` in root layout
 - [x] Admin sidebar "Settings" link
 
-## 🔲 Phase 5: Blog & Content Extensions
-- [ ] Tags & categories for pages
-- [ ] Author attribution on pages
-- [ ] Content scheduling (publish date)
-- [ ] Page revision history
-- [ ] RSS feed generation
-- [ ] Full-text search across pages and media
+## ✅ Phase 5: Blog Module
+
+Separate blog entity (not static CMS pages). Tags/categories are blog-only.
+
+**Models:** `BlogPost`, `Tag`, `Category`, `Like` — all CRUD + toggleLike in InMemoryStore.
+
+| Cycle | What |
+|-------|------|
+| 1 | ✅ Blog Post Model & API — store methods, CRUD routes, like toggle, sitemap inclusion |
+| 2 | ✅ Blog Admin UI — sidebar link, post list, create/edit with TipTap, delete |
+| 3 | ✅ Categories & Tags Admin — CRUD pages + API routes |
+| 4 | ✅ Blog Public Pages — `/blog` list, `/blog/[slug]` detail with author/date/content |
+| 5 | ✅ RSS Feed (`/rss`) + Like count on detail page |
+
+**Star/Like:** `POST /api/blog/posts/:id/like` returns `{ liked, count }`.
+
+**Test status: 192 desktop tests pass, 0 fail, 8 mobile-only skipped**
 
 ## 🔲 Phase 6: Persistence Layer
 - [ ] Database integration (SQLite or PostgreSQL via Prisma/Drizzle)

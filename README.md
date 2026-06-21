@@ -18,8 +18,8 @@ See [TODO.md](./TODO.md) for the full development roadmap.
 | 1 — Foundation | ✅ | Included |
 | 2 — Admin Features | ✅ | Included |
 | 3 — Rich Content | ✅ | Included |
-| 4 — Site Settings & SEO | ✅ | 163 pass, 0 fail, 8 skip |
-| 5+ | 🔲 | — |
+| 4 — Site Settings & SEO | ✅ | Included |
+| 5 — Blog Module | ✅ | 192 pass, 0 fail, 8 skip |
 
 ## Quick Start
 

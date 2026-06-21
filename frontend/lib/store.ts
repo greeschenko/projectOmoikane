@@ -53,6 +53,41 @@ export interface MediaItem {
   createdAt: string;
 }
 
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string;
+  authorId: string;
+  status: "draft" | "published";
+  publishDate: string;
+  featuredImage: string;
+  tags: string[];
+  categoryId: string | null;
+  likeCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+}
+
+export interface Like {
+  blogPostId: string;
+  userId: string;
+}
+
 function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
@@ -75,6 +110,10 @@ class InMemoryStore {
   private pages = new Map<string, Page>();
   private messages = new Map<string, Message>();
   private medias = new Map<string, MediaItem>();
+  private blogPosts = new Map<string, BlogPost>();
+  private tags = new Map<string, Tag>();
+  private categories = new Map<string, Category>();
+  private likes = new Map<string, Like>();
   private settings: SiteSettings = {
     siteName: "Omoikane",
     tagline: "A modern CMS",
@@ -317,6 +356,166 @@ class InMemoryStore {
 
   deleteMedia(id: string): boolean {
     return this.medias.delete(id);
+  }
+
+  // --- Blog Posts ---
+
+  getBlogPosts(): BlogPost[] {
+    return Array.from(this.blogPosts.values());
+  }
+
+  getBlogPost(id: string): BlogPost | undefined {
+    return this.blogPosts.get(id);
+  }
+
+  getBlogPostBySlug(slug: string): BlogPost | undefined {
+    for (const post of this.blogPosts.values()) {
+      if (post.slug === slug) return post;
+    }
+    return undefined;
+  }
+
+  createBlogPost(data: {
+    title: string;
+    slug: string;
+    content: string;
+    excerpt?: string;
+    authorId: string;
+    status?: "draft" | "published";
+    featuredImage?: string;
+    tags?: string[];
+    categoryId?: string | null;
+  }): BlogPost {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const post: BlogPost = {
+      id,
+      title: data.title,
+      slug: data.slug,
+      content: data.content,
+      excerpt: data.excerpt ?? "",
+      authorId: data.authorId,
+      status: data.status ?? "draft",
+      publishDate: data.status === "published" ? now : "",
+      featuredImage: data.featuredImage ?? "",
+      tags: data.tags ?? [],
+      categoryId: data.categoryId ?? null,
+      likeCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.blogPosts.set(id, post);
+    return post;
+  }
+
+  updateBlogPost(
+    id: string,
+    data: Partial<Omit<BlogPost, "id" | "createdAt" | "likeCount">>
+  ): BlogPost | undefined {
+    const post = this.blogPosts.get(id);
+    if (!post) return undefined;
+    const updated: BlogPost = {
+      ...post,
+      ...data,
+      updatedAt: new Date().toISOString(),
+      publishDate:
+        data.status === "published" && !post.publishDate
+          ? new Date().toISOString()
+          : post.publishDate,
+    };
+    this.blogPosts.set(id, updated);
+    return updated;
+  }
+
+  deleteBlogPost(id: string): boolean {
+    // Clean up likes for this post
+    for (const [key, like] of this.likes) {
+      if (like.blogPostId === id) this.likes.delete(key);
+    }
+    return this.blogPosts.delete(id);
+  }
+
+  toggleLike(blogPostId: string, userId: string): { liked: boolean; count: number } {
+    const key = `${blogPostId}_${userId}`;
+    const post = this.blogPosts.get(blogPostId);
+    if (!post) return { liked: false, count: 0 };
+
+    if (this.likes.has(key)) {
+      this.likes.delete(key);
+      post.likeCount = Math.max(0, post.likeCount - 1);
+      this.blogPosts.set(blogPostId, post);
+      return { liked: false, count: post.likeCount };
+    }
+    this.likes.set(key, { blogPostId, userId });
+    post.likeCount += 1;
+    this.blogPosts.set(blogPostId, post);
+    return { liked: true, count: post.likeCount };
+  }
+
+  getLikedPostIds(userId: string): string[] {
+    const ids: string[] = [];
+    for (const like of this.likes.values()) {
+      if (like.userId === userId) ids.push(like.blogPostId);
+    }
+    return ids;
+  }
+
+  // --- Tags ---
+
+  getTags(): Tag[] {
+    return Array.from(this.tags.values());
+  }
+
+  getTag(id: string): Tag | undefined {
+    return this.tags.get(id);
+  }
+
+  createTag(name: string, slug: string): Tag {
+    const id = crypto.randomUUID();
+    const tag: Tag = { id, name, slug };
+    this.tags.set(id, tag);
+    return tag;
+  }
+
+  updateTag(id: string, data: Partial<Omit<Tag, "id">>): Tag | undefined {
+    const tag = this.tags.get(id);
+    if (!tag) return undefined;
+    const updated: Tag = { ...tag, ...data };
+    this.tags.set(id, updated);
+    return updated;
+  }
+
+  deleteTag(id: string): boolean {
+    return this.tags.delete(id);
+  }
+
+  // --- Categories ---
+
+  getCategories(): Category[] {
+    return Array.from(this.categories.values());
+  }
+
+  getCategory(id: string): Category | undefined {
+    return this.categories.get(id);
+  }
+
+  createCategory(name: string, slug: string, description = ""): Category {
+    const id = crypto.randomUUID();
+    const cat: Category = { id, name, slug, description };
+    this.categories.set(id, cat);
+    return cat;
+  }
+
+  updateCategory(id: string, data: Partial<Omit<Category, "id">>): Category | undefined {
+    const cat = this.categories.get(id);
+    if (!cat) return undefined;
+    const updated: Category = { ...cat, ...data };
+    this.categories.set(id, updated);
+    return updated;
+  }
+
+  deleteCategory(id: string): boolean {
+    return this.categories.delete(id);
   }
 
   // --- Site Settings ---

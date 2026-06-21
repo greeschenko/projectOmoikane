@@ -1,13 +1,15 @@
 .PHONY: up down reset test
 
 up:
-	docker compose -f docker/docker-compose.yml up -d
+	docker compose -f docker/docker-compose.yml up -d --remove-orphans
+	docker exec docker-frontend-1 npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-image 2>/dev/null || true
 
 down:
-	docker compose -f docker/docker-compose.yml down
+	docker compose -f docker/docker-compose.yml down --remove-orphans
 
 reset:
 	docker compose -f docker/docker-compose.yml restart frontend
+	docker exec docker-frontend-1 npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-image 2>/dev/null || true
 
 test:
 	docker compose -f docker/docker-compose.yml restart frontend
