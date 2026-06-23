@@ -5,7 +5,7 @@ import {
   Container, Typography, Button, TextField, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, FormControlLabel, Switch, Select, MenuItem, InputLabel, FormControl, Alert,
-  IconButton,
+  IconButton, CircularProgress,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -31,6 +31,7 @@ interface Page {
 
 export default function AdminPages() {
   const [pages, setPages] = useState<Page[]>([]);
+  const [pagesLoading, setPagesLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Page | null>(null);
@@ -43,8 +44,10 @@ export default function AdminPages() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const fetchPages = useCallback(async () => {
+    setPagesLoading(true);
     const res = await fetch("/api/pages");
     if (res.ok) setPages(await res.json());
+    setPagesLoading(false);
   }, []);
 
   useEffect(() => { fetchPages(); }, [fetchPages]);
@@ -125,7 +128,11 @@ export default function AdminPages() {
         <Button variant="contained" onClick={() => openCreate()}>New Page</Button>
       </Box>
       <Paper sx={{ p: 2 }}>
-        {pages.length === 0 ? (
+        {pagesLoading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : pages.length === 0 ? (
           <Typography color="text.secondary">No pages yet.</Typography>
         ) : (
           <PageTreeList

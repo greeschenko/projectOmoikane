@@ -45,9 +45,9 @@ export default async function PublicPage({
   const parents = breadcrumbs.slice(0, -1);
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container maxWidth="md" sx={{ my: 4 }}>
       {parents.length > 0 && (
-        <Breadcrumbs sx={{ mb: 2 }}>
+        <Breadcrumbs sx={{ mb: 1 }}>
           {parents.map((p, i) => (
             <Link
               key={i}
@@ -62,9 +62,13 @@ export default async function PublicPage({
       <Typography variant="h4" component="h1" gutterBottom>
         {page.title}
       </Typography>
-      <Typography variant="body1" component="main">
-        {page.content}
-      </Typography>
+      <Box
+        sx={{
+          "& img": { maxWidth: "100%", height: "auto" },
+          "& p": { mb: 1 },
+        }}
+        dangerouslySetInnerHTML={{ __html: page.content }}
+      />
     </Container>
   );
 }

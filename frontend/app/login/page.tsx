@@ -42,7 +42,8 @@ export default function LoginPage() {
       setError(data.error || "Invalid credentials");
       return;
     }
-    router.push("/admin");
+    const data = await res.json();
+    router.push(data.role === "admin" ? "/admin" : "/");
   }
 
   return (

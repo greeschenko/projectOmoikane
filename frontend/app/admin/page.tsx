@@ -1,14 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Container, Typography, Box, Paper, Grid } from "@mui/material";
+import { Container, Typography, Box, Paper, Grid, List, ListItem, ListItemText } from "@mui/material";
 import PeopleIcon from "@mui/icons-material/People";
 import ArticleIcon from "@mui/icons-material/Article";
+import BookIcon from "@mui/icons-material/Book";
+import ImageIcon from "@mui/icons-material/Image";
+import MessageIcon from "@mui/icons-material/Message";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<{
     userCount: number;
     pageCount: number;
+    blogCount: number;
+    mediaCount: number;
+    recentMessages: { id: string; title: string; createdAt: string }[];
     recentRegistrations: { date: string; count: number }[];
   } | null>(null);
 
@@ -29,7 +35,7 @@ export default function AdminDashboard() {
         Dashboard
       </Typography>
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, sm: 6 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, display: "flex", alignItems: "center", gap: 2 }}>
             <PeopleIcon color="primary" sx={{ fontSize: 48 }} />
             <Box>
@@ -38,12 +44,30 @@ export default function AdminDashboard() {
             </Box>
           </Paper>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, display: "flex", alignItems: "center", gap: 2 }}>
             <ArticleIcon color="primary" sx={{ fontSize: 48 }} />
             <Box>
               <Typography variant="h3">{stats?.pageCount ?? "—"}</Typography>
               <Typography color="text.secondary">Pages</Typography>
+            </Box>
+          </Paper>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Paper sx={{ p: 3, display: "flex", alignItems: "center", gap: 2 }}>
+            <BookIcon color="primary" sx={{ fontSize: 48 }} />
+            <Box>
+              <Typography variant="h3">{stats?.blogCount ?? "—"}</Typography>
+              <Typography color="text.secondary">Blog Posts</Typography>
+            </Box>
+          </Paper>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Paper sx={{ p: 3, display: "flex", alignItems: "center", gap: 2 }}>
+            <ImageIcon color="primary" sx={{ fontSize: 48 }} />
+            <Box>
+              <Typography variant="h3">{stats?.mediaCount ?? "—"}</Typography>
+              <Typography color="text.secondary">Media</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -87,6 +111,29 @@ export default function AdminDashboard() {
           </Box>
         ) : (
           <Typography color="text.secondary">Loading...</Typography>
+        )}
+      </Paper>
+
+      <Typography variant="h5" gutterBottom>
+        Recent Messages
+      </Typography>
+      <Paper sx={{ p: 2, mb: 4 }}>
+        {stats?.recentMessages && stats.recentMessages.length > 0 ? (
+          <List dense>
+            {stats.recentMessages.map((msg) => (
+              <ListItem key={msg.id}>
+                <MessageIcon sx={{ mr: 2, color: "text.secondary" }} />
+                <ListItemText
+                  primary={msg.title}
+                  secondary={new Date(msg.createdAt).toLocaleDateString()}
+                />
+              </ListItem>
+            ))}
+          </List>
+        ) : (
+          <Typography color="text.secondary" sx={{ p: 2 }}>
+            No messages yet.
+          </Typography>
         )}
       </Paper>
     </Container>

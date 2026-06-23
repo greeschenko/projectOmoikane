@@ -33,7 +33,7 @@ export default function RichTextEditor({ value, onChange, error, helperText }: R
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Image.configure({ inline: true }),
+      Image.configure({ inline: true, allowBase64: true }),
     ],
     content: value,
     editorProps: {

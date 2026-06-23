@@ -548,9 +548,17 @@ class InMemoryStore {
         registrationsByDay[key]++;
       }
     }
+    const messagesArray = Array.from(this.messages.values());
+    const recentMessages = messagesArray
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+      .map((m) => ({ id: m.id, title: m.title, createdAt: m.createdAt }));
     return {
       userCount: this.users.size,
       pageCount: this.pages.size,
+      blogCount: this.blogPosts.size,
+      mediaCount: this.medias.size,
+      recentMessages,
       recentRegistrations: Object.entries(registrationsByDay)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, count]) => ({ date, count })),

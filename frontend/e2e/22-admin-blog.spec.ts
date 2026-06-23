@@ -10,6 +10,11 @@ test.describe("Admin Blog", () => {
   test("blog page shows empty state", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/admin/blog");
+    const existingPosts = await (await page.request.get("/api/blog/posts")).json();
+    for (const post of existingPosts) {
+      await page.request.delete(`/api/blog/posts/${post.id}`);
+    }
+    await page.reload();
     await expect(page).toHaveURL(/\/admin\/blog/);
     await expect(page.getByText(/no blog posts|create your first/i)).toBeVisible();
   });

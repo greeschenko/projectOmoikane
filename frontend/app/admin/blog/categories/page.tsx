@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Container, Typography, Button, TextField, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Alert, IconButton,
+  Box, Alert, IconButton, CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -18,14 +18,17 @@ interface Category {
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", slug: "", description: "" });
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchCategories = useCallback(async () => {
+    setLoading(true);
     const res = await fetch("/api/blog/categories");
     if (res.ok) setCategories(await res.json());
+    setLoading(false);
   }, []);
 
   useEffect(() => { fetchCategories(); }, [fetchCategories]);
@@ -81,7 +84,11 @@ export default function AdminCategories() {
         </Alert>
       )}
 
-      {categories.length === 0 ? (
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : categories.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: "center" }}>
           <Typography color="text.secondary">No categories yet. Create your first category!</Typography>
         </Paper>

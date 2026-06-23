@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Container, Typography, Button, TextField, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Alert, IconButton,
+  Box, Alert, IconButton, CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -17,14 +17,17 @@ interface Tag {
 
 export default function AdminTags() {
   const [tags, setTags] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", slug: "" });
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null);
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchTags = useCallback(async () => {
+    setLoading(true);
     const res = await fetch("/api/blog/tags");
     if (res.ok) setTags(await res.json());
+    setLoading(false);
   }, []);
 
   useEffect(() => { fetchTags(); }, [fetchTags]);
@@ -76,7 +79,11 @@ export default function AdminTags() {
         </Alert>
       )}
 
-      {tags.length === 0 ? (
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : tags.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: "center" }}>
           <Typography color="text.secondary">No tags yet. Create your first tag!</Typography>
         </Paper>

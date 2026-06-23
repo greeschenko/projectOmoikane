@@ -47,6 +47,12 @@ export default function AdminMediaPage() {
     setSelectedFile(file);
     setError("");
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        setError("File too large (max 10MB)");
+        setSelectedFile(null);
+        setPreview(null);
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => setPreview(reader.result as string);
       reader.readAsDataURL(file);

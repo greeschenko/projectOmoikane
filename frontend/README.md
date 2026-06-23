@@ -16,7 +16,7 @@ components/        Shared React components
 lib/
   store.ts         InMemoryStore (singleton on globalThis)
   auth.ts          Session management (cookie-based)
-e2e/               Playwright tests (20 spec files, 171 test items)
+e2e/               Playwright tests (26 spec files, 199 test items)
 ```
 
 ## Testing

@@ -34,18 +34,21 @@ export default async function PreviewPage({
   if (!page || page.previewToken !== token) notFound();
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container maxWidth="md" sx={{ my: 4 }}>
       <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
         <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
           {page.title}
         </Typography>
         <Chip label={page.status === "draft" ? "Draft" : "Published"} size="small" color={page.status === "draft" ? "default" : "success"} />
       </Box>
-      <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2 }}>
-        <Typography variant="body1" component="main">
-          {page.content}
-        </Typography>
-      </Box>
+      <Box
+        sx={{
+          borderTop: 1, borderColor: "divider", pt: 2,
+          "& img": { maxWidth: "100%", height: "auto" },
+          "& p": { mb: 1 },
+        }}
+        dangerouslySetInnerHTML={{ __html: page.content }}
+      />
     </Container>
   );
 }

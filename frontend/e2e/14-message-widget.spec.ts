@@ -28,8 +28,9 @@ test.describe("Message Widget", () => {
     });
     await page.goto("/admin");
     await page.getByLabel(/notifications/i).click();
-    await expect(page.getByRole("menu")).toBeVisible();
-    await expect(page.getByText(/system update/i)).toBeVisible();
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText(/system update/i)).toBeVisible();
   });
 
   test("unread count decreases after marking all as read", async ({ page }) => {
@@ -54,7 +55,8 @@ test.describe("Message Widget", () => {
     });
     await page.goto("/admin");
     await page.getByLabel(/notifications/i).click();
-    await expect(page.getByRole("button", { name: /mark all as read/i })).toBeVisible();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await expect(page.getByRole("menu").getByRole("button", { name: /mark all as read/i })).toBeVisible();
   });
 
   test("new system message creates notification", async ({ page }) => {
@@ -63,7 +65,8 @@ test.describe("Message Widget", () => {
     });
     await page.goto("/admin");
     await page.getByLabel(/notifications/i).click();
-    await expect(page.getByText(/new user registered/i)).toBeVisible();
+    const menu = page.getByRole("menu");
+    await expect(menu.getByText(/new user registered/i)).toBeVisible();
   });
 
   test("message bell is accessible from public header when logged in", async ({ page }) => {
