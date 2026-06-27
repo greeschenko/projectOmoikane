@@ -11,7 +11,7 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
-  return NextResponse.json({ name: user.name, email: user.email, avatar: user.avatar });
+  return NextResponse.json({ id: user.id, role: user.role, name: user.name, email: user.email, avatar: user.avatar });
 }
 
 export async function PUT(request: Request) {

@@ -14,6 +14,7 @@ interface MenuPage {
 
 export default function MainMenu() {
   const [pages, setPages] = useState<MenuPage[]>([]);
+  const [blogEnabled, setBlogEnabled] = useState(true);
   const [anchorEl, setAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
   const [mobileOpen, setMobileOpen] = useState(false);
   const theme = useTheme();
@@ -23,6 +24,12 @@ export default function MainMenu() {
     fetch("/api/pages?menu=true")
       .then((r) => r.json())
       .then(setPages)
+      .catch(() => {});
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.blogEnabled !== undefined) setBlogEnabled(data.blogEnabled);
+      })
       .catch(() => {});
   }, []);
 
@@ -44,7 +51,8 @@ export default function MainMenu() {
     return "/pages/" + segments.join("/");
   }
 
-  if (pages.length === 0) return null;
+  const hasAnyContent = blogEnabled || pages.length > 0;
+  if (!hasAnyContent) return null;
 
   if (isMobile) {
     return (
@@ -55,6 +63,13 @@ export default function MainMenu() {
         <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
           <Box sx={{ width: 250 }} role="navigation">
             <List>
+              {blogEnabled && (
+                <ListItem disablePadding>
+                  <ListItemButton component={Link} href="/blog" onClick={() => setMobileOpen(false)}>
+                    <ListItemText primary="Blog" />
+                  </ListItemButton>
+                </ListItem>
+              )}
               {rootPages.map((page) => (
                 <ListItem key={page.id} disablePadding>
                   <ListItemButton
@@ -75,6 +90,11 @@ export default function MainMenu() {
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }} role="navigation">
+      {blogEnabled && (
+        <Button color="inherit" component={Link} href="/blog">
+          Blog
+        </Button>
+      )}
       {rootPages.map((page) => {
         const children = getChildren(page.id);
         if (children.length > 0) {

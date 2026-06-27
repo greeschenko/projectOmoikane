@@ -4,7 +4,7 @@ import { loginAsAdmin } from "./helpers";
 test.describe("Blog Public Pages", () => {
   test("blog page renders heading", async ({ page }) => {
     await page.goto("/blog");
-    await expect(page.getByRole("heading", { name: /blog/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Blog", exact: true })).toBeVisible();
   });
 
   test("blog page shows published posts", async ({ page }) => {
@@ -42,7 +42,7 @@ test.describe("Blog Public Pages", () => {
 
   test("blog nav link is visible in public header", async ({ page }) => {
     await page.goto("/blog");
-    await expect(page.getByRole("link", { name: /blog/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /blog/i }).first()).toBeVisible();
   });
 
   test("clicking blog post navigates to detail page", async ({ page }) => {

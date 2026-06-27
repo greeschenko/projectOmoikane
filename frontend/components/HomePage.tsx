@@ -15,6 +15,28 @@ export default function HomePage() {
         <Button variant="contained">Get Started</Button>
         <Button variant="outlined">Learn More</Button>
       </Box>
+      <Box sx={{ mt: 4, display: "flex", gap: 3, justifyContent: "center" }}>
+        <Typography
+          component="a"
+          href="https://opencode.ai/docs"
+          target="_blank"
+          rel="noopener"
+          color="primary"
+          sx={{ textDecoration: "underline", cursor: "pointer" }}
+        >
+          Documentation
+        </Typography>
+        <Typography
+          component="a"
+          href="https://github.com/anomalyco/opencode"
+          target="_blank"
+          rel="noopener"
+          color="primary"
+          sx={{ textDecoration: "underline", cursor: "pointer" }}
+        >
+          GitHub
+        </Typography>
+      </Box>
     </Container>
   );
 }

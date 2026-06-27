@@ -1,0 +1,25 @@
+# Go
+backend/bin/
+backend/tmp/
+backend/build-errors.log
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+
+# Air tmp dir
+tmp/
+
+# Playwright test artifacts
+frontend/test-results/
+frontend/playwright-report/
+
+# Media uploads
+backend/uploads/

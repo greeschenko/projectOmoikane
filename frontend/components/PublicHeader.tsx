@@ -17,6 +17,7 @@ export default function PublicHeader({
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [siteName, setSiteName] = useState("Omoikane");
   const [logo, setLogo] = useState("");
+  const [blogEnabled, setBlogEnabled] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function PublicHeader({
       .then((data) => {
         if (data.siteName) setSiteName(data.siteName);
         if (data.logo) setLogo(data.logo);
+        if (data.blogEnabled !== undefined) setBlogEnabled(data.blogEnabled);
       })
       .catch(() => {});
     if (session) {
@@ -52,9 +54,11 @@ export default function PublicHeader({
             {siteName}
           </Link>
         </Typography>
-        <Button color="inherit" component={Link} href="/blog" sx={{ mr: 1 }}>
-          Blog
-        </Button>
+        {blogEnabled && (
+          <Button color="inherit" component={Link} href="/blog" sx={{ mr: 1 }}>
+            Blog
+          </Button>
+        )}
         <MainMenu />
         <Box sx={{ flexGrow: 1 }} />
         {session ? (

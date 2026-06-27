@@ -41,6 +41,7 @@ test.describe("User Profile", () => {
   test("settings page has avatar upload field", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/settings");
+    await page.getByRole("tab", { name: /avatar/i }).click();
     await expect(page.getByRole("button", { name: /avatar|upload avatar|change avatar/i })).toBeVisible();
   });
 });

@@ -4,8 +4,13 @@ import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const posts = store.getBlogPosts();
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const authorId = searchParams.get("authorId");
+  let posts = store.getBlogPosts();
+  if (authorId) {
+    posts = posts.filter((p) => p.authorId === authorId);
+  }
   return NextResponse.json(posts);
 }
 

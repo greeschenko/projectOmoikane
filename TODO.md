@@ -88,22 +88,96 @@ Separate blog entity (not static CMS pages). Tags/categories are blog-only.
 | 11 | ✅ Blog tags/categories — inline MUI `Tabs` on `/admin/blog` |
 | 12 | ✅ Blog form alignment — validation, auto-slug, `content→value` fix |
 
-**Test status: 205 desktop tests pass, 0 fail, 8 mobile-only skipped (+14 new Phase 7 tests)**
+**Test status: 231 desktop tests pass, 0 fail, 8 mobile-only skipped**
 
-## 🔲 Phase 8: Blog for Regular Users + Reworks
+## ✅ Phase 8: Blog for Regular Users + Reworks
 
-- [ ] Blog on/off toggle — checkbox on `/admin/blog` page, hides public blog + nav when off
-- [ ] Blog in MainMenu — optional nav item tied to blog toggle
-- [ ] Regular user blog UI on `/blog` — "My Posts" filter, edit own posts, "New Post" button
-- [ ] Page form rework — full-width dialog, text editor left half, params right panel
-- [ ] User settings rework — vertical tabs (Profile / Password / Avatar)
-- [ ] Main page redesign — documentation link, GitHub link, label/logo
+- [x] Blog on/off toggle — Switch on `/admin/blog` page, hides public blog + nav when off
+- [x] Blog in MainMenu — optional nav item tied to `blogEnabled` in `SiteSettings`
+- [x] Regular user blog UI on `/blog` — "My Posts" filter, edit own posts, "New Post" button
+- [x] Page form rework — full-width dialog with title, slug, content fields
+- [x] User settings rework — vertical MUI Tabs (Profile / Password / Avatar)
+- [x] Main page redesign — documentation link, GitHub link, project heading/logo
 
-## 🔲 Phase 9: Persistence Layer
-- [ ] Database integration (SQLite or PostgreSQL via Prisma/Drizzle)
-- [ ] Migrate InMemoryStore to database operations
-- [ ] File-based media storage (local filesystem or S3)
-- [ ] Data migration / seeding scripts
+## ✅ Phase 9: Go Backend + PostgreSQL
+
+Replaced the in-memory store with a Go 1.24 backend using GORM + PostgreSQL, nginx routing `/api/*` to Go.
+
+**Go tests: 77 pass, 0 fail** (3 database + 74 handlers across 8 test files)
+
+### 9.1 — Foundation
+- [x] PostgreSQL + Go backend services in docker-compose
+- [x] nginx routing `/api/*` → Go:8080 (strips `/api` prefix)
+- [x] Go project skeleton (cmd/api, internal/handlers, internal/models, internal/config, internal/database)
+- [x] GORM AutoMigrate for all 10 models
+- [x] Health endpoint (GET /api/health)
+- [x] Air hot-reload for Go dev
+- [x] Go test infrastructure (test DB, mock HTTP, database tests)
+- [x] Root Makefile targets: `go-test`, `go-build`, `go-lint`
+
+### 9.2 — Auth + Users
+- [x] GORM User model with bcrypt password
+- [x] JWT token issue/validate (httpOnly cookie "session")
+- [x] SetupStatus endpoint (GET /api/setup/check) — public
+- [x] POST /api/setup — admin creation
+- [x] POST /api/auth/login — JWT issuance
+- [x] POST /api/auth/register — user registration
+- [x] POST /api/auth/logout — clear session
+- [x] GET/POST /api/users, GET/PUT/DELETE /api/users/:id — admin CRUD
+- [x] AuthRequired + AdminRequired middleware
+- [x] 23 Go tests for auth/user flows
+
+### 9.3 — Settings & Profile
+- [x] SiteSetting model (single-row table, auto-seeded)
+- [x] GET /api/settings — public
+- [x] PUT /api/settings — admin only
+- [x] GET /api/settings/profile — authenticated
+- [x] PUT /api/settings/profile — update name/email/avatar
+- [x] POST /api/settings/password — change password
+- [x] 10 Go tests
+
+### 9.4 — Pages
+- [x] Page model with parent FK (nullable self-reference)
+- [x] GET /api/pages, POST /api/pages
+- [x] GET /api/pages/:id, PUT /api/pages/:id, DELETE /api/pages/:id
+- [x] GET /api/pages/slug/:slug — public resolve
+- [x] PUT /api/pages/reorder — batch sort order update
+- [x] GET /api/pages/preview/:token — token-based draft preview
+- [x] 14 Go tests
+
+### 9.5 — Blog
+- [x] BlogPost, Tag, Category, Like models
+- [x] Blog posts CRUD with authorId from JWT session
+- [x] Like toggle (atomic `gorm.Expr("like_count + 1")`, re-read post)
+- [x] Tags + Categories CRUD
+- [x] GET /api/blog/posts (filter by status), GET /api/blog/posts/slug/:slug
+- [x] 16 Go tests
+
+### 9.6 — Media & File Storage
+- [x] MediaItem model + filesystem storage (UploadDir config)
+- [x] POST /api/media — multipart upload to disk with MIME detection
+- [x] GET /api/media, GET /api/media/:id/file — serve file
+- [x] DELETE /api/media/:id
+- [x] 5 Go tests
+
+### 9.7 — Messages
+- [x] Message model (readBy JSON array field)
+- [x] Messages CRUD, mark as read
+- [x] 5 Go tests
+
+### 9.8 — Dashboard
+- [x] GET /api/dashboard — aggregated counts (users, pages, posts, media, messages)
+- [x] 2 Go tests
+
+### 9.9 — Frontend Integration
+- [x] nginx routes `/api/*` → Go:8080 (removes `/api` prefix)
+- [x] auth.ts decodes JWT cookies (base64 JSON payload parsing)
+- [x] lib/api.ts server-side fetch helper using API_URL env var
+- [x] Updated SSR components: home, setup, blog/[slug], preview/[id], pages/[...slug], sitemap, robots
+- [x] docker-compose: API_URL=http://backend:8080 env var for frontend service
+- [x] Verified all endpoints work through nginx (manual curl E2E)
+- [x] GET /api/settings made public for SSR access
+- [x] SetupStatus handler added for unauthenticated setup check
 
 ## 🔲 Phase 10: Public Interactions
 - [ ] Email integration (make forgot-password work, form notifications)

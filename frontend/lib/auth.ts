@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import store from "./store";
 
 const SESSION_COOKIE = "session";
 
@@ -8,10 +7,31 @@ export interface Session {
   role: "admin" | "user";
 }
 
+function decodeJWTPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    return JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+  } catch {
+    return null;
+  }
+}
+
 export async function getSession(): Promise<Session | null> {
   const cookieStore = await cookies();
   const value = cookieStore.get(SESSION_COOKIE)?.value;
   if (!value) return null;
+
+  // Try JWT format (issued by Go backend)
+  const payload = decodeJWTPayload(value);
+  if (payload && payload.userId && payload.role) {
+    return {
+      userId: String(payload.userId),
+      role: payload.role as "admin" | "user",
+    };
+  }
+
+  // Fallback: legacy JSON format
   try {
     return JSON.parse(value);
   } catch {

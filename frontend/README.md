@@ -8,15 +8,16 @@ Next.js 16 App Router CMS frontend.
 app/
   (withHeader)/    Public pages (home, pages, preview, settings)
   admin/           Admin panel (dashboard, users, pages, media, messages, settings)
-  api/             API routes (auth, pages, media, messages, users, settings, setup)
+  api/             Legacy API routes (no longer hit; kept for reference)
   layout.tsx       Root layout (MUI ThemeRegistry, OG/Twitter metadata)
-  sitemap.ts       /sitemap.xml generation
+  sitemap.ts       /sitemap.xml generation (fetches pages/blog from Go API)
   robots.ts        /robots.txt generation
 components/        Shared React components
 lib/
-  store.ts         InMemoryStore (singleton on globalThis)
-  auth.ts          Session management (cookie-based)
-e2e/               Playwright tests (26 spec files, 199 test items)
+  store.ts         Deprecated in-memory store (no longer used for API)
+  api.ts           Server-side fetch helper (calls Go backend directly)
+  auth.ts          JWT session management (cookie-based)
+e2e/               Playwright tests (27 spec files, 231 test items)
 ```
 
 ## Testing
@@ -32,8 +33,8 @@ PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test \
 
 ## Key Conventions
 
-- **In-memory store** — data lives on `globalThis.__omoikane_store__`, lost on restart
+- **Go API backend** — nginx proxies `/api/*` → Go:8080; server components use `lib/api.ts` for direct Go fetches
 - **Docker node_modules** — anonymous volume; install new packages via `docker exec`
-- **Auth** — session cookie set by `/api/auth/login`, checked via `getSession()` server-side
-- **Settings** — `SiteSettings` object with siteName, tagline, logo, favicon; fetched by branding components
-- **Profile** — User object with name, email, avatar (base64); edited via `/settings`
+- **Auth** — JWT in httpOnly "session" cookie, set by Go login handler, decoded by `getSession()`
+- **Settings** — fetched from Go `GET /api/settings` (public endpoint)
+- **API_URL** — `process.env.API_URL || 'http://backend:8080'` used by server components

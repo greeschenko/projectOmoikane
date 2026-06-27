@@ -6,6 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Select, MenuItem, InputLabel, FormControl, Alert,
   IconButton, Chip, Tabs, Tab, CircularProgress, FormHelperText,
+  FormControlLabel, Switch,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -67,7 +68,17 @@ export default function AdminBlog() {
   const [tagFormData, setTagFormData] = useState({ name: "", slug: "" });
   const [catFormOpen, setCatFormOpen] = useState(false);
   const [catFormData, setCatFormData] = useState({ name: "", slug: "", description: "" });
+  const [blogEnabled, setBlogEnabled] = useState(true);
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.blogEnabled !== undefined) setBlogEnabled(data.blogEnabled);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -184,6 +195,20 @@ export default function AdminBlog() {
     }
   }
 
+  async function handleBlogToggle(checked: boolean) {
+    const res = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blogEnabled: checked }),
+    });
+    if (res.ok) {
+      setBlogEnabled(checked);
+      setAlert({ type: "success", message: checked ? "Blog enabled" : "Blog disabled" });
+    } else {
+      setAlert({ type: "error", message: "Failed to update setting" });
+    }
+  }
+
   async function handleTagSave() {
     const res = await fetch("/api/blog/tags", {
       method: "POST",
@@ -222,11 +247,17 @@ export default function AdminBlog() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1 }}>
         <Typography variant="h4">Blog Posts</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          New Blog Post
-        </Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <FormControlLabel
+            control={<Switch checked={blogEnabled} onChange={(e) => handleBlogToggle(e.target.checked)} />}
+            label="Enable Blog"
+          />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            New Blog Post
+          </Button>
+        </Box>
       </Box>
 
       {alert && (

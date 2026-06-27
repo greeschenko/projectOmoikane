@@ -42,6 +42,7 @@ export interface SiteSettings {
   tagline: string;
   logo: string;
   favicon: string;
+  blogEnabled: boolean;
 }
 
 export interface MediaItem {
@@ -119,6 +120,7 @@ class InMemoryStore {
     tagline: "A modern CMS",
     logo: "",
     favicon: "",
+    blogEnabled: true,
   };
 
   // --- Users ---

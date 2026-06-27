@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
-import store from "@/lib/store";
+import { apiFetch } from "@/lib/api";
 import HomePage from "@/components/HomePage";
 
-export default function Home() {
-  if (store.userCount === 0) {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const data = await apiFetch<{ setupRequired: boolean }>("/setup/check");
+  if (data.setupRequired) {
     redirect("/setup");
   }
   return <HomePage />;

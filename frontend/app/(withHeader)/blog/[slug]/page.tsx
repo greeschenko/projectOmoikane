@@ -1,6 +1,8 @@
-import store from "@/lib/store";
+import { getSession } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 import { notFound } from "next/navigation";
-import { Container, Typography, Box, Chip } from "@mui/material";
+import { Container, Typography } from "@mui/material";
+import PostDetailClient from "@/components/PostDetailClient";
 
 export const dynamic = "force-dynamic";
 
@@ -9,33 +11,41 @@ export default async function BlogPostPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
-  const posts = store.getBlogPosts().filter(
-    (p) => p.status === "published" && p.slug === slug
-  );
-  const post = posts[0];
-  if (!post) notFound();
+  const settings = await apiFetch<{ siteName: string; blogEnabled: boolean }>("/settings");
+  if (!settings.blogEnabled) notFound();
 
-  const author = store.getUser(post.authorId);
+  const { slug } = await params;
+
+  let post: Record<string, unknown>;
+  try {
+    post = await apiFetch<Record<string, unknown>>(`/blog/posts/slug/${slug}`);
+  } catch {
+    notFound();
+  }
+
+  const session = await getSession();
+  const canEdit =
+    !!session &&
+    (session.role === "admin" || session.userId === String(post.authorId));
 
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
-      <Typography variant="h3" gutterBottom>{post.title}</Typography>
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2 }}>
-        {author && (
-          <Typography variant="body2" color="text.secondary">
-            By {author.name || author.email}
-          </Typography>
-        )}
-        <Chip label={post.status} size="small" color="success" />
-        <Typography variant="body2" color="text.secondary">
-          {new Date(post.publishDate || post.createdAt).toLocaleDateString()}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {post.likeCount} {post.likeCount === 1 ? "like" : "likes"}
-        </Typography>
-      </Box>
-      <Box sx={{ mt: 2 }} dangerouslySetInnerHTML={{ __html: post.content }} />
+      <Typography variant="h3" gutterBottom>{post.title as string}</Typography>
+      <PostDetailClient
+        post={{
+          id: post.id as string,
+          title: post.title as string,
+          slug: post.slug as string,
+          content: post.content as string,
+          authorId: post.authorId as string,
+          status: post.status as string,
+          publishDate: post.publishDate as string | undefined,
+          likeCount: post.likeCount as number,
+          createdAt: post.createdAt as string,
+          authorName: undefined,
+        }}
+        canEdit={canEdit}
+      />
     </Container>
   );
 }

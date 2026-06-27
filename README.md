@@ -1,13 +1,13 @@
 # Project Omoikane
 
-A headless-ish CMS built with Next.js 16, MUI 9, Docker Compose, and Playwright.
+A headless-ish CMS built with Next.js 16, MUI 9, Go 1.24, PostgreSQL, Docker Compose, and Playwright.
 
 ## Stack
 
 - **Frontend:** Next.js 16 (App Router), MUI 9, TipTap (rich text)
-- **Backend:** Next.js API routes, in-memory store (singleton on `globalThis`)
-- **Infrastructure:** Docker Compose (nginx reverse proxy, Next.js dev server)
-- **Testing:** Playwright (desktop + mobile) via `make test`
+- **Backend:** Go 1.24, GORM, PostgreSQL, JWT (httpOnly cookie auth)
+- **Infrastructure:** Docker Compose (nginx reverse proxy, Next.js dev, Go + Air hot-reload, PostgreSQL)
+- **Testing:** Go tests (`make go-test`) + Playwright desktop & mobile (`make test`)
 
 ## Phases
 
@@ -22,12 +22,15 @@ See [TODO.md](./TODO.md) for the full development roadmap.
 | 5 — Blog Module | ✅ | Included |
 | 6 — Manual QA | ✅ | — |
 | 7 — Bug Fixes & Polish | ✅ | 205 pass, 0 fail, 8 skip |
+| 8 — Blog for Users + Reworks | ✅ | 231 pass, 0 fail, 8 skip |
+| 9 — Go Backend + PostgreSQL | ✅ | 77 Go pass, 0 fail |
 
 ## Quick Start
 
 ```bash
-make dev      # Start Docker services
-make test     # Run full Playwright suite (restarts frontend first)
+make dev      # Start Docker services (nginx + frontend + Go + PostgreSQL)
+make go-test  # Run Go backend tests (requires running PostgreSQL)
+make test     # Run full Playwright suite
 ```
 
-The in-memory store resets on container restart — admin setup is required after each `make dev`.
+On first run, navigate to `/setup` to create the admin account.

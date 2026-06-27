@@ -7,9 +7,14 @@ test("redirects to /login when not authenticated", async ({ page }) => {
 });
 
 test.describe("Password change", () => {
+  async function goToPasswordTab(page) {
+    await page.goto("/settings");
+    await page.getByRole("tab", { name: /password/i }).click();
+  }
+
   test("form has current, new, and confirm password fields", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto("/settings");
+    await goToPasswordTab(page);
     await expect(page.getByLabel(/^Current Password\b/)).toBeVisible();
     await expect(page.getByLabel(/^New Password\b/)).toBeVisible();
     await expect(page.getByLabel(/^Confirm New Password\b/)).toBeVisible();
@@ -17,7 +22,7 @@ test.describe("Password change", () => {
 
   test("shows error for wrong current password", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto("/settings");
+    await goToPasswordTab(page);
     await page.getByLabel(/^Current Password\b/).fill("WrongPassword123!");
     await page.getByLabel(/^New Password\b/).fill("NewPass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("NewPass123!");
@@ -27,7 +32,7 @@ test.describe("Password change", () => {
 
   test("shows error when new passwords do not match", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto("/settings");
+    await goToPasswordTab(page);
     await page.getByLabel(/^Current Password\b/).fill("SecurePass123!");
     await page.getByLabel(/^New Password\b/).fill("NewPass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("DifferentPass1!");
@@ -37,7 +42,7 @@ test.describe("Password change", () => {
 
   test("shows success message on valid change", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto("/settings");
+    await goToPasswordTab(page);
     await page.getByLabel(/^Current Password\b/).fill("SecurePass123!");
     await page.getByLabel(/^New Password\b/).fill("NewPass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("NewPass123!");
@@ -52,7 +57,7 @@ test.describe("Password change", () => {
 
   test("can login with new password", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto("/settings");
+    await goToPasswordTab(page);
     await page.getByLabel(/^Current Password\b/).fill("SecurePass123!");
     await page.getByLabel(/^New Password\b/).fill("NewPass123!");
     await page.getByLabel(/^Confirm New Password\b/).fill("NewPass123!");
