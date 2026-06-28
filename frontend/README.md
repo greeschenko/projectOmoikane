@@ -8,7 +8,7 @@ Next.js 16 App Router CMS frontend.
 app/
   (withHeader)/    Public pages (home, pages, preview, settings)
   admin/           Admin panel (dashboard, users, pages, media, messages, settings)
-  api/             Legacy API routes (no longer hit; kept for reference)
+   api/             (deleted in Phase 10 — nginx proxies /api/* → Go:8080)
   layout.tsx       Root layout (MUI ThemeRegistry, OG/Twitter metadata)
   sitemap.ts       /sitemap.xml generation (fetches pages/blog from Go API)
   robots.ts        /robots.txt generation
@@ -17,7 +17,7 @@ lib/
   store.ts         Deprecated in-memory store (no longer used for API)
   api.ts           Server-side fetch helper (calls Go backend directly)
   auth.ts          JWT session management (cookie-based)
-e2e/               Playwright tests (27 spec files, 231 test items)
+e2e/               Playwright tests (27 spec files, 229 desktop + 231 mobile test items)
 ```
 
 ## Testing
@@ -38,3 +38,4 @@ PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test \
 - **Auth** — JWT in httpOnly "session" cookie, set by Go login handler, decoded by `getSession()`
 - **Settings** — fetched from Go `GET /api/settings` (public endpoint)
 - **API_URL** — `process.env.API_URL || 'http://backend:8080'` used by server components
+- **app/api/ deleted** — Phase 10 removed the entire tree (716 lines); nginx is the sole `/api/*` proxy

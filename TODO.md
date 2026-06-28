@@ -114,21 +114,14 @@ Replaced the in-memory store with a Go 1.24 + GORM + PostgreSQL backend, fronted
 - 7 SSR components (home, setup, blog/[slug], preview/[id], pages/[...slug], sitemap, robots) fetch from Go via `lib/api.ts`
 - Updated auth.ts for JWT decoding, docker-compose API_URL env var
 
-## 🔲 Phase 10: Playwright E2E Cleanup
+## ✅ Phase 10: Playwright E2E Cleanup
 
-Align Go API response shapes with frontend expectations and remove dead Next.js API routes.
+Aligned Go API response shapes with frontend expectations, removed dead Next.js API routes.
 
-- Fix Go blog post responses: unwrap `{"posts":[...]}` to bare array, add `tags []string` + `categoryId` fields
-- Fix like toggle: rename `"likeCount"`→`"count"` in response
-- Fix pages list: unwrap `{"pages":[...]}` to bare array, accept `published` boolean field
-- Fix media: add `data` (base64) field alongside `filePath`, unwrap lists
-- Fix messages: `read: bool`→`readBy: []uint`, add `unreadCount`, change mark-read to POST
-- Fix tags/categories: unwrap to bare arrays
-- Fix dashboard: add `/dashboard/stats` route with `userCount`/`pageCount`/`blogCount`/`mediaCount` fields
-- Wire `POST /forgot-password` handler in main.go
-- Add `POST /messages/read-all` and `DELETE /messages` (clear all) endpoints
-- Delete 28 dead files in `frontend/app/api/*` (788 lines, all bypassed by nginx)
-- Run full Playwright suite (`make test`), fix any remaining failures
+- **Go handler changes**: blog (bare arrays, `count`, `tags`, `categoryId`, `authorName`), pages (bare array, auth-aware drafts), media (bare array + base64 data URIs, wrapped upload), messages (`readBy`, `unreadCount`, `success`), dashboard (`/stats`), auth (Register returns user), DeleteTag + DeleteCategory endpoints
+- **Frontend fixes**: RichTextEditor media picker, admin media page (data URIs), RSS (Go backend), sitemap (bare arrays), blog slug (authorName), blog API test
+- **Dead route cleanup**: 27 files deleted (716 lines), entire `frontend/app/api/` tree removed
+- **Results** (clean DB): Go tests 77/77 pass; desktop Playwright 229/231 pass (2 pre-existing failures — breadcrumb, draft visibility); mobile 11 failures (pre-existing viewport/timeout)
 
 ## 🔲 Phase 11: Public Interactions
 
