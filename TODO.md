@@ -114,21 +114,40 @@ Replaced the in-memory store with a Go 1.24 + GORM + PostgreSQL backend, fronted
 - 7 SSR components (home, setup, blog/[slug], preview/[id], pages/[...slug], sitemap, robots) fetch from Go via `lib/api.ts`
 - Updated auth.ts for JWT decoding, docker-compose API_URL env var
 
-## 🔲 Phase 10: Public Interactions
-- [ ] Email integration (make forgot-password work, form notifications)
+## 🔲 Phase 10: Playwright E2E Cleanup
+
+Align Go API response shapes with frontend expectations and remove dead Next.js API routes.
+
+- Fix Go blog post responses: unwrap `{"posts":[...]}` to bare array, add `tags []string` + `categoryId` fields
+- Fix like toggle: rename `"likeCount"`→`"count"` in response
+- Fix pages list: unwrap `{"pages":[...]}` to bare array, accept `published` boolean field
+- Fix media: add `data` (base64) field alongside `filePath`, unwrap lists
+- Fix messages: `read: bool`→`readBy: []uint`, add `unreadCount`, change mark-read to POST
+- Fix tags/categories: unwrap to bare arrays
+- Fix dashboard: add `/dashboard/stats` route with `userCount`/`pageCount`/`blogCount`/`mediaCount` fields
+- Wire `POST /forgot-password` handler in main.go
+- Add `POST /messages/read-all` and `DELETE /messages` (clear all) endpoints
+- Delete 28 dead files in `frontend/app/api/*` (788 lines, all bypassed by nginx)
+- Run full Playwright suite (`make test`), fix any remaining failures
+
+## 🔲 Phase 11: Public Interactions
+
+- [ ] Email integration (SMTP + Go mailer + password reset flow)
 - [ ] ReCAPTCHA/spam protection on public forms
 
-## 🔲 Phase 11: Admin Polish & UX
+## 🔲 Phase 12: Admin Polish & UX
+
+- [ ] Soft delete / trash system (undo mistakes)
+- [ ] Audit log (who did what, when)
+- [ ] Bulk actions (delete, publish, unpublish multiple pages/users)
 - [ ] WYSIWYG page builder (drag-and-drop sections, widgets, blocks)
 - [ ] Theme customizer (colors, typography, layout options via admin UI)
-- [ ] Bulk actions (delete, publish, unpublish multiple pages/users)
-- [ ] Soft delete / trash system
-- [ ] Audit log (who did what, when)
 - [ ] Import/export (CSV/JSON for pages, users, media)
 
-## 🔲 Phase 12: Platform & Performance
+## 🔲 Phase 13: Platform & Performance
+
+- [ ] OpenAPI documentation for all Go routes
 - [ ] API tokens / headless CMS mode
-- [ ] OpenAPI documentation for all routes
 - [ ] Cache layer (Redis or in-memory)
 - [ ] Image optimization (sharp, next/image, thumbnails)
 - [ ] CDN-ready media delivery
