@@ -121,14 +121,23 @@ Aligned Go API response shapes with frontend expectations, removed dead Next.js 
 - **Go handler changes**: blog (bare arrays, `count`, `tags`, `categoryId`, `authorName`), pages (bare array, auth-aware drafts), media (bare array + base64 data URIs, wrapped upload), messages (`readBy`, `unreadCount`, `success`), dashboard (`/stats`), auth (Register returns user), DeleteTag + DeleteCategory endpoints
 - **Frontend fixes**: RichTextEditor media picker, admin media page (data URIs), RSS (Go backend), sitemap (bare arrays), blog slug (authorName), blog API test
 - **Dead route cleanup**: 27 files deleted (716 lines), entire `frontend/app/api/` tree removed
-- **Results** (clean DB): Go tests 77/77 pass; desktop Playwright 229/231 pass (2 pre-existing failures — breadcrumb, draft visibility); mobile 11 failures (pre-existing viewport/timeout)
+- **Go test additions**: 5 new tests (82 total)
+- **Results** (clean DB): Go tests 77/77 pass; desktop Playwright 229/231 pass (2 pre-existing failures); mobile 11 failures
 
-## 🔲 Phase 11: Public Interactions
+## ✅ Phase 11: E2E Fixes
+
+Fixed 2 pre-existing desktop Playwright failures.
+
+- **Breadcrumb** (`04-pages.spec.ts:61`): `GetPageBySlug` returns `parentTitle`/`parentSlug`; frontend renders MUI `<Breadcrumbs>`
+- **Draft visibility** (`22-admin-blog.spec.ts:40`): New `GET /admin/blog/posts` endpoint (admin-only, all statuses); admin blog page fetches from it
+- **Results** (clean DB): Go tests **82/82 pass**; desktop Playwright **231/231 pass** (0 failures); mobile 11 failures (pre-existing)
+
+## 🔲 Phase 12: Public Interactions
 
 - [ ] Email integration (SMTP + Go mailer + password reset flow)
 - [ ] ReCAPTCHA/spam protection on public forms
 
-## 🔲 Phase 12: Admin Polish & UX
+## 🔲 Phase 13: Admin Polish & UX
 
 - [ ] Soft delete / trash system (undo mistakes)
 - [ ] Audit log (who did what, when)
@@ -137,7 +146,7 @@ Aligned Go API response shapes with frontend expectations, removed dead Next.js 
 - [ ] Theme customizer (colors, typography, layout options via admin UI)
 - [ ] Import/export (CSV/JSON for pages, users, media)
 
-## 🔲 Phase 13: Platform & Performance
+## 🔲 Phase 14: Platform & Performance
 
 - [ ] OpenAPI documentation for all Go routes
 - [ ] API tokens / headless CMS mode
