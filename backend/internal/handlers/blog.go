@@ -11,6 +11,57 @@ import (
 	"gorm.io/gorm"
 )
 
+func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid tag ID"})
+		return
+	}
+
+	if err := h.DB.Delete(&models.Tag{}, id).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Tag not found"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func (h *Handler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid category ID"})
+		return
+	}
+
+	if err := h.DB.Delete(&models.Category{}, id).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Category not found"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func lookupUserName(h *Handler, userID uint) string {
+	if h == nil {
+		return ""
+	}
+	var user models.User
+	if err := h.DB.First(&user, userID).Error; err != nil {
+		return ""
+	}
+	return user.Name
+}
+
 func (h *Handler) GetPosts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -19,12 +70,10 @@ func (h *Handler) GetPosts(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]map[string]interface{}, 0)
 	for _, p := range posts {
-		result = append(result, sanitizePostJSON(p))
+		result = append(result, sanitizePostJSON(h, p))
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"posts": result,
-	})
+	json.NewEncoder(w).Encode(result)
 }
 
 func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +94,7 @@ func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(sanitizePostJSON(post))
+	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 }
 
 func (h *Handler) GetPostBySlug(w http.ResponseWriter, r *http.Request) {
@@ -60,19 +109,21 @@ func (h *Handler) GetPostBySlug(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(sanitizePostJSON(post))
+	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 }
 
 func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		Title         string `json:"title"`
-		Slug          string `json:"slug"`
-		Content       string `json:"content"`
-		Excerpt       string `json:"excerpt"`
-		Status        string `json:"status"`
-		FeaturedImage string `json:"featuredImage"`
+		Title         string   `json:"title"`
+		Slug          string   `json:"slug"`
+		Content       string   `json:"content"`
+		Excerpt       string   `json:"excerpt"`
+		Status        string   `json:"status"`
+		FeaturedImage string   `json:"featuredImage"`
+		Tags          []string `json:"tags"`
+		CategoryID    *uint    `json:"categoryId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -103,12 +154,21 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		AuthorID:      userID,
 		Status:        status,
 		FeaturedImage: req.FeaturedImage,
+		CategoryID:    req.CategoryID,
 	}
 
 	h.DB.Create(&post)
 
+	// Associate tags
+	for _, tagName := range req.Tags {
+		var tag models.Tag
+		if err := h.DB.Where("name = ?", tagName).First(&tag).Error; err == nil {
+			h.DB.Model(&post).Association("Tags").Append(&tag)
+		}
+	}
+
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(sanitizePostJSON(post))
+	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 }
 
 func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +196,7 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 		Excerpt       *string `json:"excerpt,omitempty"`
 		Status        *string `json:"status,omitempty"`
 		FeaturedImage *string `json:"featuredImage,omitempty"`
+		CategoryID    *uint   `json:"categoryId,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -162,13 +223,16 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	if req.FeaturedImage != nil {
 		updates["featured_image"] = *req.FeaturedImage
 	}
+	if req.CategoryID != nil {
+		updates["category_id"] = *req.CategoryID
+	}
 
 	if len(updates) > 0 {
 		h.DB.Model(&post).Updates(updates)
 	}
 
 	h.DB.First(&post, id)
-	json.NewEncoder(w).Encode(sanitizePostJSON(post))
+	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 }
 
 func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
@@ -229,9 +293,17 @@ func (h *Handler) ToggleLike(w http.ResponseWriter, r *http.Request) {
 
 	h.DB.First(&post, postID)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"liked":     liked,
-		"likeCount": post.LikeCount,
+		"liked":  liked,
+		"count":  post.LikeCount,
 	})
+}
+
+func sanitizeTag(t models.Tag) map[string]interface{} {
+	return map[string]interface{}{
+		"id":   t.ID,
+		"name": t.Name,
+		"slug": t.Slug,
+	}
 }
 
 func (h *Handler) GetTags(w http.ResponseWriter, r *http.Request) {
@@ -240,9 +312,12 @@ func (h *Handler) GetTags(w http.ResponseWriter, r *http.Request) {
 	var tags []models.Tag
 	h.DB.Find(&tags)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"tags": tags,
-	})
+	result := make([]map[string]interface{}, 0)
+	for _, t := range tags {
+		result = append(result, sanitizeTag(t))
+	}
+
+	json.NewEncoder(w).Encode(result)
 }
 
 func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
@@ -278,15 +353,27 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func sanitizeCategory(c models.Category) map[string]interface{} {
+	return map[string]interface{}{
+		"id":          c.ID,
+		"name":        c.Name,
+		"slug":        c.Slug,
+		"description": c.Description,
+	}
+}
+
 func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var categories []models.Category
 	h.DB.Find(&categories)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"categories": categories,
-	})
+	result := make([]map[string]interface{}, 0)
+	for _, c := range categories {
+		result = append(result, sanitizeCategory(c))
+	}
+
+	json.NewEncoder(w).Encode(result)
 }
 
 func (h *Handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
@@ -324,7 +411,24 @@ func (h *Handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func sanitizePostJSON(p models.BlogPost) map[string]interface{} {
+func sanitizePostJSON(h *Handler, p models.BlogPost) map[string]interface{} {
+	var tags []models.Tag
+	if h != nil {
+		h.DB.Model(&p).Association("Tags").Find(&tags)
+	}
+
+	tagNames := make([]string, 0)
+	for _, t := range tags {
+		tagNames = append(tagNames, t.Name)
+	}
+
+	var categoryID interface{}
+	if p.CategoryID != nil {
+		categoryID = *p.CategoryID
+	}
+
+	authorName := lookupUserName(h, p.AuthorID)
+
 	return map[string]interface{}{
 		"id":            p.ID,
 		"title":         p.Title,
@@ -332,10 +436,13 @@ func sanitizePostJSON(p models.BlogPost) map[string]interface{} {
 		"content":       p.Content,
 		"excerpt":       p.Excerpt,
 		"authorId":      p.AuthorID,
+		"authorName":    authorName,
 		"status":        p.Status,
 		"publishDate":   p.PublishDate,
 		"featuredImage": p.FeaturedImage,
 		"likeCount":     p.LikeCount,
+		"tags":          tagNames,
+		"categoryId":    categoryID,
 		"createdAt":     p.CreatedAt,
 		"updatedAt":     p.UpdatedAt,
 	}

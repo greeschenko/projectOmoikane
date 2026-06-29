@@ -16,6 +16,7 @@ func dashboardServer(db *gorm.DB) *httptest.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("GET /dashboard", h.Admin(h.GetDashboard))
+	mux.HandleFunc("GET /dashboard/stats", h.Admin(h.GetDashboardStats))
 	return httptest.NewServer(mux)
 }
 
@@ -53,6 +54,39 @@ func TestDashboard_ReturnsCounts(t *testing.T) {
 	}
 	if data["messages"] != float64(1) {
 		t.Errorf("Expected 1 message, got %v", data["messages"])
+	}
+}
+
+func TestDashboardStats_ReturnsCounts(t *testing.T) {
+	db := setupTestDB(t)
+	s := dashboardServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin@test.com", "Pass1234!", "admin")
+	createTestUser(db, "User1", "user1@test.com", "Pass1234!", "user")
+	createTestUser(db, "User2", "user2@test.com", "Pass1234!", "user")
+
+	db.Create(&models.Page{Title: "Home", Slug: "home", Status: "published", PreviewToken: "tok1"})
+	db.Create(&models.BlogPost{Title: "Post", Slug: "post", AuthorID: 1, Status: "published"})
+
+	cookie := loginAs(t, s, "admin@test.com", "Pass1234!")
+
+	resp := authenticatedRequest(t, "GET", s.URL+"/dashboard/stats", "", cookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := decodeJSON(t, readBody(t, resp))
+	if data["userCount"] != float64(3) {
+		t.Errorf("Expected 3 users, got %v", data["userCount"])
+	}
+	if data["pageCount"] != float64(1) {
+		t.Errorf("Expected 1 page, got %v", data["pageCount"])
+	}
+	if data["blogCount"] != float64(1) {
+		t.Errorf("Expected 1 post, got %v", data["blogCount"])
 	}
 }
 

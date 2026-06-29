@@ -5,12 +5,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let pages: Array<Record<string, unknown>> = [];
   let blogPosts: Array<Record<string, unknown>> = [];
   try {
-    const pagesData = await apiFetch<{ pages: Array<Record<string, unknown>> }>("/pages");
-    pages = pagesData.pages;
+    const pagesData = await apiFetch<Array<Record<string, unknown>> | { pages: Array<Record<string, unknown>> }>("/pages");
+    pages = Array.isArray(pagesData) ? pagesData : (pagesData.pages ?? []);
   } catch { /* ignore */ }
   try {
-    const postsData = await apiFetch<{ posts: Array<Record<string, unknown>> }>("/blog/posts");
-    blogPosts = postsData.posts;
+    const postsData = await apiFetch<Array<Record<string, unknown>> | { posts: Array<Record<string, unknown>> }>("/blog/posts");
+    blogPosts = Array.isArray(postsData) ? postsData : (postsData.posts ?? []);
   } catch { /* ignore */ }
 
   let baseUrl = "http://localhost:3000";

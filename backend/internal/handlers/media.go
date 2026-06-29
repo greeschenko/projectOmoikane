@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -57,15 +58,27 @@ func (h *Handler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	h.DB.Create(&item)
 
+	encoded := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data)
+
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":       item.ID,
-		"filename": item.Filename,
-		"mimeType": item.MimeType,
-		"size":     item.Size,
-		"filePath": item.FilePath,
-		"createdAt": item.CreatedAt,
+		"media": map[string]interface{}{
+			"id":        item.ID,
+			"filename":  item.Filename,
+			"mimeType":  item.MimeType,
+			"size":      item.Size,
+			"data":      encoded,
+			"createdAt": item.CreatedAt,
+		},
 	})
+}
+
+func readFileBase64(mimeType, path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data)
 }
 
 func (h *Handler) GetMedia(w http.ResponseWriter, r *http.Request) {
@@ -74,9 +87,19 @@ func (h *Handler) GetMedia(w http.ResponseWriter, r *http.Request) {
 	var items []models.MediaItem
 	h.DB.Order("created_at desc").Find(&items)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"media": items,
-	})
+	result := make([]map[string]interface{}, 0)
+	for _, item := range items {
+		result = append(result, map[string]interface{}{
+			"id":        item.ID,
+			"filename":  item.Filename,
+			"mimeType":  item.MimeType,
+			"size":      item.Size,
+			"data":      readFileBase64(item.MimeType, item.FilePath),
+			"createdAt": item.CreatedAt,
+		})
+	}
+
+	json.NewEncoder(w).Encode(result)
 }
 
 func (h *Handler) GetMediaItem(w http.ResponseWriter, r *http.Request) {

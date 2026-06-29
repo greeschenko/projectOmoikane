@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"omoikane-backend/internal/auth"
 	"omoikane-backend/internal/models"
 )
 
@@ -15,16 +16,25 @@ func (h *Handler) GetPages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var pages []models.Page
-	h.DB.Where("status = ?", "published").Order("sort_order asc").Find(&pages)
+	query := h.DB.Order("sort_order asc")
+	// Only filter by published status for unauthenticated requests
+	cookie, err := r.Cookie("session")
+	var tokenStr string
+	if err == nil && cookie.Value != "" {
+		tokenStr = cookie.Value
+	}
+	claims, _ := auth.ValidateToken(tokenStr, h.JWTSecret)
+	if claims == nil {
+		query = query.Where("status = ?", "published")
+	}
+	query.Find(&pages)
 
 	result := make([]map[string]interface{}, 0)
 	for _, p := range pages {
 		result = append(result, sanitizePageJSON(p))
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"pages": result,
-	})
+	json.NewEncoder(w).Encode(result)
 }
 
 func (h *Handler) GetPage(w http.ResponseWriter, r *http.Request) {

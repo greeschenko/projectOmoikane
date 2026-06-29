@@ -42,7 +42,7 @@ export default async function BlogPostPage({
           publishDate: post.publishDate as string | undefined,
           likeCount: post.likeCount as number,
           createdAt: post.createdAt as string,
-          authorName: undefined,
+          authorName: post.authorName as string | undefined,
         }}
         canEdit={canEdit}
       />

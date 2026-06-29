@@ -18,14 +18,27 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 
 	result := make([]map[string]interface{}, 0)
+	unreadCount := 0
 	for _, m := range messages {
 		item := sanitizeMessageJSON(m)
-		item["read"] = isMessageReadBy(m, userID)
+		readBy := parseReadBy(m.ReadBy)
+		item["readBy"] = readBy
+		read := false
+		for _, uid := range readBy {
+			if uid == userID {
+				read = true
+				break
+			}
+		}
+		if !read {
+			unreadCount++
+		}
 		result = append(result, item)
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"messages": result,
+		"messages":     result,
+		"unreadCount":  unreadCount,
 	})
 }
 
@@ -47,9 +60,8 @@ func (h *Handler) GetMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
 	item := sanitizeMessageJSON(msg)
-	item["read"] = isMessageReadBy(msg, userID)
+	item["readBy"] = parseReadBy(msg.ReadBy)
 
 	json.NewEncoder(w).Encode(item)
 }
@@ -81,7 +93,7 @@ func (h *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 	h.DB.Create(&msg)
 
 	item := sanitizeMessageJSON(msg)
-	item["read"] = false
+	item["readBy"] = []uint{}
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(item)
@@ -116,7 +128,7 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 	// Check if already read
 	for _, uid := range readBy {
 		if uid == userID {
-			json.NewEncoder(w).Encode(map[string]bool{"read": true})
+			json.NewEncoder(w).Encode(map[string]bool{"success": true})
 			return
 		}
 	}
@@ -125,7 +137,7 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 	data, _ := json.Marshal(readBy)
 	h.DB.Model(&msg).Update("read_by", string(data))
 
-	json.NewEncoder(w).Encode(map[string]bool{"read": true})
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
@@ -150,6 +162,40 @@ func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+func (h *Handler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	userID := middleware.GetUserID(r)
+
+	var messages []models.Message
+	h.DB.Find(&messages)
+
+	for _, msg := range messages {
+		readBy := parseReadBy(msg.ReadBy)
+		found := false
+		for _, uid := range readBy {
+			if uid == userID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			readBy = append(readBy, userID)
+			data, _ := json.Marshal(readBy)
+			h.DB.Model(&msg).Update("read_by", string(data))
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func (h *Handler) DeleteAllMessages(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	h.DB.Exec("DELETE FROM messages")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
 func sanitizeMessageJSON(m models.Message) map[string]interface{} {
 	return map[string]interface{}{
 		"id":        m.ID,
@@ -160,18 +206,13 @@ func sanitizeMessageJSON(m models.Message) map[string]interface{} {
 	}
 }
 
-func isMessageReadBy(m models.Message, userID uint) bool {
-	if m.ReadBy == "" || m.ReadBy == "[]" {
-		return false
+func parseReadBy(s string) []uint {
+	if s == "" || s == "[]" {
+		return []uint{}
 	}
-	var readBy []uint
-	if err := json.Unmarshal([]byte(m.ReadBy), &readBy); err != nil {
-		return false
+	var ids []uint
+	if err := json.Unmarshal([]byte(s), &ids); err != nil {
+		return []uint{}
 	}
-	for _, uid := range readBy {
-		if uid == userID {
-			return true
-		}
-	}
-	return false
+	return ids
 }

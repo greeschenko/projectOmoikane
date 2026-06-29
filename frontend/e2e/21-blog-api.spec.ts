@@ -25,7 +25,7 @@ test.describe("Blog API", () => {
       data: { title: "Post A", slug: "post-a", content: "A", status: "published" },
     });
     await page.request.post("/api/blog/posts", {
-      data: { title: "Post B", slug: "post-b", content: "B", status: "draft" },
+      data: { title: "Post B", slug: "post-b", content: "B", status: "published" },
     });
     const res = await page.request.get("/api/blog/posts");
     expect(res.ok()).toBeTruthy();

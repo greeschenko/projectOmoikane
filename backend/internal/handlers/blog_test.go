@@ -65,11 +65,8 @@ func TestGetPosts_ListPublished(t *testing.T) {
 		t.Errorf("Expected 200, got %d", resp.StatusCode)
 	}
 
-	data := decodeJSON(t, readBody(t, resp))
-	posts, ok := data["posts"].([]interface{})
-	if !ok {
-		t.Fatal("Expected 'posts' array in response")
-	}
+	data := readBody(t, resp)
+	posts := decodeJSONArray(t, data)
 	if len(posts) != 2 {
 		t.Errorf("Expected 2 posts, got %d", len(posts))
 	}
@@ -89,8 +86,8 @@ func TestGetPosts_ExcludesDrafts(t *testing.T) {
 
 	resp, _ := http.Get(s.URL + "/blog/posts")
 	defer resp.Body.Close()
-	data := decodeJSON(t, readBody(t, resp))
-	posts := data["posts"].([]interface{})
+	data := readBody(t, resp)
+	posts := decodeJSONArray(t, data)
 	if len(posts) != 1 {
 		t.Errorf("Expected 1 published post, got %d", len(posts))
 	}
@@ -219,8 +216,8 @@ func TestToggleLike_Toggles(t *testing.T) {
 	if data1["liked"] != true {
 		t.Errorf("Expected liked=true after first like, got %v", data1["liked"])
 	}
-	if data1["likeCount"] != float64(1) {
-		t.Errorf("Expected likeCount=1, got %v", data1["likeCount"])
+	if data1["count"] != float64(1) {
+		t.Errorf("Expected count=1, got %v", data1["count"])
 	}
 
 	// Toggle off
@@ -233,8 +230,8 @@ func TestToggleLike_Toggles(t *testing.T) {
 	if data2["liked"] != false {
 		t.Errorf("Expected liked=false after toggle off, got %v", data2["liked"])
 	}
-	if data2["likeCount"] != float64(0) {
-		t.Errorf("Expected likeCount=0, got %v", data2["likeCount"])
+	if data2["count"] != float64(0) {
+		t.Errorf("Expected count=0, got %v", data2["count"])
 	}
 }
 
@@ -303,8 +300,8 @@ func TestDeletePost_SoftDeletes(t *testing.T) {
 
 	resp2, _ := http.Get(s.URL + "/blog/posts")
 	defer resp2.Body.Close()
-	data := decodeJSON(t, readBody(t, resp2))
-	posts := data["posts"].([]interface{})
+	data := readBody(t, resp2)
+	posts := decodeJSONArray(t, data)
 	if len(posts) != 0 {
 		t.Errorf("Expected 0 posts after delete, got %d", len(posts))
 	}
@@ -365,11 +362,7 @@ func TestGetTags_ListAll(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected 200, got %d", resp.StatusCode)
 	}
-	data := decodeJSON(t, readBody(t, resp))
-	tags, ok := data["tags"].([]interface{})
-	if !ok {
-		t.Fatal("Expected 'tags' array")
-	}
+	tags := decodeJSONArray(t, readBody(t, resp))
 	if len(tags) != 2 {
 		t.Errorf("Expected 2 tags, got %d", len(tags))
 	}
@@ -413,11 +406,7 @@ func TestGetCategories_ListAll(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected 200, got %d", resp.StatusCode)
 	}
-	data := decodeJSON(t, readBody(t, resp))
-	cats, ok := data["categories"].([]interface{})
-	if !ok {
-		t.Fatal("Expected 'categories' array")
-	}
+	cats := decodeJSONArray(t, readBody(t, resp))
 	if len(cats) != 2 {
 		t.Errorf("Expected 2 categories, got %d", len(cats))
 	}

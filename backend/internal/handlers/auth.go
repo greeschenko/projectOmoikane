@@ -191,12 +191,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"user": map[string]interface{}{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  user.Role,
-		},
+		"user":    sanitizeUserJSON(user),
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"omoikane-backend/internal/handlers"
@@ -72,14 +73,25 @@ func TestUploadMedia_UploadsFile(t *testing.T) {
 	}
 
 	data := decodeJSON(t, readBody(t, resp))
-	if data["filename"] != "test.txt" {
-		t.Errorf("Expected filename 'test.txt', got %v", data["filename"])
+	media, ok := data["media"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected 'media' object in response")
 	}
-	if data["mimeType"] != "text/plain; charset=utf-8" {
-		t.Errorf("Expected mimeType 'text/plain; charset=utf-8', got %v", data["mimeType"])
+	if media["filename"] != "test.txt" {
+		t.Errorf("Expected filename 'test.txt', got %v", media["filename"])
 	}
-	if data["size"] != float64(11) {
-		t.Errorf("Expected size 11, got %v", data["size"])
+	if media["mimeType"] != "text/plain; charset=utf-8" {
+		t.Errorf("Expected mimeType 'text/plain; charset=utf-8', got %v", media["mimeType"])
+	}
+	if media["size"] != float64(11) {
+		t.Errorf("Expected size 11, got %v", media["size"])
+	}
+	dataStr, ok := media["data"].(string)
+	if !ok || dataStr == "" {
+		t.Error("Expected non-empty data field")
+	}
+	if !strings.HasPrefix(dataStr, "data:text/plain") {
+		t.Error("Expected data URI prefix")
 	}
 
 	// Verify file exists on disk
@@ -119,11 +131,7 @@ func TestGetMedia_ListsItems(t *testing.T) {
 		t.Errorf("Expected 200, got %d", resp.StatusCode)
 	}
 
-	data := decodeJSON(t, readBody(t, resp))
-	items, ok := data["media"].([]interface{})
-	if !ok {
-		t.Fatal("Expected 'media' array")
-	}
+	items := decodeJSONArray(t, readBody(t, resp))
 	if len(items) != 2 {
 		t.Errorf("Expected 2 media items, got %d", len(items))
 	}
@@ -149,8 +157,9 @@ func TestDeleteMedia_DeletesFromDisk(t *testing.T) {
 	req.AddCookie(cookie)
 	resp, _ := http.DefaultClient.Do(req)
 	data := decodeJSON(t, readBody(t, resp))
+	mediaItem := data["media"].(map[string]interface{})
 
-	mediaID := int(data["id"].(float64))
+	mediaID := int(mediaItem["id"].(float64))
 	_ = mediaID
 	resp.Body.Close()
 
@@ -207,7 +216,8 @@ func TestUploadMedia_ImageDetectsMime(t *testing.T) {
 	defer resp.Body.Close()
 
 	data := decodeJSON(t, readBody(t, resp))
-	if data["mimeType"] != "image/png" {
-		t.Errorf("Expected mimeType 'image/png', got %v", data["mimeType"])
+	mediaItem := data["media"].(map[string]interface{})
+	if mediaItem["mimeType"] != "image/png" {
+		t.Errorf("Expected mimeType 'image/png', got %v", mediaItem["mimeType"])
 	}
 }

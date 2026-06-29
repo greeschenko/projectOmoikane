@@ -34,6 +34,7 @@ func main() {
 	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("POST /auth/register", h.Register)
 	mux.HandleFunc("POST /auth/logout", h.Logout)
+	mux.HandleFunc("POST /auth/forgot-password", h.ForgotPassword)
 
 	// Settings
 	mux.HandleFunc("GET /settings", h.GetSettings) // public (read)
@@ -44,12 +45,15 @@ func main() {
 
 	// Dashboard
 	mux.HandleFunc("GET /dashboard", h.Admin(h.GetDashboard))
+	mux.HandleFunc("GET /dashboard/stats", h.Admin(h.GetDashboardStats))
 
 	// Messages
 	mux.HandleFunc("GET /messages", h.Auth(h.GetMessages))
 	mux.HandleFunc("POST /messages", h.Admin(h.CreateMessage))
 	mux.HandleFunc("GET /messages/{id}", h.Auth(h.GetMessage))
-	mux.HandleFunc("PUT /messages/{id}/read", h.Auth(h.MarkRead))
+	mux.HandleFunc("POST /messages/{id}/read", h.Auth(h.MarkRead))
+	mux.HandleFunc("POST /messages/read-all", h.Auth(h.MarkAllRead))
+	mux.HandleFunc("DELETE /messages", h.Admin(h.DeleteAllMessages))
 	mux.HandleFunc("DELETE /messages/{id}", h.Admin(h.DeleteMessage))
 
 	// Media
@@ -68,6 +72,7 @@ func main() {
 	mux.HandleFunc("POST /blog/posts/{id}/like", h.Auth(h.ToggleLike))
 	mux.HandleFunc("GET /blog/tags", h.GetTags)
 	mux.HandleFunc("POST /blog/tags", h.Admin(h.CreateTag))
+	mux.HandleFunc("DELETE /blog/tags/{id}", h.Admin(h.DeleteTag))
 	mux.HandleFunc("GET /blog/categories", h.GetCategories)
 	mux.HandleFunc("POST /blog/categories", h.Admin(h.CreateCategory))
 

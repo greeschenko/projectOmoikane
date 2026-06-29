@@ -154,3 +154,12 @@ func decodeJSON(t *testing.T, data string) map[string]interface{} {
 	}
 	return result
 }
+
+func decodeJSONArray(t *testing.T, data string) []interface{} {
+	t.Helper()
+	var result []interface{}
+	if err := json.Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("Failed to decode JSON array: %v\nBody: %s", err, data)
+	}
+	return result
+}

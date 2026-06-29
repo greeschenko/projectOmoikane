@@ -59,7 +59,7 @@ export default function RichTextEditor({ value, onChange, error, helperText }: R
     try {
       const res = await fetch("/api/media");
       const data = await res.json();
-      setMediaItems(data.media ?? []);
+      setMediaItems(Array.isArray(data) ? data : (data.media ?? []));
     } catch {
       setMediaItems([]);
     }

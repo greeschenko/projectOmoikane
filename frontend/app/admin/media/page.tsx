@@ -37,7 +37,7 @@ export default function AdminMediaPage() {
   const fetchMedia = useCallback(async () => {
     const res = await fetch("/api/media");
     const data = await res.json();
-    setMedia(data.media ?? []);
+    setMedia(Array.isArray(data) ? data : (data.media ?? []));
   }, []);
 
   useEffect(() => { fetchMedia(); }, [fetchMedia]);

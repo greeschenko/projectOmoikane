@@ -18,7 +18,7 @@ func messageServer(db *gorm.DB) *httptest.Server {
 	mux.HandleFunc("GET /messages", h.Auth(h.GetMessages))
 	mux.HandleFunc("POST /messages", h.Admin(h.CreateMessage))
 	mux.HandleFunc("GET /messages/{id}", h.Auth(h.GetMessage))
-	mux.HandleFunc("PUT /messages/{id}/read", h.Auth(h.MarkRead))
+	mux.HandleFunc("POST /messages/{id}/read", h.Auth(h.MarkRead))
 	mux.HandleFunc("DELETE /messages/{id}", h.Admin(h.DeleteMessage))
 	return httptest.NewServer(mux)
 }
@@ -111,7 +111,7 @@ func TestMarkRead_MarksAsRead(t *testing.T) {
 	createTestUser(db, "User", "user@test.com", "Pass1234!", "user")
 	cookie2 := loginAs(t, s, "user@test.com", "Pass1234!")
 
-	markResp := authenticatedRequest(t, "PUT", fmt.Sprintf("%s/messages/%d/read", s.URL, msgID), "", cookie2)
+	markResp := authenticatedRequest(t, "POST", fmt.Sprintf("%s/messages/%d/read", s.URL, msgID), "", cookie2)
 	defer markResp.Body.Close()
 
 	if markResp.StatusCode != 200 {
@@ -119,8 +119,8 @@ func TestMarkRead_MarksAsRead(t *testing.T) {
 	}
 
 	markData := decodeJSON(t, readBody(t, markResp))
-	if markData["read"] != true {
-		t.Errorf("Expected read=true, got %v", markData["read"])
+	if markData["success"] != true {
+		t.Errorf("Expected success=true, got %v", markData["success"])
 	}
 }
 
