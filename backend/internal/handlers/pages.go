@@ -70,7 +70,17 @@ func (h *Handler) GetPageBySlug(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(sanitizePageJSON(page))
+	result := sanitizePageJSON(page)
+
+	if page.ParentID != nil {
+		var parent models.Page
+		if err := h.DB.First(&parent, *page.ParentID).Error; err == nil {
+			result["parentTitle"] = parent.Title
+			result["parentSlug"] = parent.Slug
+		}
+	}
+
+	json.NewEncoder(w).Encode(result)
 }
 
 func (h *Handler) CreatePage(w http.ResponseWriter, r *http.Request) {

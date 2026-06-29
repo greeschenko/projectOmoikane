@@ -15,6 +15,8 @@ interface PageData {
   metaTitle?: string;
   metaDescription?: string;
   parentId?: string | null;
+  parentTitle?: string;
+  parentSlug?: string;
 }
 
 async function fetchPageBySlug(slug: string): Promise<PageData | null> {
@@ -50,6 +52,20 @@ export default async function PublicPage({
 
   return (
     <Container maxWidth="md" sx={{ my: 4 }}>
+      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+        <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
+          Home
+        </Link>
+        {page.parentSlug && page.parentTitle && (
+          <Link
+            href={`/pages/${page.parentSlug}`}
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            {page.parentTitle}
+          </Link>
+        )}
+        <Typography color="text.primary">{page.title}</Typography>
+      </Breadcrumbs>
       <Typography variant="h4" component="h1" gutterBottom>
         {page.title}
       </Typography>

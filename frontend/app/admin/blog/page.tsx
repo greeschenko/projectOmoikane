@@ -83,7 +83,7 @@ export default function AdminBlog() {
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/blog/posts");
+      const res = await fetch("/api/admin/blog/posts");
       if (res.ok) setPosts(await res.json());
     } catch { /* ignore */ }
     setLoading(false);

@@ -64,6 +64,7 @@ func main() {
 
 	// Blog
 	mux.HandleFunc("GET /blog/posts", h.GetPosts)
+	mux.HandleFunc("GET /admin/blog/posts", h.Admin(h.GetAdminPosts))
 	mux.HandleFunc("GET /blog/posts/slug/{slug}", h.GetPostBySlug)
 	mux.HandleFunc("GET /blog/posts/{id}", h.GetPost)
 	mux.HandleFunc("POST /blog/posts", h.Auth(h.CreatePost))

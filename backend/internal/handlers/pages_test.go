@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -63,6 +64,45 @@ func TestGetPages_ListPublished(t *testing.T) {
 	pages := decodeJSONArray(t, readBody(t, resp))
 	if len(pages) != 2 {
 		t.Errorf("Expected 2 pages, got %d", len(pages))
+	}
+}
+
+func TestGetPageBySlug_ReturnsParentFields(t *testing.T) {
+	db := setupTestDB(t)
+	s := pagesServer(db)
+	defer s.Close()
+
+	parent := createTestPage(db, "Parent Page", "parent", "published", 0)
+	child := models.Page{
+		Title:    "Child Page",
+		Slug:     "child",
+		Content:  "<p>Child content</p>",
+		Status:   "published",
+		ParentID: &parent.ID,
+	}
+	db.Create(&child)
+
+	resp, err := http.Get(s.URL + "/pages/slug/child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	body := readBody(t, resp)
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(body), &result); err != nil {
+		t.Fatal(err)
+	}
+
+	if result["parentTitle"] != "Parent Page" {
+		t.Errorf("Expected parentTitle 'Parent Page', got %v", result["parentTitle"])
+	}
+	if result["parentSlug"] != "parent" {
+		t.Errorf("Expected parentSlug 'parent', got %v", result["parentSlug"])
 	}
 }
 

@@ -76,6 +76,20 @@ func (h *Handler) GetPosts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+func (h *Handler) GetAdminPosts(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var posts []models.BlogPost
+	h.DB.Order("created_at desc").Find(&posts)
+
+	result := make([]map[string]interface{}, 0)
+	for _, p := range posts {
+		result = append(result, sanitizePostJSON(h, p))
+	}
+
+	json.NewEncoder(w).Encode(result)
+}
+
 func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

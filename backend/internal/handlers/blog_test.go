@@ -17,6 +17,7 @@ func blogServer(db *gorm.DB) *httptest.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("GET /blog/posts", h.GetPosts)
+	mux.HandleFunc("GET /admin/blog/posts", h.Admin(h.GetAdminPosts))
 	mux.HandleFunc("GET /blog/posts/{id}", h.GetPost)
 	mux.HandleFunc("GET /blog/posts/slug/{slug}", h.GetPostBySlug)
 	mux.HandleFunc("POST /blog/posts", h.Auth(h.CreatePost))
@@ -90,6 +91,32 @@ func TestGetPosts_ExcludesDrafts(t *testing.T) {
 	posts := decodeJSONArray(t, data)
 	if len(posts) != 1 {
 		t.Errorf("Expected 1 published post, got %d", len(posts))
+	}
+}
+
+func TestGetAdminPosts_ReturnsAllStatuses(t *testing.T) {
+	db := setupTestDB(t)
+	s := blogServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin-blog@test.com", "Pass1234!", "admin")
+	adminCookie := loginAs(t, s, "admin-blog@test.com", "Pass1234!")
+	author := models.User{}
+	db.Where("email = ?", "admin-blog@test.com").First(&author)
+
+	createTestPost(db, "Published Post", "pub-post", "published", author.ID)
+	createTestPost(db, "Draft Post", "draft-post", "draft", author.ID)
+
+	resp := authenticatedRequest(t, "GET", s.URL+"/admin/blog/posts", "", adminCookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	posts := decodeJSONArray(t, readBody(t, resp))
+	if len(posts) != 2 {
+		t.Errorf("Expected 2 posts (published + draft), got %d", len(posts))
 	}
 }
 
