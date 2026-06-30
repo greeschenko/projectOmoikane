@@ -42,6 +42,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		tables := []string{
 			"users", "pages", "blog_posts", "tags", "blog_post_tags",
 			"categories", "likes", "media_items", "messages", "site_settings",
+			"password_reset_tokens",
 		}
 		for _, table := range tables {
 			db.Exec("DROP TABLE IF EXISTS " + table + " CASCADE")
@@ -57,6 +58,8 @@ func authServer(db *gorm.DB) *httptest.Server {
 	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("POST /auth/register", h.Register)
 	mux.HandleFunc("POST /auth/logout", h.Logout)
+	mux.HandleFunc("POST /auth/forgot-password", h.ForgotPassword)
+	mux.HandleFunc("POST /auth/reset-password", h.ResetPassword)
 	return httptest.NewServer(mux)
 }
 

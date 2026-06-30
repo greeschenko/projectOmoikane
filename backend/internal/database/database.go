@@ -45,6 +45,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.MediaItem{},
 		&models.Message{},
 		&models.SiteSetting{},
+		&models.PasswordResetToken{},
 	)
 	if err != nil {
 		return fmt.Errorf("AutoMigrate failed: %w", err)

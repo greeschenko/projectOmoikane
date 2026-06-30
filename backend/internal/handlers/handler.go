@@ -9,9 +9,15 @@ import (
 )
 
 type Handler struct {
-	DB        *gorm.DB
-	JWTSecret string
-	UploadDir string
+	DB              *gorm.DB
+	JWTSecret       string
+	UploadDir       string
+	SMTPHost        string
+	SMTPPort        string
+	SMTPUser        string
+	SMTPPass        string
+	SMTPFrom        string
+	RecaptchaSecret string
 }
 
 func (h *Handler) Auth(next http.HandlerFunc) http.HandlerFunc {

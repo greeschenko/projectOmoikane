@@ -13,6 +13,7 @@ import {
   Paper,
   Link as MuiLink,
 } from "@mui/material";
+import ReCaptcha from "@/components/ReCaptcha";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -42,7 +44,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, recaptchaToken }),
     });
     if (!res.ok) {
       const data = await res.json();
@@ -102,6 +104,9 @@ export default function RegisterPage() {
             error={!!fieldErrors.password}
             required
           />
+          <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
+            <ReCaptcha onChange={setRecaptchaToken} />
+          </Box>
           <Button
             type="submit"
             variant="contained"

@@ -19,7 +19,17 @@ func main() {
 	if uploadDir == "" {
 		uploadDir = "./uploads"
 	}
-	h := &handlers.Handler{DB: db, JWTSecret: cfg.JWTSecret, UploadDir: uploadDir}
+	h := &handlers.Handler{
+		DB:              db,
+		JWTSecret:       cfg.JWTSecret,
+		UploadDir:       uploadDir,
+		SMTPHost:        cfg.SMTP.Host,
+		SMTPPort:        cfg.SMTP.Port,
+		SMTPUser:        cfg.SMTP.User,
+		SMTPPass:        cfg.SMTP.Pass,
+		SMTPFrom:        cfg.SMTP.From,
+		RecaptchaSecret: cfg.RecaptchaSecret,
+	}
 
 	mux := http.NewServeMux()
 
@@ -35,6 +45,7 @@ func main() {
 	mux.HandleFunc("POST /auth/register", h.Register)
 	mux.HandleFunc("POST /auth/logout", h.Logout)
 	mux.HandleFunc("POST /auth/forgot-password", h.ForgotPassword)
+	mux.HandleFunc("POST /auth/reset-password", h.ResetPassword)
 
 	// Settings
 	mux.HandleFunc("GET /settings", h.GetSettings) // public (read)

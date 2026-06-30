@@ -132,12 +132,29 @@ Fixed 2 pre-existing desktop Playwright failures.
 - **Draft visibility** (`22-admin-blog.spec.ts:40`): New `GET /admin/blog/posts` endpoint (admin-only, all statuses); admin blog page fetches from it
 - **Results** (clean DB): Go tests **82/82 pass**; desktop Playwright **231/231 pass** (0 failures); mobile 11 failures (pre-existing)
 
-## 🔲 Phase 12: Public Interactions
+## ✅ Phase 12: Public Interactions
 
-- [ ] Email integration (SMTP + Go mailer + password reset flow)
-- [ ] ReCAPTCHA/spam protection on public forms
+Email integration and ReCAPTCHA protection.
 
-## 🔲 Phase 13: Admin Polish & UX
+- [x] SMTP config — `SMTPHost`, `SMTPPort`, `SMTPUser`, `SMTPPass`, `SMTPFrom` in env vars
+- [x] `PasswordResetToken` model + DB migration
+- [x] Mailer package — `net/smtp` sender (logs to stdout when SMTP not configured)
+- [x] `POST /auth/forgot-password` — generates 32-byte token, stores with 1h expiry, sends email (real SMTP or dev log)
+- [x] `POST /auth/reset-password` — validates token, hashes + updates password, marks token used
+- [x] Frontend `/reset-password` page — reads token from URL, form with new password + confirm
+- [x] ReCAPTCHA v2 (checkbox) — `RECAPTCHA_SECRET` env var, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` for frontend
+- [x] `Recaptcha` Go package — verifies token against Google's `/recaptcha/api/siteverify`
+- [x] `ReCaptcha` React component — renders checkbox via `react-google-recaptcha`
+- [x] ReCAPTCHA wired into `Register` + `ForgotPassword` handlers and pages
+- [x] Go tests for forgot-password (success, nonexistent user, missing email) and reset-password (success, invalid token, expired token, short password)
+
+## 🔲 Phase 13: Public Interactions (future)
+
+- [ ] Email templates (customizable admin UI for reset email HTML)
+- [ ] Rate limiting on forgot-password endpoint
+- [ ] Contact form with ReCAPTCHA
+
+## 🔲 Phase 15: Admin Polish & UX
 
 - [ ] Soft delete / trash system (undo mistakes)
 - [ ] Audit log (who did what, when)
@@ -146,7 +163,7 @@ Fixed 2 pre-existing desktop Playwright failures.
 - [ ] Theme customizer (colors, typography, layout options via admin UI)
 - [ ] Import/export (CSV/JSON for pages, users, media)
 
-## 🔲 Phase 14: Platform & Performance
+## 🔲 Phase 16: Platform & Performance
 
 - [ ] OpenAPI documentation for all Go routes
 - [ ] API tokens / headless CMS mode

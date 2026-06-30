@@ -12,9 +12,11 @@ import {
   Paper,
   Link as MuiLink,
 } from "@mui/material";
+import ReCaptcha from "@/components/ReCaptcha";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,7 +28,7 @@ export default function ForgotPasswordPage() {
     const res = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, recaptchaToken }),
     });
     if (!res.ok) {
       const data = await res.json();
@@ -59,6 +61,9 @@ export default function ForgotPasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+            <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
+              <ReCaptcha onChange={setRecaptchaToken} />
+            </Box>
             <Button
               type="submit"
               variant="contained"

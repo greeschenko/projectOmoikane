@@ -26,6 +26,7 @@ See [TODO.md](./TODO.md) for the full development roadmap.
 | 9 — Go Backend + PostgreSQL | ✅ | 77 Go pass, 0 fail |
 | 10 — E2E Cleanup | ✅ | 229/231 desktop pass, 77 Go pass |
 | 11 — E2E Fixes | ✅ | 231/231 desktop pass, 82 Go pass |
+| 12 — Public Interactions | ✅ | 82 Go pass (password reset + ReCAPTCHA) |
 
 ## Quick Start
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"omoikane-backend/internal/models"
 
@@ -216,6 +217,188 @@ func TestRegister_MissingFields(t *testing.T) {
 	defer s.Close()
 
 	resp, err := http.Post(s.URL+"/auth/register", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 400 {
+		t.Errorf("Expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestForgotPassword_ReturnsSuccess(t *testing.T) {
+	db := setupTestDB(t)
+	s := authServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Test User", "user@test.com", "MyPass123!", "user")
+
+	body := `{"email":"user@test.com"}`
+	resp, err := http.Post(s.URL+"/auth/forgot-password", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := readBody(t, resp)
+	result := decodeJSON(t, data)
+	if result["success"] != true {
+		t.Errorf("Expected success=true, got %v", result["success"])
+	}
+	if result["message"] != "Check your email for a reset link" {
+		t.Errorf("Unexpected message: %v", result["message"])
+	}
+
+	var tokenCount int64
+	db.Model(&models.PasswordResetToken{}).Count(&tokenCount)
+	if tokenCount != 1 {
+		t.Errorf("Expected 1 reset token, got %d", tokenCount)
+	}
+}
+
+func TestForgotPassword_NoUserStillReturnsSuccess(t *testing.T) {
+	db := setupTestDB(t)
+	s := authServer(db)
+	defer s.Close()
+
+	body := `{"email":"nonexistent@test.com"}`
+	resp, err := http.Post(s.URL+"/auth/forgot-password", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := readBody(t, resp)
+	result := decodeJSON(t, data)
+	if result["success"] != true {
+		t.Errorf("Expected success=true, got %v", result["success"])
+	}
+
+	var tokenCount int64
+	db.Model(&models.PasswordResetToken{}).Count(&tokenCount)
+	if tokenCount != 0 {
+		t.Errorf("Expected 0 reset tokens for nonexistent user, got %d", tokenCount)
+	}
+}
+
+func TestForgotPassword_MissingEmail(t *testing.T) {
+	db := setupTestDB(t)
+	s := authServer(db)
+	defer s.Close()
+
+	resp, err := http.Post(s.URL+"/auth/forgot-password", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 400 {
+		t.Errorf("Expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestResetPassword_Success(t *testing.T) {
+	db := setupTestDB(t)
+	s := authServer(db)
+	defer s.Close()
+
+	user := createTestUser(db, "Test User", "user@test.com", "OldPass123!", "user")
+
+	token := "test-reset-token-12345"
+	db.Create(&models.PasswordResetToken{
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(1 * time.Hour),
+	})
+
+	body := `{"token":"test-reset-token-12345","password":"NewPass123!"}`
+	resp, err := http.Post(s.URL+"/auth/reset-password", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := readBody(t, resp)
+	result := decodeJSON(t, data)
+	if result["success"] != true {
+		t.Errorf("Expected success=true, got %v", result["success"])
+	}
+
+	var dbUser models.User
+	db.First(&dbUser, user.ID)
+	if err := bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte("NewPass123!")); err != nil {
+		t.Error("Password was not updated correctly")
+	}
+
+	var resetToken models.PasswordResetToken
+	db.Where("token = ?", token).First(&resetToken)
+	if !resetToken.Used {
+		t.Error("Expected reset token to be marked as used")
+	}
+}
+
+func TestResetPassword_InvalidToken(t *testing.T) {
+	db := setupTestDB(t)
+	s := authServer(db)
+	defer s.Close()
+
+	body := `{"token":"invalid-token","password":"NewPass123!"}`
+	resp, err := http.Post(s.URL+"/auth/reset-password", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 400 {
+		t.Errorf("Expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestResetPassword_ExpiredToken(t *testing.T) {
+	db := setupTestDB(t)
+	s := authServer(db)
+	defer s.Close()
+
+	user := createTestUser(db, "Test User", "user@test.com", "OldPass123!", "user")
+
+	db.Create(&models.PasswordResetToken{
+		UserID:    user.ID,
+		Token:     "expired-token",
+		ExpiresAt: time.Now().Add(-1 * time.Hour),
+	})
+
+	body := `{"token":"expired-token","password":"NewPass123!"}`
+	resp, err := http.Post(s.URL+"/auth/reset-password", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 400 {
+		t.Errorf("Expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestResetPassword_ShortPassword(t *testing.T) {
+	db := setupTestDB(t)
+	s := authServer(db)
+	defer s.Close()
+
+	body := `{"token":"some-token","password":"12345"}`
+	resp, err := http.Post(s.URL+"/auth/reset-password", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
