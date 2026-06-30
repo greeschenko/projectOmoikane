@@ -3,10 +3,12 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"omoikane-backend/internal/config"
 	"omoikane-backend/internal/database"
 	"omoikane-backend/internal/handlers"
+	"omoikane-backend/internal/middleware"
 )
 
 func main() {
@@ -44,7 +46,8 @@ func main() {
 	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("POST /auth/register", h.Register)
 	mux.HandleFunc("POST /auth/logout", h.Logout)
-	mux.HandleFunc("POST /auth/forgot-password", h.ForgotPassword)
+	forgotPasswordLimiter := middleware.NewRateLimiter(1.0/300.0, 3, 15*time.Minute)
+	mux.HandleFunc("POST /auth/forgot-password", forgotPasswordLimiter.Middleware(h.ForgotPassword))
 	mux.HandleFunc("POST /auth/reset-password", h.ResetPassword)
 
 	// Settings
