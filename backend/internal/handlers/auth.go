@@ -277,14 +277,34 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 				scheme = "https"
 			}
 			frontendURL := scheme + "://" + r.Host
-
-			mailer.SendResetEmail(mailer.Config{
+			resetLink := frontendURL + "/reset-password?token=" + tokenHex
+			mailerCfg := mailer.Config{
 				Host: h.SMTPHost,
 				Port: h.SMTPPort,
 				User: h.SMTPUser,
 				Pass: h.SMTPPass,
 				From: h.SMTPFrom,
-			}, user.Email, tokenHex, frontendURL)
+			}
+
+			settings := models.SiteSetting{}
+			h.DB.First(&settings, 1)
+			subject := settings.ResetEmailSubject
+			if subject == "" {
+				subject = "Password Reset Request"
+			}
+			bodyTemplate := settings.ResetEmailBodyHTML
+			if bodyTemplate == "" {
+				bodyTemplate = `<h2>Password Reset</h2><p>Click <a href="{{.ResetLink}}">here</a> to reset your password. Expires in {{.ExpiryHours}} hour(s).</p><p>If you did not request this, ignore this email.</p>`
+			}
+
+			bodyHTML, renderErr := mailer.RenderResetTemplate(bodyTemplate, mailer.ResetEmailData{
+				ResetLink:   resetLink,
+				SiteName:    settings.SiteName,
+				ExpiryHours: 1,
+			})
+			if renderErr == nil {
+				mailer.SendEmail(mailerCfg, user.Email, subject, bodyHTML)
+			}
 		}
 	}
 

@@ -84,6 +84,58 @@ func TestUpdateSettings_AdminOnly(t *testing.T) {
 	}
 }
 
+func TestGetSettings_ReturnsEmailTemplateFields(t *testing.T) {
+	db := setupTestDB(t)
+	s := settingsServer(db)
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := decodeJSON(t, readBody(t, resp))
+	if _, ok := data["resetEmailSubject"]; !ok {
+		t.Error("Expected resetEmailSubject in response")
+	}
+	if _, ok := data["resetEmailBodyHTML"]; !ok {
+		t.Error("Expected resetEmailBodyHTML in response")
+	}
+	if data["resetEmailSubject"] != "Password Reset Request" {
+		t.Errorf("Expected default resetEmailSubject 'Password Reset Request', got %v", data["resetEmailSubject"])
+	}
+}
+
+func TestUpdateSettings_UpdatesEmailTemplateFields(t *testing.T) {
+	db := setupTestDB(t)
+	s := settingsServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin@test.com", "AdminPass1!", "admin")
+	cookie := loginAs(t, s, "admin@test.com", "AdminPass1!")
+
+	body := `{"resetEmailSubject":"Custom Subject","resetEmailBodyHTML":"<p>Custom body {{.ResetLink}}</p>"}`
+	resp := authenticatedRequest(t, "PUT", s.URL+"/settings", body, cookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := decodeJSON(t, readBody(t, resp))
+	if data["resetEmailSubject"] != "Custom Subject" {
+		t.Errorf("Expected resetEmailSubject 'Custom Subject', got %v", data["resetEmailSubject"])
+	}
+	if data["resetEmailBodyHTML"] != "<p>Custom body {{.ResetLink}}</p>" {
+		t.Errorf("Unexpected resetEmailBodyHTML: %v", data["resetEmailBodyHTML"])
+	}
+}
+
 func TestUpdateSettings_PartialUpdate(t *testing.T) {
 	db := setupTestDB(t)
 	s := settingsServer(db)

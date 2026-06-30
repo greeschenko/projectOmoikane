@@ -2,14 +2,21 @@
 
 import { useState, useEffect } from "react";
 import {
-  Container, Typography, Paper, TextField, Button, Box, Alert,
+  Container, Typography, Paper, TextField, Button, Box, Alert, Tabs, Tab,
 } from "@mui/material";
+import RichTextEditor from "@/components/RichTextEditor";
 
 export default function AdminSettings() {
+  const [tab, setTab] = useState(0);
+
   const [siteName, setSiteName] = useState("");
   const [tagline, setTagline] = useState("");
   const [logo, setLogo] = useState("");
   const [favicon, setFavicon] = useState("");
+
+  const [resetEmailSubject, setResetEmailSubject] = useState("");
+  const [resetEmailBodyHTML, setResetEmailBodyHTML] = useState("");
+
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,6 +28,8 @@ export default function AdminSettings() {
         setTagline(data.tagline || "");
         setLogo(data.logo || "");
         setFavicon(data.favicon || "");
+        setResetEmailSubject(data.resetEmailSubject || "");
+        setResetEmailBodyHTML(data.resetEmailBodyHTML || "");
       })
       .catch(() => setMessage({ type: "error", text: "Failed to load settings" }))
       .finally(() => setLoading(false));
@@ -29,11 +38,14 @@ export default function AdminSettings() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
+    const body: Record<string, unknown> = { siteName, tagline, logo, favicon };
+    body.resetEmailSubject = resetEmailSubject;
+    body.resetEmailBodyHTML = resetEmailBodyHTML;
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteName, tagline, logo, favicon }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         setMessage({ type: "success", text: "Settings saved" });
@@ -68,46 +80,72 @@ export default function AdminSettings() {
     <Container maxWidth="md">
       <Typography variant="h4" sx={{ mb: 3 }}>Site Settings</Typography>
       {message && <Alert severity={message.type} sx={{ mb: 2 }}>{message.text}</Alert>}
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+        <Tab label="General" />
+        <Tab label="Email Templates" />
+      </Tabs>
       <Paper sx={{ p: 3 }} component="form" onSubmit={handleSubmit}>
-        <TextField
-          label="Site Name"
-          fullWidth
-          margin="dense"
-          value={siteName}
-          onChange={(e) => setSiteName(e.target.value)}
-          required
-        />
-        <TextField
-          label="Tagline"
-          fullWidth
-          margin="dense"
-          value={tagline}
-          onChange={(e) => setTagline(e.target.value)}
-        />
-        <Box sx={{ mt: 2, mb: 1 }}>
-          <Typography variant="body2" sx={{ mb: 1 }}>Logo</Typography>
-          <Button variant="outlined" component="label" aria-label="logo">
-            {logo ? "Change Logo" : "Upload Logo"}
-            <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
-          </Button>
-          {logo && (
-            <Box sx={{ mt: 1 }}>
-              <img src={logo} alt="Logo preview" style={{ maxHeight: 60, maxWidth: 200 }} />
+        {tab === 0 && (
+          <Box>
+            <TextField
+              label="Site Name"
+              fullWidth
+              margin="dense"
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+              required
+            />
+            <TextField
+              label="Tagline"
+              fullWidth
+              margin="dense"
+              value={tagline}
+              onChange={(e) => setTagline(e.target.value)}
+            />
+            <Box sx={{ mt: 2, mb: 1 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>Logo</Typography>
+              <Button variant="outlined" component="label" aria-label="logo">
+                {logo ? "Change Logo" : "Upload Logo"}
+                <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
+              </Button>
+              {logo && (
+                <Box sx={{ mt: 1 }}>
+                  <img src={logo} alt="Logo preview" style={{ maxHeight: 60, maxWidth: 200 }} />
+                </Box>
+              )}
             </Box>
-          )}
-        </Box>
-        <Box sx={{ mt: 2, mb: 2 }}>
-          <Typography variant="body2" sx={{ mb: 1 }}>Favicon</Typography>
-          <Button variant="outlined" component="label" aria-label="favicon">
-            {favicon ? "Change Favicon" : "Upload Favicon"}
-            <input type="file" hidden accept="image/*" onChange={handleFaviconUpload} />
-          </Button>
-          {favicon && (
-            <Box sx={{ mt: 1 }}>
-              <img src={favicon} alt="Favicon preview" style={{ maxHeight: 32, maxWidth: 32 }} />
+            <Box sx={{ mt: 2, mb: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>Favicon</Typography>
+              <Button variant="outlined" component="label" aria-label="favicon">
+                {favicon ? "Change Favicon" : "Upload Favicon"}
+                <input type="file" hidden accept="image/*" onChange={handleFaviconUpload} />
+              </Button>
+              {favicon && (
+                <Box sx={{ mt: 1 }}>
+                  <img src={favicon} alt="Favicon preview" style={{ maxHeight: 32, maxWidth: 32 }} />
+                </Box>
+              )}
             </Box>
-          )}
-        </Box>
+          </Box>
+        )}
+        {tab === 1 && (
+          <Box>
+            <TextField
+              label="Reset Email Subject"
+              fullWidth
+              margin="dense"
+              value={resetEmailSubject}
+              onChange={(e) => setResetEmailSubject(e.target.value)}
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>
+              Reset Email Body (HTML with template variables: {"{{.ResetLink}}"}, {"{{.SiteName}}"}, {"{{.ExpiryHours}}"})
+            </Typography>
+            <RichTextEditor
+              value={resetEmailBodyHTML}
+              onChange={(html: string) => setResetEmailBodyHTML(html)}
+            />
+          </Box>
+        )}
         <Box sx={{ mt: 3 }}>
           <Button type="submit" variant="contained">Save</Button>
         </Box>

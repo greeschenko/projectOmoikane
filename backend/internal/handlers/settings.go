@@ -25,11 +25,13 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"siteName":    settings.SiteName,
-		"tagline":     settings.Tagline,
-		"logo":        settings.Logo,
-		"favicon":     settings.Favicon,
-		"blogEnabled": settings.BlogEnabled,
+		"siteName":          settings.SiteName,
+		"tagline":           settings.Tagline,
+		"logo":              settings.Logo,
+		"favicon":           settings.Favicon,
+		"blogEnabled":       settings.BlogEnabled,
+		"resetEmailSubject": settings.ResetEmailSubject,
+		"resetEmailBodyHTML": settings.ResetEmailBodyHTML,
 	})
 }
 
@@ -37,11 +39,13 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		SiteName    *string `json:"siteName,omitempty"`
-		Tagline     *string `json:"tagline,omitempty"`
-		Logo        *string `json:"logo,omitempty"`
-		Favicon     *string `json:"favicon,omitempty"`
-		BlogEnabled *bool   `json:"blogEnabled,omitempty"`
+		SiteName           *string `json:"siteName,omitempty"`
+		Tagline            *string `json:"tagline,omitempty"`
+		Logo               *string `json:"logo,omitempty"`
+		Favicon            *string `json:"favicon,omitempty"`
+		BlogEnabled        *bool   `json:"blogEnabled,omitempty"`
+		ResetEmailSubject  *string `json:"resetEmailSubject,omitempty"`
+		ResetEmailBodyHTML *string `json:"resetEmailBodyHTML,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -76,6 +80,12 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if req.BlogEnabled != nil {
 		updates["blog_enabled"] = *req.BlogEnabled
 	}
+	if req.ResetEmailSubject != nil {
+		updates["reset_email_subject"] = *req.ResetEmailSubject
+	}
+	if req.ResetEmailBodyHTML != nil {
+		updates["reset_email_body_html"] = *req.ResetEmailBodyHTML
+	}
 
 	if len(updates) > 0 {
 		h.DB.Model(&settings).Updates(updates)
@@ -83,11 +93,13 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	h.DB.First(&settings, 1)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"siteName":    settings.SiteName,
-		"tagline":     settings.Tagline,
-		"logo":        settings.Logo,
-		"favicon":     settings.Favicon,
-		"blogEnabled": settings.BlogEnabled,
+		"siteName":          settings.SiteName,
+		"tagline":           settings.Tagline,
+		"logo":              settings.Logo,
+		"favicon":           settings.Favicon,
+		"blogEnabled":       settings.BlogEnabled,
+		"resetEmailSubject": settings.ResetEmailSubject,
+		"resetEmailBodyHTML": settings.ResetEmailBodyHTML,
 	})
 }
 
