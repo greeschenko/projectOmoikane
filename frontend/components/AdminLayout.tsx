@@ -28,6 +28,7 @@ const navItems = [
   { label: "Tags", href: "/admin/blog/tags", icon: <SellIcon />, indent: true },
   { label: "Categories", href: "/admin/blog/categories", icon: <CategoryIcon />, indent: true },
   { label: "Messages", href: "/admin/messages", icon: <MailIcon /> },
+  { label: "Contacts", href: "/admin/contacts", icon: <MailIcon /> },
   { label: "Media", href: "/admin/media", icon: <CollectionsIcon /> },
   { label: "Settings", href: "/admin/settings", icon: <SettingsIcon /> },
 ];

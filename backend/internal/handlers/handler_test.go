@@ -42,7 +42,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		tables := []string{
 			"users", "pages", "blog_posts", "tags", "blog_post_tags",
 			"categories", "likes", "media_items", "messages", "site_settings",
-			"password_reset_tokens",
+			"password_reset_tokens", "contact_messages",
 		}
 		for _, table := range tables {
 			db.Exec("DROP TABLE IF EXISTS " + table + " CASCADE")

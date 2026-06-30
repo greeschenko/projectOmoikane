@@ -100,6 +100,13 @@ func main() {
 	mux.HandleFunc("DELETE /pages/{id}", h.Auth(h.DeletePage))
 	mux.HandleFunc("PUT /pages/reorder", h.Auth(h.ReorderPages))
 
+	// Contact Form
+	mux.HandleFunc("POST /contact", h.SubmitContact)                             // public
+	mux.HandleFunc("GET /contacts", h.Admin(h.GetContacts))                      // admin
+	mux.HandleFunc("GET /contacts/{id}", h.Admin(h.GetContact))                  // admin
+	mux.HandleFunc("POST /contacts/{id}/read", h.Admin(h.MarkContactRead))       // admin
+	mux.HandleFunc("DELETE /contacts/{id}", h.Admin(h.DeleteContact))            // admin
+
 	// Users (admin only)
 	mux.HandleFunc("GET /users", h.Admin(h.GetUsers))
 	mux.HandleFunc("POST /users", h.Admin(h.CreateUser))

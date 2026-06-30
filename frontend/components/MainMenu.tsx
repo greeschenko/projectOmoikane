@@ -70,6 +70,11 @@ export default function MainMenu() {
                   </ListItemButton>
                 </ListItem>
               )}
+              <ListItem disablePadding>
+                <ListItemButton component={Link} href="/contact" onClick={() => setMobileOpen(false)}>
+                  <ListItemText primary="Contact" />
+                </ListItemButton>
+              </ListItem>
               {rootPages.map((page) => (
                 <ListItem key={page.id} disablePadding>
                   <ListItemButton
@@ -95,6 +100,9 @@ export default function MainMenu() {
           Blog
         </Button>
       )}
+      <Button color="inherit" component={Link} href="/contact">
+        Contact
+      </Button>
       {rootPages.map((page) => {
         const children = getChildren(page.id);
         if (children.length > 0) {

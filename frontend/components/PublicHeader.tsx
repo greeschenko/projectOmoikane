@@ -59,6 +59,9 @@ export default function PublicHeader({
             Blog
           </Button>
         )}
+        <Button color="inherit" component={Link} href="/contact" sx={{ mr: 1 }}>
+          Contact
+        </Button>
         <MainMenu />
         <Box sx={{ flexGrow: 1 }} />
         {session ? (
