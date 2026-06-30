@@ -1,19 +1,23 @@
 # Omoikane — Project Context for AI Agents
 
 ## Goal
-- **Phase 12 complete**: Phase 13 — (next milestone)
+- **Phase 13 complete**: Next — investigate mobile failures
 
 ## Constraints & Preferences
-- `make go-test` to verify all Go tests pass (82 tests, ~12s)
+- `make go-test` to verify all Go tests pass (~87 tests: 82 handler, 2 mailer, 3 middleware)
 - `make test` for full Playwright suite (desktop + mobile); must reset DB between runs
 - nginx proxies `/api/*` → Go:8080
 - Database must be reset (`DROP/CREATE` + restart backend) before each clean Playwright run
+- `.next-root-owned/` added to frontend `.gitignore` (Next.js 16 cache)
 
 ## Progress
 ### Done
-- **Phase 10**: All Go API response shapes aligned, 27 dead API routes deleted, 229/231 desktop Playwright tests pass
-- **Phase 11**: Fixed breadcrumb + draft visibility — **231/231 desktop pass**, 82 Go tests pass
-- **Phase 12 complete**: Email integration (SMTP + password reset) + ReCAPTCHA v2
+- **Phase 10**: All Go API response shapes aligned, 27 dead API routes deleted, 229/231 desktop tests pass
+- **Phase 11**: Breadcrumb + draft visibility — **231/231 desktop pass**, 82 Go tests pass
+- **Phase 12**: Email integration (SMTP + password reset) + ReCAPTCHA v2 — 90 Go tests
+- **Phase 13a**: Email templates (customizable via admin UI)
+- **Phase 13b**: Rate limiting on forgot-password (3 req/15min per IP)
+- **Phase 13c**: Contact form with ReCAPTCHA — public POST + admin CRUD
 
 ### Phase 12 — Public Interactions
 - SMTP config in env vars (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`)
@@ -28,8 +32,30 @@
 - `frontend/app/reset-password/page.tsx` — new page with token from URL + password form
 - 8 new Go tests for forgot/reset password flows
 
+### Phase 13a — Email Templates
+- `SiteSetting` model: `resetEmailSubject` + `resetEmailBodyHTML` fields (with defaults)
+- Mailer: `RenderResetTemplate(templateStr, data)`, `ResetEmailData{ResetLink, SiteName, ExpiryHours}`
+- Settings handler: GET/PUT include email template fields
+- `ForgotPassword` reads template from settings, renders with `html/template`
+- Admin settings page: Tabs (General / Email Templates), RichTextEditor for body HTML
+
+### Phase 13b — Rate Limiting
+- `middleware.NewRateLimiter(rps, burst, window)` + `Limiter.Middleware(next)`
+- Per-IP tracking via `golang.org/x/time/rate` + `sync.Map` with periodic cleanup
+- Forgot-password: 3 requests per 15 min per IP (429 on exceed)
+- 3 middleware tests: allow, block after burst, different IPs independent
+
+### Phase 13c — Contact Form
+- `ContactMessage` model (name, email, subject, message, read bool)
+- `POST /contact` — public, ReCAPTCHA-protected
+- `GET /contacts`, `GET /contacts/{id}`, `POST /contacts/{id}/read`, `DELETE /contacts/{id}` — admin only
+- `frontend/app/(withHeader)/contact/page.tsx` — public form with ReCAPTCHA
+- `frontend/app/admin/contacts/page.tsx` — admin list with mark-read + delete
+- Contact added to PublicHeader, MainMenu (mobile + desktop), AdminLayout sidebar
+- 6 handler tests: submit success, missing fields, default subject, admin-only, mark read, delete
+
 ### Mobile Failures (pre-existing)
-- 11 failures — pre-existing mobile viewport/timeout issues
+- 11 failures — pre-existing mobile viewport/timeout issues (unchanged since Phase 11)
 
 ## Key Decisions
 - **Fix Go, not frontend** — Go is the permanent backend; shape changes localized per handler
@@ -40,15 +66,13 @@
 - **Mailer logs to stdout** when SMTP not configured — transparent dev fallback
 - **ForgotPassword always returns success** — prevents email enumeration even if email doesn't exist
 
-## Next Steps (Phase 13)
-1. Investigate mobile Playwright failures
-2. Email templates (customizable via admin UI)
-3. Rate limiting on forgot-password
-4. Contact form with ReCAPTCHA
+## Next Steps
+1. Investigate 11 pre-existing mobile Playwright failures (viewport/timeout)
+2. Verify desktop Playwright still passes (231/231)
 
 ## Critical Context
-- **Go tests**: all compile (82 tests, need running PostgreSQL)
-- **Desktop Playwright**: 231/231 pass (0 failures)
+- **Go tests**: all compile (~87 tests: 82 handler, 2 mailer, 3 middleware; need running PostgreSQL)
+- **Desktop Playwright**: 231/231 pass (0 failures) — last verified Phase 11
 - **Mobile**: 11 pre-existing failures (viewport/timeout)
 - **Docker backend** uses `omoikane` database; must reset before each clean Playwright run
 - **DB reset**: `docker compose exec postgres psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane; CREATE DATABASE omoikane;"` then restart backend
@@ -73,19 +97,42 @@
 - `frontend/app/(withHeader)/pages/[...slug]/page.tsx`: MUI `<Breadcrumbs>` rendered
 - `frontend/app/admin/blog/page.tsx`: Fetches from `/api/admin/blog/posts`
 
-### Phase 12 — Public Interactions
+### Phase 12
 - `backend/internal/config/config.go`: SMTP config struct + RecaptchaSecret
 - `docker/docker-compose.yml`: SMTP + RECAPTCHA_SECRET env vars
 - `backend/internal/models/password_reset_token.go`: New model
-- `backend/internal/database/database.go`: Added PasswordResetToken to AutoMigrate
 - `backend/internal/mailer/mailer.go`: New SMTP sender package
 - `backend/internal/recaptcha/recaptcha.go`: New ReCAPTCHA verify package
-- `backend/internal/handlers/handler.go`: Added SMTP + Recaptcha fields
-- `backend/internal/handlers/auth.go`: Rewrote ForgotPassword, added ResetPassword, wired ReCAPTCHA
-- `backend/cmd/api/main.go`: Added `POST /auth/reset-password` route
-- `backend/internal/handlers/handler_test.go`: Added routes + cleanup for password_reset_tokens
-- `backend/internal/handlers/auth_test.go`: 8 new tests for forgot/reset flows
-- `frontend/components/ReCaptcha.tsx`: New ReCAPTCHA v2 widget
-- `frontend/app/reset-password/page.tsx`: New password reset page
-- `frontend/app/register/page.tsx`: Added ReCAPTCHA widget + recaptchaToken in body
-- `frontend/app/forgot-password/page.tsx`: Added ReCAPTCHA widget + recaptchaToken in body
+- `backend/internal/handlers/auth.go`: ForgotPassword + ResetPassword + ReCAPTCHA wiring
+- `backend/internal/handlers/auth_test.go`: 8 new tests
+- `frontend/components/ReCaptcha.tsx`: ReCAPTCHA v2 widget
+- `frontend/app/reset-password/page.tsx`: Password reset page
+- `frontend/app/register/page.tsx`: ReCAPTCHA added
+- `frontend/app/forgot-password/page.tsx`: ReCAPTCHA added
+
+### Phase 13a — Email Templates
+- `backend/internal/models/settings.go`: `ResetEmailSubject` + `ResetEmailBodyHTML` fields
+- `backend/internal/mailer/mailer.go`: `RenderResetTemplate`, `ResetEmailData`
+- `backend/internal/handlers/settings.go`: GET/PUT include email template fields
+- `backend/internal/handlers/auth.go`: `ForgotPassword` reads template from settings
+- `frontend/app/admin/settings/page.tsx`: Tabs with RichTextEditor for email body
+
+### Phase 13b — Rate Limiting
+- `backend/internal/middleware/ratelimit.go`: `NewRateLimiter`, `Limiter.Middleware`
+- `backend/internal/middleware/ratelimit_test.go`: 3 tests
+- `backend/cmd/api/main.go`: Rate-limited forgot-password route
+- `backend/go.mod`: Added `golang.org/x/time`
+
+### Phase 13c — Contact Form
+- `backend/internal/models/contact_message.go`: New model
+- `backend/internal/handlers/contacts.go`: `SubmitContact`, `GetContacts`, `GetContact`, `MarkContactRead`, `DeleteContact`
+- `backend/internal/handlers/contacts_test.go`: 6 tests
+- `backend/internal/database/database.go`: Added `ContactMessage` to AutoMigrate
+- `backend/internal/handlers/handler_test.go`: Added `contact_messages` to cleanup
+- `backend/cmd/api/main.go`: 5 contact routes wired
+- `frontend/app/(withHeader)/contact/page.tsx`: Public contact form
+- `frontend/app/admin/contacts/page.tsx`: Admin list with mark-read + delete
+- `frontend/components/AdminLayout.tsx`: Contacts nav entry
+- `frontend/components/PublicHeader.tsx`: Contact button
+- `frontend/components/MainMenu.tsx`: Contact link (desktop + mobile)
+- `frontend/.gitignore`: Added `.next-root-owned/`
