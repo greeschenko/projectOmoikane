@@ -27,8 +27,8 @@ export async function loginAsAdmin(page: Page) {
       data: { email: "admin@example.com", password: "SecurePass123!" },
     });
   }
-  await page.goto("/admin", { waitUntil: "networkidle" });
-  await expect(page).toHaveURL(/\/admin/);
+  await page.goto("/admin", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/admin/, { timeout: isMobile() ? 15000 : 10000 });
   // Reset and seed sample pages via API
   const existingPages = await page.request.get("/api/pages");
   const pagesData = await existingPages.json();

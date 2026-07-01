@@ -6,12 +6,15 @@ import {
   AppBar, Toolbar, Typography, IconButton, Avatar,
   Menu, MenuItem, Box,
 } from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
 import MessageWidget from "./MessageWidget";
 
 export default function AdminAppBar({
   session,
+  onMenuToggle,
 }: {
   session: { userId: string; role: string };
+  onMenuToggle?: () => void;
 }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [siteName, setSiteName] = useState("Omoikane");
@@ -41,6 +44,17 @@ export default function AdminAppBar({
   return (
     <AppBar position="sticky" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }} aria-label="Admin header">
       <Toolbar>
+        {onMenuToggle && (
+          <IconButton
+            color="inherit"
+            edge="start"
+            aria-label="toggle sidebar"
+            onClick={onMenuToggle}
+            sx={{ mr: 1 }}
+          >
+            <MenuIcon />
+          </IconButton>
+        )}
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           {siteName} Admin
         </Typography>

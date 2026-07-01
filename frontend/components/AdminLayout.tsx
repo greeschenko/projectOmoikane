@@ -4,11 +4,10 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  AppBar, Toolbar, IconButton, Typography, Drawer,
+  Toolbar, Drawer,
   List, ListItem, ListItemButton, ListItemText, ListItemIcon, Box,
   useMediaQuery, useTheme,
 } from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import ArticleIcon from "@mui/icons-material/Article";
@@ -63,30 +62,15 @@ export default function AdminLayout({
     </List>
   );
 
+  const toggleMobile = () => setMobileOpen(!mobileOpen);
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <AdminAppBar session={session} />
+      <AdminAppBar session={session} onMenuToggle={isMobile ? toggleMobile : undefined} />
       <Box sx={{ display: "flex", flex: 1 }}>
-        {isMobile && (
-          <AppBar position="fixed">
-            <Toolbar>
-              <IconButton
-                color="inherit"
-                edge="start"
-                aria-label="toggle sidebar"
-                onClick={() => setMobileOpen(!mobileOpen)}
-              >
-                <MenuIcon />
-              </IconButton>
-              <Typography variant="h6" sx={{ ml: 2 }}>
-                Admin
-              </Typography>
-            </Toolbar>
-          </AppBar>
-        )}
         <Box
           component="main"
-          sx={{ flexGrow: 1, p: 3, mt: isMobile ? 8 : 0, order: { md: 1 } }}
+          sx={{ flexGrow: 1, p: 3, mt: 0, order: { md: 1 } }}
         >
           {children}
         </Box>

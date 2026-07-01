@@ -53,7 +53,7 @@ Separate blog entity (not static CMS pages). Tags/categories are blog-only.
 
 **Star/Like:** `POST /api/blog/posts/:id/like` returns `{ liked, count }`.
 
-**Test status: 205 desktop tests pass, 0 fail, 8 mobile-only skipped**
+**Test status: 231 desktop tests pass, 0 fail, 8 mobile-only skipped**
 
 ## ✅ Phase 6: Manual QA Checklist
 - [x] Setup wizard — fresh container, navigate to `/`, create root admin, verify redirect to `/admin`
@@ -148,11 +148,36 @@ Email integration and ReCAPTCHA protection.
 - [x] ReCAPTCHA wired into `Register` + `ForgotPassword` handlers and pages
 - [x] Go tests for forgot-password (success, nonexistent user, missing email) and reset-password (success, invalid token, expired token, short password)
 
-## 🔲 Phase 13: Public Interactions (future)
+## ✅ Phase 13: Public Interactions
 
-- [ ] Email templates (customizable admin UI for reset email HTML)
-- [ ] Rate limiting on forgot-password endpoint
-- [ ] Contact form with ReCAPTCHA
+- [x] Email templates (customizable admin UI for reset email HTML) — 13a
+- [x] Rate limiting on forgot-password endpoint (3 req/15min per IP) — 13b
+- [x] Contact form with ReCAPTCHA — 13c
+
+**Test status (clean DB):** Go tests 87/87 pass; desktop Playwright 231/231 pass (0 failures); mobile 201 pass, 29 fail, 9 skip
+
+### Phase 13a — Email Templates
+
+- `SiteSetting` model: `resetEmailSubject` + `resetEmailBodyHTML` fields (with defaults from handler)
+- Mailer: `RenderResetTemplate(templateStr, data)`, `ResetEmailData{ResetLink, SiteName, ExpiryHours}`
+- Settings handler: GET/PUT include email template fields
+- `ForgotPassword` reads template from settings, renders with `html/template`
+- Admin settings page: Tabs (General / Email Templates), RichTextEditor for body HTML
+
+### Phase 13b — Rate Limiting
+
+- `middleware.NewRateLimiter(rps, burst, window)` + `Limiter.Middleware(next)`
+- Per-IP tracking via `golang.org/x/time/rate` + `sync.Map` with periodic cleanup
+- Forgot-password: 3 requests per 15 min per IP (429 on exceed)
+- 3 middleware tests: allow, block after burst, different IPs independent
+
+### Phase 13c — Contact Form
+
+- `ContactMessage` model (name, email, subject, message, read bool)
+- `POST /contact` — public, ReCAPTCHA-protected
+- `GET /contacts`, `GET /contacts/{id}`, `POST /contacts/{id}/read`, `DELETE /contacts/{id}` — admin only
+- Public contact page with ReCAPTCHA + admin contacts list with mark-read + delete
+- 6 handler tests: submit success, missing fields, default subject, admin-only, mark read, delete
 
 ## 🔲 Phase 15: Admin Polish & UX
 

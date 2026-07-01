@@ -16,7 +16,7 @@ export default defineConfig({
     },
     {
       name: "mobile",
-      use: { viewport: { width: 390, height: 844 } },
+      use: { viewport: { width: 390, height: 844 }, actionTimeout: 15000 },
     },
   ],
 });

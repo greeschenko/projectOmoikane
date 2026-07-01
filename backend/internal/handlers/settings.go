@@ -17,9 +17,11 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	result := h.DB.First(&settings, 1)
 	if result.Error != nil {
 		settings = models.SiteSetting{
-			SiteName:    "Omoikane",
-			Tagline:     "A headless-ish CMS",
-			BlogEnabled: true,
+			SiteName:           "Omoikane",
+			Tagline:            "A headless-ish CMS",
+			BlogEnabled:        true,
+			ResetEmailSubject:  "Password Reset Request",
+			ResetEmailBodyHTML: `<h2>Password Reset</h2><p>Click <a href="{{.ResetLink}}">here</a> to reset your password. Expires in {{.ExpiryHours}} hour(s).</p><p>If you did not request this, ignore this email.</p>`,
 		}
 		h.DB.Create(&settings)
 	}
@@ -57,9 +59,11 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	result := h.DB.First(&settings, 1)
 	if result.Error != nil {
 		settings = models.SiteSetting{
-			SiteName:    "Omoikane",
-			Tagline:     "A headless-ish CMS",
-			BlogEnabled: true,
+			SiteName:           "Omoikane",
+			Tagline:            "A headless-ish CMS",
+			BlogEnabled:        true,
+			ResetEmailSubject:  "Password Reset Request",
+			ResetEmailBodyHTML: `<h2>Password Reset</h2><p>Click <a href="{{.ResetLink}}">here</a> to reset your password. Expires in {{.ExpiryHours}} hour(s).</p><p>If you did not request this, ignore this email.</p>`,
 		}
 		h.DB.Create(&settings)
 	}

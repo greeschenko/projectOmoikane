@@ -15,6 +15,7 @@ import (
 func contactServerRecaptcha(db *gorm.DB, recaptchaSecret string) *httptest.Server {
 	h := &handlers.Handler{DB: db, JWTSecret: testJWTSecret, RecaptchaSecret: recaptchaSecret}
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("POST /contact", h.SubmitContact)
 	mux.HandleFunc("GET /contacts", h.Admin(h.GetContacts))
 	mux.HandleFunc("GET /contacts/{id}", h.Admin(h.GetContact))
