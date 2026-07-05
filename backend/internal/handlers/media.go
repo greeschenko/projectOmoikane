@@ -141,10 +141,38 @@ func (h *Handler) DeleteMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete from disk
-	os.Remove(item.FilePath)
-
+	// Soft-delete only — file stays on disk until hard-purge from trash
 	h.DB.Delete(&item)
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func (h *Handler) BatchMedia(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Action string   `json:"action"`
+		IDs    []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+	if len(req.IDs) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "No IDs provided"})
+		return
+	}
+
+	switch req.Action {
+	case "delete":
+		h.DB.Delete(&models.MediaItem{}, req.IDs)
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown action"})
+		return
+	}
+
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 

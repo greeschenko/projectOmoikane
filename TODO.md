@@ -155,16 +155,50 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 **Test status (clean DB):** Go tests 87/87 pass; desktop Playwright 231/231 pass (0 failures); mobile 230/230 pass (0 failures), 9 skip
 
-## 🔲 Phase 15: Admin Polish & UX
+## 🔲 Phase 15: Trash System & Bulk Actions
 
-- [ ] Soft delete / trash system (undo mistakes)
-- [ ] Audit log (who did what, when)
-- [ ] Bulk actions (delete, publish, unpublish multiple pages/users)
-- [ ] WYSIWYG page builder (drag-and-drop sections, widgets, blocks)
-- [ ] Theme customizer (colors, typography, layout options via admin UI)
-- [ ] Import/export (CSV/JSON for pages, users, media)
+### Feature A — 🗑️ Trash System (unified trash page + restore/hard-delete)
 
-## 🔲 Phase 16: Platform & Performance
+**Backend:**
+- [x] `GET /api/trash` — list all soft-deleted items (unified, with `entityType` discriminator)
+- [x] `POST /api/trash/{entity}/{id}/restore` — restore item
+- [x] `DELETE /api/trash/{entity}/{id}` — hard-delete permanently
+- [x] `DELETE /api/trash` — empty entire trash
+- [x] Media: move `os.Remove` from `DeleteMedia` → hard-purge only (soft delete keeps file)
+- [x] New `backend/internal/handlers/trash.go`
+
+**Frontend:**
+- [ ] New page `frontend/app/admin/trash/page.tsx` — table with title, entity type badge, deleted date, Restore + Delete Forever actions
+- [ ] "Trash" nav item in `AdminLayout.tsx` sidebar (with badge count)
+- [ ] Entity type filter tabs on trash page (All / Pages / Users / Posts / etc.)
+
+### Feature B — ☑️ Bulk Actions (checkbox selection + batch endpoints)
+
+**Backend (per-entity batch endpoints):**
+- [x] `POST /api/users/batch` — actions: `delete`, `ban`, `activate`
+- [x] `POST /api/pages/batch` — actions: `delete`, `publish`, `draft`
+- [x] `POST /api/blog/posts/batch` — actions: `delete`, `publish`, `draft`
+- [x] `POST /api/media/batch` — actions: `delete`
+
+**Frontend (checkbox UI on each admin page):**
+- [ ] Users page — checkbox column + bulk toolbar (Ban, Activate, Delete)
+- [ ] Pages page — checkbox column + bulk toolbar (Publish, Draft, Delete)
+- [ ] Blog posts page — checkbox column + bulk toolbar (Publish, Draft, Delete)
+- [ ] Media page — checkbox column + bulk toolbar (Delete Selected)
+
+### Feature C — 🧹 Polish & Consistency
+- [ ] Undo snackbar after delete — "Moved to trash" with `Undo` button calling restore
+- [ ] Contacts delete: add missing confirmation dialog (currently deletes immediately)
+- [ ] Media delete dialog: update text for soft-delete
+
+**Test status target:** Go tests 82/82 pass; desktop 231/231 pass; mobile 230/230 pass
+
+## 🔲 Phase 16: Audit Log (separate microservice)
+- [ ] New `audit-log` microservice with own DB
+- [ ] Event emission from main app handlers via HTTP or message queue
+- [ ] Admin audit log viewer
+
+## 🔲 Phase 17: Platform & Performance
 
 - [ ] OpenAPI documentation for all Go routes
 - [ ] API tokens / headless CMS mode

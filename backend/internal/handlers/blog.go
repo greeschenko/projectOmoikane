@@ -271,6 +271,40 @@ func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+func (h *Handler) BatchPosts(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Action string   `json:"action"`
+		IDs    []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+	if len(req.IDs) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "No IDs provided"})
+		return
+	}
+
+	switch req.Action {
+	case "delete":
+		h.DB.Delete(&models.BlogPost{}, req.IDs)
+	case "publish":
+		h.DB.Model(&models.BlogPost{}).Where("id IN ?", req.IDs).Update("status", "published")
+	case "draft":
+		h.DB.Model(&models.BlogPost{}).Where("id IN ?", req.IDs).Update("status", "draft")
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown action"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
 func (h *Handler) ToggleLike(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

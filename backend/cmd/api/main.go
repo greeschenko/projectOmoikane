@@ -75,6 +75,7 @@ func main() {
 	mux.HandleFunc("POST /media", h.Auth(h.UploadMedia))
 	mux.HandleFunc("GET /media/{id}", h.Auth(h.GetMediaItem))
 	mux.HandleFunc("DELETE /media/{id}", h.Auth(h.DeleteMedia))
+	mux.HandleFunc("POST /media/batch", h.Auth(h.BatchMedia))
 
 	// Blog
 	mux.HandleFunc("GET /blog/posts", h.GetPosts)
@@ -84,6 +85,7 @@ func main() {
 	mux.HandleFunc("POST /blog/posts", h.Auth(h.CreatePost))
 	mux.HandleFunc("PUT /blog/posts/{id}", h.Auth(h.UpdatePost))
 	mux.HandleFunc("DELETE /blog/posts/{id}", h.Auth(h.DeletePost))
+	mux.HandleFunc("POST /blog/posts/batch", h.Auth(h.BatchPosts))
 	mux.HandleFunc("POST /blog/posts/{id}/like", h.Auth(h.ToggleLike))
 	mux.HandleFunc("GET /blog/tags", h.GetTags)
 	mux.HandleFunc("POST /blog/tags", h.Admin(h.CreateTag))
@@ -98,6 +100,7 @@ func main() {
 	mux.HandleFunc("POST /pages", h.Auth(h.CreatePage))
 	mux.HandleFunc("PUT /pages/{id}", h.Auth(h.UpdatePage))
 	mux.HandleFunc("DELETE /pages/{id}", h.Auth(h.DeletePage))
+	mux.HandleFunc("POST /pages/batch", h.Auth(h.BatchPages))
 	mux.HandleFunc("PUT /pages/reorder", h.Auth(h.ReorderPages))
 
 	// Contact Form
@@ -112,6 +115,14 @@ func main() {
 	mux.HandleFunc("POST /users", h.Admin(h.CreateUser))
 	mux.HandleFunc("PUT /users/{id}", h.Admin(h.UpdateUser))
 	mux.HandleFunc("DELETE /users/{id}", h.Admin(h.DeleteUser))
+	mux.HandleFunc("POST /users/batch", h.Admin(h.BatchUsers))
+
+	// Trash system (admin only)
+	mux.HandleFunc("GET /trash", h.Admin(h.GetTrash))
+	mux.HandleFunc("GET /trash/count", h.Admin(h.GetTrashCount))
+	mux.HandleFunc("POST /trash/{entity}/{id}/restore", h.Admin(h.RestoreItem))
+	mux.HandleFunc("DELETE /trash/{entity}/{id}", h.Admin(h.HardDeleteItem))
+	mux.HandleFunc("DELETE /trash", h.Admin(h.EmptyTrash))
 
 	addr := ":" + cfg.Port
 	log.Printf("Server starting on %s", addr)

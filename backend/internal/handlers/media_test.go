@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"omoikane-backend/internal/handlers"
+	"omoikane-backend/internal/models"
 
 	"gorm.io/gorm"
 )
@@ -170,10 +171,17 @@ func TestDeleteMedia_DeletesFromDisk(t *testing.T) {
 		t.Errorf("Expected 200 on delete, got %d", delResp.StatusCode)
 	}
 
-	// Verify file no longer on disk
+	// File remains on disk after soft-delete (hard-purge only via trash)
 	files, _ := os.ReadDir(dir)
-	if len(files) != 0 {
-		t.Errorf("Expected 0 files on disk after delete, got %d", len(files))
+	if len(files) != 1 {
+		t.Errorf("Expected 1 file on disk after soft-delete, got %d", len(files))
+	}
+
+	// DB record should have deleted_at set (soft-deleted)
+	var count int64
+	db.Model(&models.MediaItem{}).Unscoped().Where("id = ? AND deleted_at IS NOT NULL", mediaID).Count(&count)
+	if count != 1 {
+		t.Errorf("Expected 1 soft-deleted media record, got %d", count)
 	}
 }
 

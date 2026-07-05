@@ -187,3 +187,37 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
+
+func (h *Handler) BatchUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Action string   `json:"action"`
+		IDs    []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+	if len(req.IDs) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "No IDs provided"})
+		return
+	}
+
+	switch req.Action {
+	case "delete":
+		h.DB.Delete(&models.User{}, req.IDs)
+	case "ban":
+		h.DB.Model(&models.User{}).Where("id IN ?", req.IDs).Update("status", "banned")
+	case "activate":
+		h.DB.Model(&models.User{}).Where("id IN ?", req.IDs).Update("status", "active")
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown action"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
