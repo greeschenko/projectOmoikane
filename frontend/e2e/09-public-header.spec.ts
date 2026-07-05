@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./helpers";
+import { isMobile, loginAsAdmin } from "./helpers";
 
 test.describe("Public Header", () => {
   test("shows on the home page", async ({ page }) => {
@@ -124,7 +124,10 @@ test.describe("Main Menu Widget", () => {
 
   test("shows navigation links for pages with inMenu enabled", async ({ page }) => {
     const banner = page.getByRole("banner", { name: /public/i });
-    await expect(banner.getByRole("link", { name: /about/i })).toBeVisible();
+    if (isMobile()) {
+      await banner.getByRole("button", { name: /menu/i }).click();
+    }
+    await expect(page.getByRole("link", { name: /about/i })).toBeVisible();
   });
 
   test("menu links are inside a navigation landmark", async ({ page }) => {

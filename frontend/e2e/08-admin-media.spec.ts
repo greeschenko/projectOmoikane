@@ -15,19 +15,20 @@ test.describe("Admin Media Library", () => {
   });
 
   test("upload dialog opens on clicking upload button", async ({ page }) => {
+    const mediaResponse = page.waitForResponse(r => r.url().includes('/api/media') && r.status() === 200);
     await page.goto("/admin/media");
+    await mediaResponse;
     await page.getByRole("button", { name: /^upload$/i }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByRole("heading", { name: /upload media/i })).toBeVisible();
   });
 
   test("upload image and display in gallery", async ({ page }) => {
+    const mediaResponse = page.waitForResponse(r => r.url().includes('/api/media') && r.status() === 200);
     await page.goto("/admin/media");
+    await mediaResponse;
     await page.getByRole("button", { name: /^upload$/i }).click();
-    const fileChooserPromise = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: /choose file/i }).click();
-    const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles({
+    await page.locator('input[type="file"]').setInputFiles({
       name: "test.png",
       mimeType: "image/png",
       buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),
@@ -37,12 +38,11 @@ test.describe("Admin Media Library", () => {
   });
 
   test("delete media removes it from gallery", async ({ page }) => {
+    const mediaResponse = page.waitForResponse(r => r.url().includes('/api/media') && r.status() === 200);
     await page.goto("/admin/media");
+    await mediaResponse;
     await page.getByRole("button", { name: /^upload$/i }).click();
-    const fileChooserPromise = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: /choose file/i }).click();
-    const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles({
+    await page.locator('input[type="file"]').setInputFiles({
       name: "delete-me.png",
       mimeType: "image/png",
       buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),

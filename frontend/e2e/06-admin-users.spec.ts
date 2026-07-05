@@ -48,13 +48,19 @@ test.describe("Admin Users", () => {
 
   test.describe("User creation form", () => {
     test("'New User' button opens a form", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
       await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
     });
 
     test("form has name, email, password, confirm password, and role fields", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
       await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       for (const field of userFormFieldLabels) {
         await expect(page.getByLabel(field)).toBeVisible();
@@ -63,7 +69,10 @@ test.describe("Admin Users", () => {
     });
 
     test("role selector has admin and user options", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
       await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await page.getByRole("combobox").click();
       for (const option of userRoleOptions) {
@@ -72,14 +81,20 @@ test.describe("Admin Users", () => {
     });
 
     test("shows validation errors on empty submission", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
       await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await page.getByRole("button", { name: /save|create|submit/i }).click();
       await expect(page.getByText(/required|cannot be empty/i).first()).toBeVisible();
     });
 
     test("shows error for invalid email", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
       await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await page.getByLabel("Name").fill("New User");
       await page.getByLabel("Email").fill("not-an-email");
@@ -90,7 +105,10 @@ test.describe("Admin Users", () => {
     });
 
     test("shows error when passwords do not match", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
       await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await page.getByLabel("Name").fill("New User");
       await page.getByLabel("Email").fill("user@example.com");
@@ -105,6 +123,8 @@ test.describe("Admin Users", () => {
       await expect(page.locator("table tbody tr")).not.toHaveCount(0);
       await expect(page.getByRole("table")).toContainText(/@example\.com/);
       const rowCount = await page.locator("table tbody tr").count();
+      await page.getByPlaceholder(/filter|search/i).waitFor();
+      await expect(page.locator("table tbody tr")).not.toHaveCount(0);
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await page.getByLabel("Name").fill("Jane Doe");
       await page.getByLabel("Email").fill("jane@example.com");
@@ -123,6 +143,8 @@ test.describe("Admin Users", () => {
       await expect(page.locator("table tbody tr")).not.toHaveCount(0);
       await expect(page.getByRole("table")).toContainText(/@example\.com/);
       const rowCount = await page.locator("table tbody tr").count();
+      await page.getByPlaceholder(/filter|search/i).waitFor();
+      await expect(page.locator("table tbody tr")).not.toHaveCount(0);
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       await page.getByRole("button", { name: /cancel/i }).click();
       await expect(page.locator("[role='dialog'], form")).not.toBeVisible();

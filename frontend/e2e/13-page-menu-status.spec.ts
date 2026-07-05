@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./helpers";
+import { isMobile, loginAsAdmin } from "./helpers";
 
 test.describe("Page Status & Menu", () => {
   test.beforeEach(async ({ page }) => {
@@ -8,33 +8,38 @@ test.describe("Page Status & Menu", () => {
 
   test("page creation form has Show in menu toggle", async ({ page }) => {
     await page.goto("/admin/pages");
-    await page.getByRole("button", { name: /new page|add page|create page/i }).click();
+      await page.locator("main li").first().waitFor();
+      await page.getByRole("button", { name: /new page|add page|create page/i }).click();
     await expect(page.getByLabel(/show in menu|in menu|menu/i)).toBeVisible();
   });
 
   test("page creation form has Status dropdown", async ({ page }) => {
     await page.goto("/admin/pages");
-    await page.getByRole("button", { name: /new page|add page|create page/i }).click();
+      await page.locator("main li").first().waitFor();
+      await page.getByRole("button", { name: /new page|add page|create page/i }).click();
     await expect(page.getByRole("dialog").getByText("Status").locator("..").getByRole("combobox")).toBeVisible();
   });
 
   test("status defaults to Draft for new pages", async ({ page }) => {
     await page.goto("/admin/pages");
-    await page.getByRole("button", { name: /new page|add page|create page/i }).click();
+      await page.locator("main li").first().waitFor();
+      await page.getByRole("button", { name: /new page|add page|create page/i }).click();
     const statusField = page.getByRole("dialog").getByText("Status").locator("..").getByRole("combobox");
     await expect(statusField).toHaveText(/draft/i);
   });
 
   test("in menu defaults to unchecked for new pages", async ({ page }) => {
     await page.goto("/admin/pages");
-    await page.getByRole("button", { name: /new page|add page|create page/i }).click();
+      await page.locator("main li").first().waitFor();
+      await page.getByRole("button", { name: /new page|add page|create page/i }).click();
     const toggle = page.getByLabel(/show in menu|in menu|menu/i);
     await expect(toggle).not.toBeChecked();
   });
 
   test("can create a published page with inMenu enabled", async ({ page }) => {
     await page.goto("/admin/pages");
-    await page.getByRole("button", { name: /new page|add page|create page/i }).click();
+      await page.locator("main li").first().waitFor();
+      await page.getByRole("button", { name: /new page|add page|create page/i }).click();
     await page.getByLabel(/^Title\b/i).fill("Menu Page");
     await page.getByLabel("Slug").fill("menu-page");
     await page.getByLabel("Content").fill("Menu page content");
@@ -80,29 +85,41 @@ test.describe("Public Header Menu Widget", () => {
     await page.context().clearCookies();
     await page.goto("/pages/about");
     const banner = page.getByRole("banner", { name: /public/i });
-    await expect(banner.getByRole("link", { name: /about/i })).toBeVisible();
-    await expect(banner.getByRole("link", { name: /services/i })).toBeVisible();
+    if (isMobile()) {
+      await banner.getByRole("button", { name: /menu/i }).click();
+    }
+    await expect(page.getByRole("link", { name: /about/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /services/i })).toBeVisible();
   });
 
   test("header menu does not show pages with inMenu disabled", async ({ page }) => {
     await page.context().clearCookies();
     await page.goto("/pages/about");
     const banner = page.getByRole("banner", { name: /public/i });
-    await expect(banner.getByRole("link", { name: /hidden/i })).toHaveCount(0);
+    if (isMobile()) {
+      await banner.getByRole("button", { name: /menu/i }).click();
+    }
+    await expect(page.getByRole("link", { name: /hidden/i })).toHaveCount(0);
   });
 
   test("header menu does not show draft pages even if inMenu is enabled", async ({ page }) => {
     await page.context().clearCookies();
     await page.goto("/pages/about");
     const banner = page.getByRole("banner", { name: /public/i });
-    await expect(banner.getByRole("link", { name: /draft/i })).toHaveCount(0);
+    if (isMobile()) {
+      await banner.getByRole("button", { name: /menu/i }).click();
+    }
+    await expect(page.getByRole("link", { name: /draft/i })).toHaveCount(0);
   });
 
   test("menu links navigate to the correct page", async ({ page }) => {
     await page.context().clearCookies();
     await page.goto("/pages/about");
     const banner = page.getByRole("banner", { name: /public/i });
-    await banner.getByRole("link", { name: /about/i }).click();
+    if (isMobile()) {
+      await banner.getByRole("button", { name: /menu/i }).click();
+    }
+    await page.getByRole("link", { name: /about/i }).click();
     await expect(page).toHaveURL(/\/pages\/about/);
   });
 });

@@ -134,50 +134,26 @@ Fixed 2 pre-existing desktop Playwright failures.
 
 ## ✅ Phase 12: Public Interactions
 
-Email integration and ReCAPTCHA protection.
+Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
-- [x] SMTP config — `SMTPHost`, `SMTPPort`, `SMTPUser`, `SMTPPass`, `SMTPFrom` in env vars
-- [x] `PasswordResetToken` model + DB migration
-- [x] Mailer package — `net/smtp` sender (logs to stdout when SMTP not configured)
-- [x] `POST /auth/forgot-password` — generates 32-byte token, stores with 1h expiry, sends email (real SMTP or dev log)
-- [x] `POST /auth/reset-password` — validates token, hashes + updates password, marks token used
-- [x] Frontend `/reset-password` page — reads token from URL, form with new password + confirm
-- [x] ReCAPTCHA v2 (checkbox) — `RECAPTCHA_SECRET` env var, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` for frontend
-- [x] `Recaptcha` Go package — verifies token against Google's `/recaptcha/api/siteverify`
-- [x] `ReCaptcha` React component — renders checkbox via `react-google-recaptcha`
-- [x] ReCAPTCHA wired into `Register` + `ForgotPassword` handlers and pages
-- [x] Go tests for forgot-password (success, nonexistent user, missing email) and reset-password (success, invalid token, expired token, short password)
+- [x] SMTP config (`SMTPHost`, `SMTPPort`, `SMTPUser`, `SMTPPass`, `SMTPFrom`), PasswordResetToken model, `net/smtp` mailer (logs to stdout when unconfigured)
+- [x] `POST /auth/forgot-password` (32-byte token, 1h expiry) + `POST /auth/reset-password`, frontend `/reset-password` page
+- [x] ReCAPTCHA v2 checkbox — `RECAPTCHA_SECRET` env var, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` frontend, wired into Register + ForgotPassword
+- [x] Email templates — `SiteSetting.resetEmailSubject`/`resetEmailBodyHTML`, admin settings tabs with RichTextEditor, `RenderResetTemplate()` in mailer
+- [x] Rate limiting — `NewRateLimiter(rps, burst, window)`, per-IP via `golang.org/x/time/rate` + `sync.Map`, 3 req/15min on forgot-password (3 middleware tests)
+- [x] Contact form — `ContactMessage` model, `POST /contact` (public + ReCAPTCHA), admin CRUD, public page + admin list (6 handler tests)
 
-## ✅ Phase 13: Public Interactions
+**Test status (clean DB):** Go tests 87/87 pass; desktop Playwright 231/231 pass (0 failures); mobile 201 pass, 29 fail, 9 skip — ALL 29 FIXED in Phase 14
 
-- [x] Email templates (customizable admin UI for reset email HTML) — 13a
-- [x] Rate limiting on forgot-password endpoint (3 req/15min per IP) — 13b
-- [x] Contact form with ReCAPTCHA — 13c
+## ✅ Phase 14: Mobile E2E Stability
 
-**Test status (clean DB):** Go tests 87/87 pass; desktop Playwright 231/231 pass (0 failures); mobile 201 pass, 29 fail, 9 skip
+- [x] **14a — Dialog hydration timing** (23 tests in 06/07/08/13/27): Add `page.waitForResponse` before button clicks; use `getByPlaceholder` instead of `getByRole("table")` for server-rendered elements
+- [x] **14b — Media upload file picker** (2 tests in 08): Use `input[type="file"]` directly via `setInputFiles()` instead of clicking "Choose File" button
+- [x] **14c — Public header menu selectors** (3 tests in 09/13): Click hamburger toggle before asserting menu link visibility on mobile
+- [x] **14d — Strict mode heading** (1 test in 27): Use `{ exact: true }` on blog heading selector
+- [x] **14e — GetPages inMenu filter** (1 test in 13): Backend `GetPages` filters `in_menu = true` when `?menu=true` query param present; desktop renders menu as `<Button>` (not `<Link>`), so `getByRole("link")` missed, but mobile uses `<ListItemButton component={Link}>`
 
-### Phase 13a — Email Templates
-
-- `SiteSetting` model: `resetEmailSubject` + `resetEmailBodyHTML` fields (with defaults from handler)
-- Mailer: `RenderResetTemplate(templateStr, data)`, `ResetEmailData{ResetLink, SiteName, ExpiryHours}`
-- Settings handler: GET/PUT include email template fields
-- `ForgotPassword` reads template from settings, renders with `html/template`
-- Admin settings page: Tabs (General / Email Templates), RichTextEditor for body HTML
-
-### Phase 13b — Rate Limiting
-
-- `middleware.NewRateLimiter(rps, burst, window)` + `Limiter.Middleware(next)`
-- Per-IP tracking via `golang.org/x/time/rate` + `sync.Map` with periodic cleanup
-- Forgot-password: 3 requests per 15 min per IP (429 on exceed)
-- 3 middleware tests: allow, block after burst, different IPs independent
-
-### Phase 13c — Contact Form
-
-- `ContactMessage` model (name, email, subject, message, read bool)
-- `POST /contact` — public, ReCAPTCHA-protected
-- `GET /contacts`, `GET /contacts/{id}`, `POST /contacts/{id}/read`, `DELETE /contacts/{id}` — admin only
-- Public contact page with ReCAPTCHA + admin contacts list with mark-read + delete
-- 6 handler tests: submit success, missing fields, default subject, admin-only, mark read, delete
+**Test status (clean DB):** Go tests 87/87 pass; desktop Playwright 231/231 pass (0 failures); mobile 230/230 pass (0 failures), 9 skip
 
 ## 🔲 Phase 15: Admin Polish & UX
 

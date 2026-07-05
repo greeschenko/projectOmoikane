@@ -48,7 +48,10 @@ test.describe("Mobile admin responsive layout", () => {
     });
 
     test("New User form fits mobile viewport", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
       await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       const dialog = page.locator("[role='dialog'], form").first();
       const box = await dialog.boundingBox();
@@ -60,6 +63,7 @@ test.describe("Mobile admin responsive layout", () => {
 
     test("form fields have adequate tap targets", async ({ page }) => {
       await page.goto("/admin/users");
+      await page.getByPlaceholder(/filter|search/i).waitFor();
       await page.getByRole("button", { name: /new user|add user|create user/i }).click();
       const inputs = page.locator("input, select, button");
       const count = await inputs.count();

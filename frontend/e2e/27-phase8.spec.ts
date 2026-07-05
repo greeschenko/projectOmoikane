@@ -69,7 +69,7 @@ test.describe("Phase 8 — Blog On/Off Toggle", () => {
     await page.goto("/admin/blog");
     await toggle.click();
     await page.goto("/blog");
-    await expect(page.getByRole("heading", { name: /blog/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Blog", exact: true })).toBeVisible();
   });
 });
 
@@ -222,7 +222,8 @@ test.describe("Phase 8 — Page Form Rework", () => {
 
   test("page editor dialog has left and right columns", async ({ page }) => {
     await page.goto("/admin/pages");
-    await page.getByRole("button", { name: /new page/i }).click();
+      await page.locator("main li").first().waitFor();
+      await page.getByRole("button", { name: /new page/i }).click();
     await expect(page.getByRole("textbox", { name: /^title$/i })).toBeVisible();
     await expect(page.getByRole("textbox", { name: /^slug$/i })).toBeVisible();
     await expect(page.locator('[contenteditable="true"]')).toBeVisible();
@@ -230,7 +231,8 @@ test.describe("Phase 8 — Page Form Rework", () => {
 
   test("preview button opens preview in new tab", async ({ page }) => {
     await page.goto("/admin/pages");
-    await page.getByRole("button", { name: /new page/i }).click();
+      await page.locator("main li").first().waitFor();
+      await page.getByRole("button", { name: /new page/i }).click();
     await page.getByRole("textbox", { name: /^title$/i }).fill("Previewable");
     await page.getByRole("textbox", { name: /^slug$/i }).fill("previewable");
     await page.locator('[contenteditable="true"]').fill("Preview content");
@@ -241,7 +243,8 @@ test.describe("Phase 8 — Page Form Rework", () => {
 
   test("page form submit still creates page", async ({ page }) => {
     await page.goto("/admin/pages");
-    await page.getByRole("button", { name: /new page/i }).click();
+      await page.locator("main li").first().waitFor();
+      await page.getByRole("button", { name: /new page/i }).click();
     await page.getByRole("textbox", { name: /^title$/i }).fill("Rework Test Page");
     await page.getByRole("textbox", { name: /^slug$/i }).fill("rework-test");
     await page.locator('[contenteditable="true"]').fill("Rework content");

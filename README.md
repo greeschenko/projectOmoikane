@@ -28,6 +28,7 @@ See [TODO.md](./TODO.md) for the full development roadmap.
 | 11 — E2E Fixes | ✅ | 231/231 desktop pass, 82 Go pass |
 | 12 — Public Interactions | ✅ | 87 Go pass (password reset + ReCAPTCHA) |
 | 13 — Email Templates, Rate Limiting, Contact Form | ✅ | 87 Go pass, 231/231 desktop, 201/239 mobile |
+| 14 — Mobile E2E Stability | ✅ | 87 Go pass, 231/231 desktop, 230/230 mobile |
 
 ## Quick Start
 

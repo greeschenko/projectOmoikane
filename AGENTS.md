@@ -1,7 +1,7 @@
 # Omoikane — Project Context for AI Agents
 
 ## Goal
-- **Phase 13 complete**: Mobile failures investigated — 186→29 pre-existing failures remain
+- **Phase 14 complete**: Zero mobile failures — all 461 tests pass (231 desktop + 230 mobile)
 
 ## Constraints & Preferences
 - `make go-test` to verify all Go tests pass (~87 tests: 82 handler, 2 mailer, 3 middleware)
@@ -27,6 +27,10 @@
   - `loginAsAdmin` uses `domcontentloaded` instead of `networkidle`, 15s mobile timeout
   - `playwright.config.ts` added `actionTimeout: 15000` for mobile project
   - **Root cause**: Duplicate AppBars on mobile (AdminAppBar z-index 1201 overlapped mobile AppBar hamburger). Fix: merge hamburger into AdminAppBar via `onMenuToggle` prop, eliminate separate mobile AppBar
+- **Phase 14**: All 230 mobile tests pass — 29 pre-existing failures eliminated
+  - Root cause: clicking buttons before API data fetch completes (`/api/users`, `/api/media`); server-rendered elements (filter input, "no media uploaded") resolve `waitFor` before React hydrates event handlers
+  - Fix: `page.waitForResponse(r => r.url().includes('/api/...') && r.status() === 200)` before button clicks ensures data loaded before interaction
+  - Last failure: `GetPages` handler ignored `menu=true` query param, returned all published pages regardless of `inMenu`; desktop rendered as `<Button>` (not `<Link>`), so `getByRole("link")` never matched, but mobile rendered as `<a>` via `ListItemButton component={Link}`
 
 ### Phase 12 — Public Interactions
 - SMTP config in env vars (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`)
@@ -63,8 +67,12 @@
 - Contact added to PublicHeader, MainMenu (mobile + desktop), AdminLayout sidebar
 - 6 handler tests: submit success, missing fields, default subject, admin-only, mark read, delete
 
-### Mobile Failures (pre-existing)
-- 11 pre-existing failures from Phase 11 — after investigation, actual count is 29, but many are variations of same root cause
+### Phase 14 — Mobile E2E Stability
+- Hydration wait fix: `page.waitForResponse` for `/api/users` or `/api/media` before button clicks (React event handlers not yet attached on slow mobile CPU)
+- `06-admin-users`: `waitForResponse` for `/api/users` + `getByPlaceholder(/filter|search/i).waitFor()` instead of `getByRole("table").waitFor()`
+- `08-admin-media`: `waitForResponse` for `/api/media` + `locator.setInputFiles()` instead of `click({ force })`
+- `08-admin-mobile`: `waitForResponse` for `/api/users` before New User button click
+- `GetPages` handler: filter by `in_menu = true` when `?menu=true` query param present
 
 ## Key Decisions
 - **Fix Go, not frontend** — Go is the permanent backend; shape changes localized per handler
@@ -76,13 +84,13 @@
 - **ForgotPassword always returns success** — prevents email enumeration even if email doesn't exist
 
 ## Next Steps
-1. Fix 29 pre-existing mobile failures (16 are dialog-not-appearing after button click on admin pages; root cause: React event handlers not attached before Playwright clicks at narrow viewport — likely needs wait-for-content before click)
-2. Verify desktop Playwright still passes (231/231)
+1. Feature work or further test stability improvements
+2. Verify desktop Playwright passes (231/231) — last verified this session
 
 ## Critical Context
 - **Go tests**: all compile (~87 tests: 82 handler, 2 mailer, 3 middleware; need running PostgreSQL)
 - **Desktop Playwright**: 231/231 pass (0 failures) — last verified this session
-- **Mobile**: 201 pass, 29 fail, 9 skip — massive improvement from ~186 failures
+- **Mobile**: 230/230 pass (0 failures), 9 skip — all 29 pre-existing failures eliminated
 - **Docker backend** uses `omoikane` database; must reset before each clean Playwright run
 - **DB reset**: `docker compose exec postgres psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane; CREATE DATABASE omoikane;"` then restart backend
 
@@ -153,3 +161,9 @@
 - `frontend/e2e/01-setup.spec.ts`: Skip validation tests on mobile, keep submission test
 - `frontend/components/AdminAppBar.tsx`: Added `onMenuToggle` prop + hamburger `MenuIcon`
 - `frontend/components/AdminLayout.tsx`: Remove separate mobile AppBar, pass `onMenuToggle` to AdminAppBar, remove unused `mt: 8` on main
+
+### Phase 14 — Mobile E2E Stability
+- `frontend/e2e/06-admin-users.spec.ts`: `waitForResponse` for `/api/users` + `getByPlaceholder` instead of `getByRole("table")`
+- `frontend/e2e/08-admin-media.spec.ts`: `waitForResponse` for `/api/media` + `locator.setInputFiles()` instead of `click({ force })`
+- `frontend/e2e/08-admin-mobile.spec.ts`: `waitForResponse` for `/api/users` before New User button
+- `backend/internal/handlers/pages.go`: `GetPages` filters `in_menu = true` when `?menu=true`

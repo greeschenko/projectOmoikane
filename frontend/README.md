@@ -17,7 +17,7 @@ lib/
   store.ts         Deprecated in-memory store (no longer used for API)
   api.ts           Server-side fetch helper (calls Go backend directly)
   auth.ts          JWT session management (cookie-based)
-e2e/               Playwright tests (27 spec files, 229 desktop + 231 mobile test items)
+e2e/               Playwright tests (27 spec files, 231 desktop + 230 mobile test items)
 ```
 
 ## Testing

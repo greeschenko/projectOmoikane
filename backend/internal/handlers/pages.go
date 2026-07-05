@@ -17,15 +17,21 @@ func (h *Handler) GetPages(w http.ResponseWriter, r *http.Request) {
 
 	var pages []models.Page
 	query := h.DB.Order("sort_order asc")
-	// Only filter by published status for unauthenticated requests
-	cookie, err := r.Cookie("session")
-	var tokenStr string
-	if err == nil && cookie.Value != "" {
-		tokenStr = cookie.Value
-	}
-	claims, _ := auth.ValidateToken(tokenStr, h.JWTSecret)
-	if claims == nil {
-		query = query.Where("status = ?", "published")
+
+	// menu=true: return only published pages with inMenu enabled (for public menu widget)
+	if r.URL.Query().Get("menu") == "true" {
+		query = query.Where("status = ? AND in_menu = ?", "published", true)
+	} else {
+		// Only filter by published status for unauthenticated requests
+		cookie, err := r.Cookie("session")
+		var tokenStr string
+		if err == nil && cookie.Value != "" {
+			tokenStr = cookie.Value
+		}
+		claims, _ := auth.ValidateToken(tokenStr, h.JWTSecret)
+		if claims == nil {
+			query = query.Where("status = ?", "published")
+		}
 	}
 	query.Find(&pages)
 

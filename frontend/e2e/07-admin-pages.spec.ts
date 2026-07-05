@@ -32,12 +32,14 @@ test.describe("Admin Pages", () => {
 
     test("'New Page' button opens a form", async ({ page }) => {
       await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
     });
 
     test("form has title, slug, content, meta fields, parent selector, status, and menu toggle", async ({ page }) => {
       await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
       await expect(page.getByLabel(/^Title\b/i)).toBeVisible();
       await expect(page.getByLabel("Slug")).toBeVisible();
@@ -52,6 +54,7 @@ test.describe("Admin Pages", () => {
 
     test("parent page selector lists existing pages", async ({ page }) => {
       await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
       await page.getByRole("combobox").first().click();
       const options = page.getByRole("option");
@@ -60,6 +63,7 @@ test.describe("Admin Pages", () => {
 
     test("shows validation errors on empty submission", async ({ page }) => {
       await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
       await page.getByRole("button", { name: /save|create|submit/i }).click();
       await expect(page.getByText(/required|cannot be empty/i).first()).toBeVisible();
@@ -67,6 +71,7 @@ test.describe("Admin Pages", () => {
 
     test("successful submission adds page to the tree", async ({ page }) => {
       await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
       await page.getByLabel(/^Title\b/i).fill("About Us");
       await page.getByLabel("Slug").fill("about");
@@ -77,6 +82,7 @@ test.describe("Admin Pages", () => {
 
     test("cancel closes the form without adding a page", async ({ page }) => {
       await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
       await page.getByRole("button", { name: /cancel/i }).click();
       await expect(page.getByRole("dialog")).not.toBeVisible();
@@ -142,6 +148,7 @@ test.describe("Admin Pages", () => {
   test.describe("Rich text editor", () => {
     test("content editor has formatting toolbar with Bold, Italic, and Insert Image buttons", async ({ page }) => {
       await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
       await page.getByRole("button", { name: /new page|add page|create page/i }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
       await expect(page.getByRole("button", { name: /bold|format_bold/i })).toBeVisible();
