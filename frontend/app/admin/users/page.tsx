@@ -6,7 +6,7 @@ import {
   TableCell, TableContainer, TableHead, TableRow, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Select, MenuItem, FormControl, InputLabel, Alert, Chip,
-  TableSortLabel,
+  TableSortLabel, Checkbox,
 } from "@mui/material";
 
 interface User {
@@ -28,6 +28,8 @@ export default function AdminUsers() {
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [formData, setFormData] = useState({ name: "", email: "", password: "", confirmPassword: "", role: "user", status: "active" });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/users");
@@ -55,6 +57,24 @@ export default function AdminUsers() {
       const bVal = String(b[sortField] || "").toLowerCase();
       return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((u) => selectedIds.has(u.id));
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set([...selectedIds].filter((id) => !filtered.some((u) => u.id === id))));
+    } else {
+      const next = new Set(selectedIds);
+      filtered.forEach((u) => next.add(u.id));
+      setSelectedIds(next);
+    }
+  }
+
+  function toggleSelect(id: string) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedIds(next);
+  }
 
   function openCreate() {
     setEditingUser(null);
@@ -106,6 +126,18 @@ export default function AdminUsers() {
     fetchUsers();
   }
 
+  async function handleBulkAction() {
+    if (!bulkAction || selectedIds.size === 0) return;
+    await fetch("/api/users/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: bulkAction, ids: [...selectedIds] }),
+    });
+    setBulkAction(null);
+    setSelectedIds(new Set());
+    fetchUsers();
+  }
+
   return (
     <Container>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
@@ -119,10 +151,26 @@ export default function AdminUsers() {
         onChange={(e) => setFilter(e.target.value)}
         sx={{ mb: 2, width: 300 }}
       />
+      {selectedIds.size > 0 && (
+        <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="body2">{selectedIds.size} selected</Typography>
+          <Button size="small" variant="outlined" onClick={() => setBulkAction("delete")}>Delete Selected</Button>
+          <Button size="small" variant="outlined" onClick={() => setBulkAction("ban")}>Ban</Button>
+          <Button size="small" variant="outlined" onClick={() => setBulkAction("activate")}>Activate</Button>
+          <Button size="small" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+        </Box>
+      )}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  indeterminate={selectedIds.size > 0 && !allFilteredSelected}
+                  checked={allFilteredSelected}
+                  onChange={toggleSelectAll}
+                />
+              </TableCell>
               {(["name", "email", "role", "status", "createdAt"] as const).map((field) => (
                 <TableCell
                   key={field}
@@ -144,13 +192,16 @@ export default function AdminUsers() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 4, color: "text.secondary" }}>
                   No users found
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((user) => (
-              <TableRow key={user.id}>
+              <TableRow key={user.id} selected={selectedIds.has(user.id)}>
+                <TableCell padding="checkbox">
+                  <Checkbox checked={selectedIds.has(user.id)} onChange={() => toggleSelect(user.id)} />
+                </TableCell>
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{user.role}</TableCell>
@@ -222,6 +273,23 @@ export default function AdminUsers() {
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
           <Button onClick={confirmDelete} color="error" variant="contained">Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!bulkAction} onClose={() => setBulkAction(null)}>
+        <DialogTitle>Confirm Bulk Action</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {bulkAction === "delete" && `Delete ${selectedIds.size} user(s)? They will be moved to trash.`}
+            {bulkAction === "ban" && `Ban ${selectedIds.size} user(s)?`}
+            {bulkAction === "activate" && `Activate ${selectedIds.size} user(s)?`}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkAction(null)}>Cancel</Button>
+          <Button onClick={handleBulkAction} variant="contained" color={bulkAction === "delete" ? "error" : "primary"}>
+            Confirm
+          </Button>
         </DialogActions>
       </Dialog>
     </Container>

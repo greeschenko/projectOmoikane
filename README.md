@@ -29,7 +29,7 @@ See [TODO.md](./TODO.md) for the full development roadmap.
 | 12 — Public Interactions | ✅ | 82 Go pass (password reset + ReCAPTCHA) |
 | 13 — Email Templates, Rate Limiting, Contact Form | ✅ | 82 Go pass, 231/231 desktop, 201/239 mobile |
 | 14 — Mobile E2E Stability | ✅ | 82 Go pass, 231/231 desktop, 230/230 mobile |
-| 15 — Trash System & Bulk Actions (backend) | ✅ (frontend in progress) | 82 Go pass |
+| 15 — Trash System & Bulk Actions | ✅ | 249/249 pass, 82 Go pass |
 
 ## Quick Start
 

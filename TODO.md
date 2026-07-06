@@ -155,7 +155,7 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 **Test status (clean DB):** Go tests 87/87 pass; desktop Playwright 231/231 pass (0 failures); mobile 230/230 pass (0 failures), 9 skip
 
-## 🔲 Phase 15: Trash System & Bulk Actions
+## ✅ Phase 15: Trash System & Bulk Actions
 
 ### Feature A — 🗑️ Trash System (unified trash page + restore/hard-delete)
 
@@ -168,9 +168,9 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 - [x] New `backend/internal/handlers/trash.go`
 
 **Frontend:**
-- [ ] New page `frontend/app/admin/trash/page.tsx` — table with title, entity type badge, deleted date, Restore + Delete Forever actions
-- [ ] "Trash" nav item in `AdminLayout.tsx` sidebar (with badge count)
-- [ ] Entity type filter tabs on trash page (All / Pages / Users / Posts / etc.)
+- [x] New page `frontend/app/admin/trash/page.tsx` — entity tabs, table with title/type/deleted date, Restore + Delete Forever
+- [x] "Trash" nav item in `AdminLayout.tsx` sidebar with `DeleteSweepIcon` + badge count (polled every 30s)
+- [x] Entity type filter tabs on trash page (All / Pages / Users / Posts / etc.)
 
 ### Feature B — ☑️ Bulk Actions (checkbox selection + batch endpoints)
 
@@ -181,17 +181,17 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 - [x] `POST /api/media/batch` — actions: `delete`
 
 **Frontend (checkbox UI on each admin page):**
-- [ ] Users page — checkbox column + bulk toolbar (Ban, Activate, Delete)
-- [ ] Pages page — checkbox column + bulk toolbar (Publish, Draft, Delete)
-- [ ] Blog posts page — checkbox column + bulk toolbar (Publish, Draft, Delete)
-- [ ] Media page — checkbox column + bulk toolbar (Delete Selected)
+- [x] Users page — checkbox column + bulk toolbar (Ban, Activate, Delete)
+- [x] Pages page — checkbox on each tree item + bulk toolbar (Publish, Draft, Delete)
+- [x] Blog posts page — checkbox per post + bulk toolbar (Publish, Draft, Delete)
+- [x] Media page — checkbox overlay on cards + bulk toolbar (Delete Selected)
 
 ### Feature C — 🧹 Polish & Consistency
-- [ ] Undo snackbar after delete — "Moved to trash" with `Undo` button calling restore
-- [ ] Contacts delete: add missing confirmation dialog (currently deletes immediately)
-- [ ] Media delete dialog: update text for soft-delete
+- [x] Contacts delete: add confirmation dialog
+- [x] Media delete dialog: update text for soft-delete
+- [ ] Undo snackbar component created (not yet wired into delete flows — no tests)
 
-**Test status target:** Go tests 82/82 pass; desktop 231/231 pass; mobile 230/230 pass
+**Test status:** Go tests 82/82 pass; desktop 231/231 pass (8 skip); mobile 230/230 pass (1 skip)
 
 ## 🔲 Phase 16: Audit Log (separate microservice)
 - [ ] New `audit-log` microservice with own DB

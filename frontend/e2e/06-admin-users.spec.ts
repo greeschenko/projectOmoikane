@@ -157,7 +157,7 @@ test.describe("Admin Users", () => {
     test("edit button opens form pre-filled with user data", async ({ page }) => {
       await page.goto("/admin/users");
       const firstRow = page.locator("table tbody tr").first();
-      const email = await firstRow.locator("td, [role='gridcell']").nth(1).textContent();
+      const email = await firstRow.locator("td, [role='gridcell']").nth(2).textContent();
       await firstRow.getByRole("button", { name: /edit|pencil/i }).click();
       await expect(page.getByLabel("Email")).toHaveValue(email?.trim() ?? "");
     });
@@ -214,6 +214,65 @@ test.describe("Admin Users", () => {
       await expect(page.locator("[role='dialog']")).not.toBeVisible();
       const afterCount = await page.locator("table tbody tr").count();
       expect(afterCount).toBe(rowCount);
+    });
+  });
+
+  test.describe("Bulk actions", () => {
+    test("each user row has a checkbox", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
+      await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
+      const checkboxes = page.locator('input[type="checkbox"]');
+      expect(await checkboxes.count()).toBeGreaterThanOrEqual(2);
+    });
+
+    test("select all checkbox selects all rows", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
+      await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
+      const headerCheckbox = page.locator('thead input[type="checkbox"]');
+      await headerCheckbox.check();
+      const rowCheckboxes = page.locator('tbody input[type="checkbox"]');
+      const count = await rowCheckboxes.count();
+      for (let i = 0; i < count; i++) {
+        await expect(rowCheckboxes.nth(i)).toBeChecked();
+      }
+    });
+
+    test("bulk delete removes selected users", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
+      await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
+      const targetEmail = await page.locator("table tbody tr").first().locator("td").nth(2).textContent();
+      expect(targetEmail).toBeTruthy();
+      const firstCheckbox = page.locator('tbody input[type="checkbox"]').first();
+      await firstCheckbox.check();
+      await page.getByRole("button", { name: /delete selected/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      const refetchResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
+      await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+      await refetchResponse;
+      await expect(page.getByText(targetEmail!.trim())).not.toBeVisible();
+    });
+
+    test("bulk ban and activate users", async ({ page }) => {
+      const usersResponse = page.waitForResponse(r => r.url().includes('/api/users') && r.status() === 200);
+      await page.goto("/admin/users");
+      await usersResponse;
+      await page.getByPlaceholder(/filter|search/i).waitFor();
+      await page.locator('tbody input[type="checkbox"]').first().check();
+      await page.getByRole("button", { name: /ban/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+      await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
+      await page.waitForTimeout(500);
+      await page.locator('tbody input[type="checkbox"]').first().check();
+      await page.getByRole("button", { name: /activate/i }).click();
+      await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+      await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
     });
   });
 });

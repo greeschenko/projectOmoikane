@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Select, MenuItem, InputLabel, FormControl, Alert,
   IconButton, Chip, Tabs, Tab, CircularProgress, FormHelperText,
-  FormControlLabel, Switch,
+  FormControlLabel, Switch, Checkbox,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -70,6 +70,8 @@ export default function AdminBlog() {
   const [catFormData, setCatFormData] = useState({ name: "", slug: "", description: "" });
   const [blogEnabled, setBlogEnabled] = useState(true);
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -195,6 +197,18 @@ export default function AdminBlog() {
     }
   }
 
+  async function handleBulkAction() {
+    if (!bulkAction || selectedIds.size === 0) return;
+    await fetch("/api/blog/posts/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: bulkAction, ids: [...selectedIds] }),
+    });
+    setBulkAction(null);
+    setSelectedIds(new Set());
+    fetchPosts();
+  }
+
   async function handleBlogToggle(checked: boolean) {
     const res = await fetch("/api/settings", {
       method: "PUT",
@@ -282,6 +296,16 @@ export default function AdminBlog() {
             sx={{ mb: 2, maxWidth: 320 }}
           />
 
+          {selectedIds.size > 0 && (
+            <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2">{selectedIds.size} selected</Typography>
+              <Button size="small" variant="outlined" onClick={() => setBulkAction("publish")}>Publish</Button>
+              <Button size="small" variant="outlined" onClick={() => setBulkAction("draft")}>Draft</Button>
+              <Button size="small" variant="outlined" color="error" onClick={() => setBulkAction("delete")}>Delete Selected</Button>
+              <Button size="small" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+            </Box>
+          )}
+
           {loading ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
               <CircularProgress />
@@ -295,15 +319,24 @@ export default function AdminBlog() {
           ) : (
             <Paper>
               <Box sx={{ display: "flex", flexDirection: "column" }}>
-                {filteredPosts.map((post) => (
-                  <Box
-                    key={post.id}
-                    sx={{
-                      display: "flex", alignItems: "center", gap: 2,
-                      p: 2, borderBottom: "1px solid", borderColor: "divider",
-                    }}
-                  >
-                    <Box sx={{ flex: 1 }}>
+                  {filteredPosts.map((post) => (
+                    <Box
+                      key={post.id}
+                      sx={{
+                        display: "flex", alignItems: "center", gap: 2,
+                        p: 2, borderBottom: "1px solid", borderColor: "divider",
+                        bgcolor: selectedIds.has(post.id) ? "action.selected" : "transparent",
+                      }}
+                    >
+                      <Checkbox
+                        checked={selectedIds.has(post.id)}
+                        onChange={() => {
+                          const next = new Set(selectedIds);
+                          if (next.has(post.id)) next.delete(post.id); else next.add(post.id);
+                          setSelectedIds(next);
+                        }}
+                      />
+                      <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle1">{post.title}</Typography>
                       <Typography variant="body2" color="text.secondary">
                         /blog/{post.slug}
@@ -474,6 +507,24 @@ export default function AdminBlog() {
         <DialogActions>
           <Button onClick={() => setCatFormOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleCategorySave}>Create</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Action Confirmation */}
+      <Dialog open={!!bulkAction} onClose={() => setBulkAction(null)}>
+        <DialogTitle>Confirm Bulk Action</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {bulkAction === "delete" && `Delete ${selectedIds.size} post(s)? They will be moved to trash.`}
+            {bulkAction === "publish" && `Publish ${selectedIds.size} post(s)?`}
+            {bulkAction === "draft" && `Set ${selectedIds.size} post(s) to draft?`}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkAction(null)}>Cancel</Button>
+          <Button onClick={handleBulkAction} variant="contained" color={bulkAction === "delete" ? "error" : "primary"}>
+            Confirm
+          </Button>
         </DialogActions>
       </Dialog>
 

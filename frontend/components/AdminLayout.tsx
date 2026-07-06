@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Toolbar, Drawer,
-  List, ListItem, ListItemButton, ListItemText, ListItemIcon, Box,
+  List, ListItem, ListItemButton, ListItemText, ListItemIcon, Box, Badge,
   useMediaQuery, useTheme,
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -17,6 +17,7 @@ import CategoryIcon from "@mui/icons-material/Category";
 import MailIcon from "@mui/icons-material/Mail";
 import CollectionsIcon from "@mui/icons-material/Collections";
 import SettingsIcon from "@mui/icons-material/Settings";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import AdminAppBar from "./AdminAppBar";
 
 const navItems = [
@@ -29,6 +30,7 @@ const navItems = [
   { label: "Messages", href: "/admin/messages", icon: <MailIcon /> },
   { label: "Contacts", href: "/admin/contacts", icon: <MailIcon /> },
   { label: "Media", href: "/admin/media", icon: <CollectionsIcon /> },
+  { label: "Trash", href: "/admin/trash", icon: <DeleteSweepIcon /> },
   { label: "Settings", href: "/admin/settings", icon: <SettingsIcon /> },
 ];
 
@@ -43,6 +45,24 @@ export default function AdminLayout({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [trashCount, setTrashCount] = useState(0);
+
+  useEffect(() => {
+    const fetchTrashCount = async () => {
+      try {
+        const res = await fetch("/api/trash/count");
+        if (res.ok) {
+          const data = await res.json();
+          setTrashCount(data.count ?? 0);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchTrashCount();
+    const interval = setInterval(fetchTrashCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const sidebarContent = (
     <List>
@@ -54,7 +74,15 @@ export default function AdminLayout({
             selected={pathname === item.href}
             onClick={() => setMobileOpen(false)}
           >
-            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemIcon>
+              {item.label === "Trash" ? (
+                <Badge badgeContent={trashCount} color="error">
+                  {item.icon}
+                </Badge>
+              ) : (
+                item.icon
+              )}
+            </ListItemIcon>
             <ListItemText primary={item.label} />
           </ListItemButton>
         </ListItem>

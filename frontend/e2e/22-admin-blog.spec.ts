@@ -46,4 +46,53 @@ test.describe("Admin Blog", () => {
     await expect(page.getByText("Draft Post")).toBeVisible();
     await expect(page.getByText("draft", { exact: true }).first()).toBeVisible();
   });
+
+  test.describe("Bulk actions", () => {
+    test.beforeEach(async ({ page }) => {
+      await loginAsAdmin(page);
+      await page.request.post("/api/blog/posts", {
+        data: { title: "Bulk Test Post", slug: "bulk-test-post", content: "Bulk test", status: "draft" },
+      });
+    });
+
+    test("each blog post has a checkbox", async ({ page }) => {
+      const postsResponse = page.waitForResponse(r => r.url().includes('/api/admin/blog/posts') && r.status() === 200);
+      await page.goto("/admin/blog");
+      await postsResponse;
+      await expect(page.getByText("Bulk Test Post")).toBeVisible();
+      const checkboxes = page.locator('input[type="checkbox"]');
+      const count = await checkboxes.count();
+      expect(count).toBeGreaterThanOrEqual(1);
+    });
+
+    test("bulk publish and draft posts", async ({ page }) => {
+      await page.goto("/admin/blog");
+      await expect(page.getByText("Bulk Test Post")).toBeVisible();
+      await page.getByRole("checkbox").first().check();
+      await page.getByRole("button", { name: /^publish$/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+      await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
+      await page.waitForTimeout(500);
+      await page.getByRole("checkbox").first().check();
+      await page.getByRole("button", { name: /^draft$/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+      await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
+    });
+
+    test("bulk delete removes selected posts", async ({ page }) => {
+      await page.goto("/admin/blog");
+      await expect(page.getByText("Bulk Test Post")).toBeVisible();
+      await page.getByRole("checkbox").first().check();
+      await expect(page.getByRole("button", { name: /^delete selected$/i })).toBeVisible();
+      await page.getByRole("button", { name: /^delete selected$/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      const refetchResponse = page.waitForResponse(r => r.url().includes('/api/admin/blog/posts') && r.status() === 200);
+      await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+      await refetchResponse;
+      await page.waitForTimeout(500);
+      await expect(page.getByText("Bulk Test Post")).not.toBeVisible();
+    });
+  });
 });

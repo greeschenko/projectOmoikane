@@ -5,7 +5,7 @@ import {
   Container, Typography, Button, TextField, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, FormControlLabel, Switch, Select, MenuItem, InputLabel, FormControl, Alert,
-  IconButton, CircularProgress,
+  IconButton, CircularProgress, Checkbox,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -42,6 +42,8 @@ export default function AdminPages() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<string | null>(null);
 
   const fetchPages = useCallback(async () => {
     setPagesLoading(true);
@@ -121,12 +123,41 @@ export default function AdminPages() {
     fetchPages();
   }
 
+  function toggleSelect(id: string) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedIds(next);
+  }
+
+  async function handleBulkAction() {
+    if (!bulkAction || selectedIds.size === 0) return;
+    await fetch("/api/pages/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: bulkAction, ids: [...selectedIds] }),
+    });
+    setBulkAction(null);
+    setSelectedIds(new Set());
+    fetchPages();
+  }
+
   return (
     <Container>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h4" component="h1">Pages</Typography>
         <Button variant="contained" onClick={() => openCreate()}>New Page</Button>
       </Box>
+
+      {selectedIds.size > 0 && (
+        <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="body2">{selectedIds.size} selected</Typography>
+          <Button size="small" variant="outlined" onClick={() => setBulkAction("publish")}>Publish</Button>
+          <Button size="small" variant="outlined" onClick={() => setBulkAction("draft")}>Draft</Button>
+          <Button size="small" variant="outlined" color="error" onClick={() => setBulkAction("delete")}>Delete Selected</Button>
+          <Button size="small" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+        </Box>
+      )}
+
       <Paper sx={{ p: 2 }}>
         {pagesLoading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
@@ -145,6 +176,8 @@ export default function AdminPages() {
             dragOverId={dragOverId}
             setDragOverId={setDragOverId}
             depth={0}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
           />
         )}
       </Paper>
@@ -221,12 +254,29 @@ export default function AdminPages() {
           <Button onClick={confirmDelete} color="error" variant="contained">Delete</Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={!!bulkAction} onClose={() => setBulkAction(null)}>
+        <DialogTitle>Confirm Bulk Action</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {bulkAction === "delete" && `Delete ${selectedIds.size} page(s)? They will be moved to trash.`}
+            {bulkAction === "publish" && `Publish ${selectedIds.size} page(s)?`}
+            {bulkAction === "draft" && `Set ${selectedIds.size} page(s) to draft?`}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkAction(null)}>Cancel</Button>
+          <Button onClick={handleBulkAction} variant="contained" color={bulkAction === "delete" ? "error" : "primary"}>
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
 
 function PageTreeList({
-  parentId, pages, getChildren, onEdit, onDelete, onReorder, dragOverId, setDragOverId, depth,
+  parentId, pages, getChildren, onEdit, onDelete, onReorder, dragOverId, setDragOverId, depth, selectedIds, onToggleSelect,
 }: {
   parentId: string | null;
   pages: Page[];
@@ -237,6 +287,8 @@ function PageTreeList({
   dragOverId: string | null;
   setDragOverId: (id: string | null) => void;
   depth: number;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
 }) {
   const children = getChildren(parentId);
   if (children.length === 0) return null;
@@ -255,6 +307,8 @@ function PageTreeList({
           onReorder={onReorder}
           dragOverId={dragOverId}
           setDragOverId={setDragOverId}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
         />
       ))}
     </ul>
@@ -274,7 +328,7 @@ function buildViewUrl(p: Page, pages: Page[]): string {
 }
 
 function PageTreeItem({
-  page, pages, getChildren, depth, onEdit, onDelete, onReorder, dragOverId, setDragOverId,
+  page, pages, getChildren, depth, onEdit, onDelete, onReorder, dragOverId, setDragOverId, selectedIds, onToggleSelect,
 }: {
   page: Page;
   pages: Page[];
@@ -285,6 +339,8 @@ function PageTreeItem({
   onReorder: (pid: string | null, ids: string[]) => void;
   dragOverId: string | null;
   setDragOverId: (id: string | null) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
 }) {
   const siblings = getChildren(page.parentId);
 
@@ -330,13 +386,18 @@ function PageTreeItem({
         onDrop={handleDrop}
         sx={{
           display: "flex", alignItems: "center", gap: 1, py: 0.5, pl: depth * 24,
-          bgcolor: isDragOver ? "action.hover" : "transparent",
+          bgcolor: selectedIds.has(page.id) ? "action.selected" : isDragOver ? "action.hover" : "transparent",
           borderTop: isDragOver ? 2 : 0,
           borderColor: "primary.main",
           cursor: "grab",
           "&:active": { cursor: "grabbing" },
         }}
       >
+        <Checkbox
+          checked={selectedIds.has(page.id)}
+          onChange={() => onToggleSelect(page.id)}
+          size="small"
+        />
         <DragIndicatorIcon fontSize="small" color="disabled" sx={{ cursor: "grab" }} />
         <Typography sx={{ flexGrow: 1 }}>{page.title}</Typography>
         <IconButton
@@ -364,6 +425,8 @@ function PageTreeItem({
         dragOverId={dragOverId}
         setDragOverId={setDragOverId}
         depth={depth + 1}
+        selectedIds={selectedIds}
+        onToggleSelect={onToggleSelect}
       />
     </li>
   );

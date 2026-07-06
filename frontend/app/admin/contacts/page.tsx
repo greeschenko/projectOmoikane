@@ -11,6 +11,10 @@ import {
   Box,
   Chip,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 
 interface ContactMessage {
@@ -27,6 +31,7 @@ export default function AdminContacts() {
   const [contacts, setContacts] = useState<ContactMessage[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<ContactMessage | null>(null);
 
   const fetchContacts = useCallback(async () => {
     const res = await fetch("/api/contacts");
@@ -48,9 +53,11 @@ export default function AdminContacts() {
     }
   }
 
-  async function handleDelete(id: string) {
-    const res = await fetch(`/api/contacts/${id}`, { method: "DELETE" });
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const res = await fetch(`/api/contacts/${deleteTarget.id}`, { method: "DELETE" });
     if (res.ok) {
+      setDeleteTarget(null);
       fetchContacts();
     } else {
       setError("Failed to delete");
@@ -98,7 +105,7 @@ export default function AdminContacts() {
                     Mark Read
                   </Button>
                 )}
-                <Button size="small" color="error" onClick={() => handleDelete(msg.id)}>
+                <Button size="small" color="error" onClick={() => setDeleteTarget(msg)}>
                   Delete
                 </Button>
               </CardActions>
@@ -106,6 +113,17 @@ export default function AdminContacts() {
           ))}
         </Box>
       )}
+
+      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+        <DialogTitle>Delete Message</DialogTitle>
+        <DialogContent>
+          <Typography>Delete this message from {deleteTarget?.name}?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
+          <Button onClick={confirmDelete} color="error" variant="contained">Delete</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

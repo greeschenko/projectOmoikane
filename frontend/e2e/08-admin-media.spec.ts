@@ -55,4 +55,42 @@ test.describe("Admin Media Library", () => {
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByText("delete-me.png", { exact: true })).toHaveCount(0);
   });
+
+  test.describe("Bulk actions", () => {
+    test("each media item has a checkbox", async ({ page }) => {
+      const mediaResponse = page.waitForResponse(r => r.url().includes('/api/media') && r.status() === 200);
+      await page.goto("/admin/media");
+      await mediaResponse;
+      const checkboxes = page.locator('input[type="checkbox"]');
+      const count = await checkboxes.count();
+      expect(count).toBeGreaterThanOrEqual(1);
+    });
+
+    test("bulk delete removes selected media", async ({ page }) => {
+      // Upload two images
+      for (const name of ["bulk1.png", "bulk2.png"]) {
+        await page.goto("/admin/media");
+        const mediaResponse = page.waitForResponse(r => r.url().includes('/api/media') && r.status() === 200);
+        await mediaResponse;
+        await page.getByRole("button", { name: /^upload$/i }).click();
+        await page.locator('input[type="file"]').setInputFiles({
+          name,
+          mimeType: "image/png",
+          buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),
+        });
+        await page.getByRole("button", { name: /^upload$/i }).last().click();
+        await expect(page.getByText(name)).toBeVisible();
+      }
+      await page.locator('input[type="checkbox"]').first().check();
+      if (await page.locator('input[type="checkbox"]').count() > 1) {
+        await page.locator('input[type="checkbox"]').nth(1).check();
+      }
+      await page.getByRole("button", { name: /delete selected/i }).click();
+      const refetchResponse = page.waitForResponse(r => r.url().includes('/api/media') && r.status() === 200);
+      await page.getByRole("dialog").getByRole("button", { name: /delete/i }).click();
+      await refetchResponse;
+      await page.waitForTimeout(500);
+      await expect(page.getByText("bulk1.png")).not.toBeVisible();
+    });
+  });
 });

@@ -215,4 +215,48 @@ test.describe("Admin Pages", () => {
       expect(reordered[1].id).toBe(pageA.id);
     });
   });
+
+  test.describe("Bulk actions", () => {
+    test("each page tree item has a checkbox", async ({ page }) => {
+      await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
+      const checkboxes = page.locator('main input[type="checkbox"]');
+      expect(await checkboxes.count()).toBeGreaterThanOrEqual(1);
+    });
+
+    test("bulk publish and draft pages", async ({ page }) => {
+      await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
+      const checkbox = page.locator('main input[type="checkbox"]').first();
+      await checkbox.check();
+      const publishBtn = page.getByRole("button", { name: /^publish$/i });
+      if (await publishBtn.isVisible()) {
+        await publishBtn.click();
+        await expect(page.getByRole("dialog")).toBeVisible();
+        await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+        await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
+      }
+      await checkbox.check();
+      const draftBtn = page.getByRole("button", { name: /^draft$/i });
+      if (await draftBtn.isVisible()) {
+        await draftBtn.click();
+        await expect(page.getByRole("dialog")).toBeVisible();
+        await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+        await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
+      }
+    });
+
+    test("bulk delete removes selected pages", async ({ page }) => {
+      await page.goto("/admin/pages");
+      await page.locator("main li").first().waitFor();
+      const firstTitle = await page.locator("main li").first().textContent();
+      expect(firstTitle).toBeTruthy();
+      await page.locator('main input[type="checkbox"]').first().check();
+      await page.getByRole("button", { name: /delete selected/i }).click();
+      const refetchResponse = page.waitForResponse(r => r.url().includes('/api/pages') && r.status() === 200);
+      await page.getByRole("dialog").getByRole("button", { name: /confirm/i }).click();
+      await refetchResponse;
+      await expect(page.getByText(firstTitle!.trim())).not.toBeVisible();
+    });
+  });
 });
