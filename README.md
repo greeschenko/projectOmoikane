@@ -30,6 +30,7 @@ See [TODO.md](./TODO.md) for the full development roadmap.
 | 13 — Email Templates, Rate Limiting, Contact Form | ✅ | 82 Go pass, 231/231 desktop, 201/239 mobile |
 | 14 — Mobile E2E Stability | ✅ | 82 Go pass, 231/231 desktop, 230/230 mobile |
 | 15 — Trash System & Bulk Actions | ✅ | 249/249 pass, 82 Go pass |
+| 16 — Manual Testing Session | 🔲 | — |
 
 ## Quick Start
 

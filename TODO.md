@@ -193,12 +193,37 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 **Test status:** Go tests 82/82 pass; desktop 231/231 pass (8 skip); mobile 230/230 pass (1 skip)
 
-## 🔲 Phase 16: Audit Log (separate microservice)
+## 🔲 Phase 16: Manual Testing Session
+
+- [ ] Setup wizard — fresh container, navigate to `/`, create root admin, verify redirect to `/admin`
+- [ ] Authentication — login, session persists across refresh, logout clears session
+- [ ] Admin user CRUD — create/edit/delete users, search/filter, sort
+- [ ] Admin user bulk actions — select checkboxes, Ban/Activate/Delete, confirm dialog
+- [ ] Admin pages CRUD — create/edit/delete, drag-and-drop reorder, preview draft in incognito
+- [ ] Admin pages bulk actions — select checkboxes, Publish/Draft/Delete
+- [ ] Admin blog CRUD — create/edit/delete posts with TipTap, manage tags/categories
+- [ ] Admin blog bulk actions — select checkboxes, Publish/Draft/Delete
+- [ ] Media library — upload image, view gallery, delete (soft-delete, moves to trash)
+- [ ] Media bulk actions — select multiple items, "Delete Selected" with confirmation dialog
+- [ ] Contacts — view list, delete with confirmation dialog
+- [ ] Trash page — view tabs (All/Pages/Users/Posts/etc.), restore item, hard-delete, verify badge count updates
+- [ ] Messages — create broadcast message, verify badge appears, mark read
+- [ ] Site settings — change name/tagline/logo/favicon, verify reflected on public pages + admin header
+- [ ] Email templates — customize in admin settings
+- [ ] Dashboard — verify stats load (user count, page count, chart)
+- [ ] Public pages — home loads, dynamic pages with breadcrumbs, menu from pages
+- [ ] Blog public — `/blog` lists published posts only, detail page shows content + likes, `/rss` returns valid XML
+- [ ] Contact form — submit as public user, verify it appears in admin contacts
+- [ ] Registration — create new account, ReCAPTCHA works, verify redirect to `/`
+- [ ] Forgot/reset password — request reset, check email (or logs), use token to set new password
+- [ ] Responsive — mobile sidebar toggle, public header menu collapses on narrow viewport
+
+## 🔲 Phase 17: Audit Log (separate microservice)
 - [ ] New `audit-log` microservice with own DB
 - [ ] Event emission from main app handlers via HTTP or message queue
 - [ ] Admin audit log viewer
 
-## 🔲 Phase 17: Platform & Performance
+## 🔲 Phase 18: Platform & Performance
 
 - [ ] OpenAPI documentation for all Go routes
 - [ ] API tokens / headless CMS mode
