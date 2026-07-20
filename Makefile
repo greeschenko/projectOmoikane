@@ -29,7 +29,7 @@ reset:
 	docker compose -f docker/docker-compose.yml restart frontend
 	docker exec docker-frontend-1 npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-image 2>/dev/null || true
 
-db-reset:
+db-reset: up
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='omoikane' AND pid<>pg_backend_pid();"
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane;"
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "CREATE DATABASE omoikane;"
