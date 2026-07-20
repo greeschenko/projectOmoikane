@@ -20,14 +20,14 @@ up:
 		if [ $$i -eq 60 ]; then echo "Frontend not ready after 60s"; exit 1; fi; \
 		sleep 2; \
 	done
-	docker exec docker-frontend-1 npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-image 2>/dev/null || true
+	docker exec docker-frontend-1 npm install 2>/dev/null || true
 
 down:
 	docker compose -f docker/docker-compose.yml down --remove-orphans
 
 reset:
 	docker compose -f docker/docker-compose.yml restart frontend
-	docker exec docker-frontend-1 npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-image 2>/dev/null || true
+	docker exec docker-frontend-1 npm install 2>/dev/null || true
 
 db-reset: up
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='omoikane' AND pid<>pg_backend_pid();"
