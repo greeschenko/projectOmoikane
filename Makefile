@@ -1,4 +1,11 @@
-.PHONY: up down reset db-reset test go-test go-build
+.PHONY: up down reset db-reset test go-test go-build swagger
+
+SWAG := $(shell command -v swag 2>/dev/null || echo "$(HOME)/prodev/go/bin/swag")
+
+swagger:
+	cd backend && $(SWAG) init -g cmd/api/main.go --output ./docs --parseDependency --parseInternal --exclude "cmd/audit,docs,cmd/audit/docs"
+	cd backend && $(SWAG) init -g cmd/audit/main.go --output ./cmd/audit/docs --parseDependency --parseInternal --exclude "internal,cmd/api,docs"
+	@echo "Swagger docs generated"
 
 up:
 	docker compose -f docker/docker-compose.yml up -d --remove-orphans

@@ -14,6 +14,43 @@ import (
 	"omoikane-backend/internal/models"
 )
 
+type createPageRequest struct {
+	Title           string `json:"title"`
+	Slug            string `json:"slug"`
+	Content         string `json:"content"`
+	MetaTitle       string `json:"metaTitle"`
+	MetaDescription string `json:"metaDescription"`
+	MetaKeywords    string `json:"metaKeywords"`
+	Status          string `json:"status"`
+	ParentID        *uint  `json:"parentId"`
+	InMenu          *bool  `json:"inMenu"`
+}
+
+type updatePageRequest struct {
+	Title           *string `json:"title,omitempty"`
+	Slug            *string `json:"slug,omitempty"`
+	Content         *string `json:"content,omitempty"`
+	MetaTitle       *string `json:"metaTitle,omitempty"`
+	MetaDescription *string `json:"metaDescription,omitempty"`
+	MetaKeywords    *string `json:"metaKeywords,omitempty"`
+	Status          *string `json:"status,omitempty"`
+	ParentID        *uint   `json:"parentId,omitempty"`
+	InMenu          *bool   `json:"inMenu,omitempty"`
+}
+
+type reorderPagesRequest struct {
+	PageIds []uint `json:"pageIds"`
+}
+
+// GetPages returns pages ordered by sort_order. Public callers only see published pages;
+// use ?menu=true to get only published pages flagged for the menu.
+// @Summary List pages
+// @Description Returns pages. Unauthenticated requests and ?menu=true only receive published pages.
+// @Tags pages
+// @Produce json
+// @Param menu query bool false "Return only published menu pages"
+// @Success 200 {array} map[string]interface{}
+// @Router /pages [get]
 func (h *Handler) GetPages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -45,6 +82,16 @@ func (h *Handler) GetPages(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// GetPage returns a single page by ID.
+// @Summary Get page by ID
+// @Description Returns a single page by its numeric ID.
+// @Tags pages
+// @Produce json
+// @Param id path int true "Page ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /pages/{id} [get]
 func (h *Handler) GetPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -66,6 +113,15 @@ func (h *Handler) GetPage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizePageJSON(page))
 }
 
+// GetPageBySlug returns a published page by slug.
+// @Summary Get page by slug
+// @Description Returns a single published page by its slug. Includes parent title/slug when a parent exists.
+// @Tags pages
+// @Produce json
+// @Param slug path string true "Page slug"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]string
+// @Router /pages/slug/{slug} [get]
 func (h *Handler) GetPageBySlug(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -91,6 +147,18 @@ func (h *Handler) GetPageBySlug(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// CreatePage creates a new page.
+// @Summary Create page
+// @Description Creates a page. Slug defaults to a generated slug from the title when omitted.
+// @Tags pages
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body createPageRequest true "Page details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Router /pages [post]
 func (h *Handler) CreatePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -176,6 +244,19 @@ func (h *Handler) CreatePage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizePageJSON(page))
 }
 
+// UpdatePage updates an existing page.
+// @Summary Update page
+// @Description Updates the provided fields of a page.
+// @Tags pages
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Page ID"
+// @Param body body updatePageRequest true "Fields to update"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /pages/{id} [put]
 func (h *Handler) UpdatePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -267,6 +348,17 @@ func (h *Handler) UpdatePage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizePageJSON(page))
 }
 
+// DeletePage soft-deletes a page.
+// @Summary Delete page
+// @Description Soft-deletes a page; the record moves to trash and can be restored.
+// @Tags pages
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Page ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /pages/{id} [delete]
 func (h *Handler) DeletePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -308,6 +400,17 @@ func (h *Handler) DeletePage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// ReorderPages sets the sort order of pages.
+// @Summary Reorder pages
+// @Description Reorders pages by assigning sort_order based on the order of pageIds.
+// @Tags pages
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body reorderPagesRequest true "Ordered page IDs"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /pages/reorder [put]
 func (h *Handler) ReorderPages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -327,6 +430,17 @@ func (h *Handler) ReorderPages(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// BatchPages performs a bulk action on pages.
+// @Summary Batch page actions
+// @Description Applies an action (delete, publish, draft) to multiple pages.
+// @Tags pages
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body batchRequest true "Action and page IDs"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /pages/batch [post]
 func (h *Handler) BatchPages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

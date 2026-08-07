@@ -11,6 +11,34 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type updateSettingsRequest struct {
+	SiteName           *string `json:"siteName,omitempty"`
+	Tagline            *string `json:"tagline,omitempty"`
+	Logo               *string `json:"logo,omitempty"`
+	Favicon            *string `json:"favicon,omitempty"`
+	BlogEnabled        *bool   `json:"blogEnabled,omitempty"`
+	ResetEmailSubject  *string `json:"resetEmailSubject,omitempty"`
+	ResetEmailBodyHTML *string `json:"resetEmailBodyHTML,omitempty"`
+}
+
+type updateProfileRequest struct {
+	Name   *string `json:"name,omitempty"`
+	Email  *string `json:"email,omitempty"`
+	Avatar *string `json:"avatar,omitempty"`
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+// GetSettings returns public site settings.
+// @Summary Get site settings
+// @Description Returns site name, tagline, logo, favicon, blog toggle and email template settings.
+// @Tags settings
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /settings [get]
 func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -38,6 +66,17 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// UpdateSettings updates site settings (admin only).
+// @Summary Update site settings
+// @Description Updates the provided site settings fields.
+// @Tags settings
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body updateSettingsRequest true "Fields to update"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /settings [put]
 func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -126,6 +165,18 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// UpdateProfile updates the current user's profile.
+// @Summary Update profile
+// @Description Updates the current user's name, email and/or avatar.
+// @Tags settings
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body updateProfileRequest true "Fields to update"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /settings/profile [put]
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -172,6 +223,18 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizeUserJSON(user))
 }
 
+// ChangePassword changes the current user's password.
+// @Summary Change password
+// @Description Changes the current user's password after verifying the current one.
+// @Tags settings
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body changePasswordRequest true "Current and new password"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /settings/password [post]
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

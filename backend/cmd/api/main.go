@@ -5,12 +5,23 @@ import (
 	"net/http"
 	"time"
 
+	_ "omoikane-backend/docs"
 	"omoikane-backend/internal/config"
 	"omoikane-backend/internal/database"
 	"omoikane-backend/internal/handlers"
 	"omoikane-backend/internal/middleware"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// @title Omoikane API
+// @version 1.0
+// @description REST API for the Omoikane CMS. Public endpoints do not require authentication; protected endpoints accept a Bearer token (or the session cookie set by login). Admin-only endpoints require an admin role.
+// @contact.name Omoikane
+// @BasePath /api
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	cfg := config.Load()
 
@@ -35,6 +46,9 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+
+	// Swagger UI (public)
+	mux.HandleFunc("GET /swagger/", httpSwagger.Handler())
 
 	// Health
 	mux.HandleFunc("GET /health", handlers.HealthHandler)

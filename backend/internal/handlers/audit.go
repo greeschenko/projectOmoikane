@@ -8,6 +8,20 @@ import (
 	"omoikane-backend/internal/models"
 )
 
+// GetAuditLogs returns audit log entries (admin only).
+// @Summary List audit logs
+// @Description Returns audit log entries from the audit microservice. Supports filters and pagination (limit <= 500).
+// @Tags audit
+// @Produce json
+// @Security BearerAuth
+// @Param entity query string false "Filter by entity type (e.g. user, page, post)"
+// @Param action query string false "Filter by action (e.g. create, update, delete)"
+// @Param userId query int false "Filter by actor user ID"
+// @Param search query string false "Search user name or detail"
+// @Param limit query int false "Max results (1-500, default 100)"
+// @Param offset query int false "Pagination offset"
+// @Success 200 {object} map[string]interface{}
+// @Router /audit-logs [get]
 func (h *Handler) GetAuditLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

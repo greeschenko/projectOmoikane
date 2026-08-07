@@ -7,6 +7,14 @@ import (
 	"omoikane-backend/internal/models"
 )
 
+// GetDashboard returns content counts (admin only).
+// @Summary Dashboard content counts
+// @Description Returns counts of users, pages, posts, media and messages.
+// @Tags dashboard
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /dashboard [get]
 func (h *Handler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -31,6 +39,14 @@ func (h *Handler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetDashboardStats returns dashboard stats plus recent registrations and messages (admin only).
+// @Summary Dashboard stats
+// @Description Returns content counts plus the 5 most recent user registrations and messages.
+// @Tags dashboard
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /dashboard/stats [get]
 func (h *Handler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

@@ -28,3 +28,9 @@ func (h *Handler) Auth(next http.HandlerFunc) http.HandlerFunc {
 func (h *Handler) Admin(next http.HandlerFunc) http.HandlerFunc {
 	return middleware.AdminRequired(h.JWTSecret, next)
 }
+
+// batchRequest is the shared body for batch actions across entities.
+type batchRequest struct {
+	Action string `json:"action"` // "delete", "publish", "draft", "ban", "activate", "clear"
+	IDs    []uint `json:"ids"`
+}

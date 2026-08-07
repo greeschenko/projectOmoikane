@@ -7,13 +7,19 @@ import (
 	"os"
 	"strconv"
 
+	_ "omoikane-backend/cmd/audit/docs"
 	"omoikane-backend/internal/models"
 
+	httpSwagger "github.com/swaggo/http-swagger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
+// @title Omoikane Audit Service
+// @version 1.0
+// @description Internal microservice that receives and stores audit log events emitted by the main API. Not meant for direct public use.
+// @BasePath /api/audit
 var db *gorm.DB
 
 func main() {
@@ -39,12 +45,10 @@ func main() {
 	log.Println("Audit service connected and migrated")
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /swagger/", httpSwagger.Handler())
 	mux.HandleFunc("POST /events", handleReceiveEvent)
 	mux.HandleFunc("GET /logs", handleGetLogs)
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	})
+	mux.HandleFunc("GET /health", handleHealth)
 
 	addr := ":" + port
 	log.Printf("Audit service starting on %s", addr)
@@ -53,6 +57,29 @@ func main() {
 	}
 }
 
+// handleHealth reports audit service health.
+// @Summary Health check
+// @Description Returns the audit service status.
+// @Tags system
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /health [get]
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// handleReceiveEvent stores a single audit event.
+// @Summary Ingest audit event
+// @Description Stores an audit log event emitted by the main API.
+// @Tags audit
+// @Accept json
+// @Produce json
+// @Param body body models.AuditLog true "Audit event"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /events [post]
 func handleReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -87,6 +114,19 @@ func handleReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// handleGetLogs returns stored audit logs with filters and pagination.
+// @Summary List audit logs
+// @Description Returns stored audit log entries. Supports filters and pagination (limit <= 500).
+// @Tags audit
+// @Produce json
+// @Param entity query string false "Filter by entity type"
+// @Param action query string false "Filter by action"
+// @Param userId query int false "Filter by actor user ID"
+// @Param search query string false "Search user name or detail"
+// @Param limit query int false "Max results (1-500, default 100)"
+// @Param offset query int false "Pagination offset"
+// @Success 200 {object} map[string]interface{}
+// @Router /logs [get]
 func handleGetLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

@@ -14,6 +14,18 @@ import (
 	"omoikane-backend/internal/models"
 )
 
+// UploadMedia uploads a file via multipart form (field "file").
+// @Summary Upload media file
+// @Description Uploads a file (multipart/form-data, field name "file"). Returns the media item with base64-encoded data.
+// @Tags media
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param file formData file true "File to upload"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /media [post]
 func (h *Handler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -81,6 +93,14 @@ func readFileBase64(mimeType, path string) string {
 	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data)
 }
 
+// GetMedia returns all media items with base64-encoded file data.
+// @Summary List media
+// @Description Returns all media items, newest first, each with base64-encoded data.
+// @Tags media
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} map[string]interface{}
+// @Router /media [get]
 func (h *Handler) GetMedia(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -102,6 +122,17 @@ func (h *Handler) GetMedia(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// GetMediaItem returns a single media item by ID.
+// @Summary Get media item
+// @Description Returns a single media item by its numeric ID.
+// @Tags media
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Media ID"
+// @Success 200 {object} models.MediaItem
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /media/{id} [get]
 func (h *Handler) GetMediaItem(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -123,6 +154,17 @@ func (h *Handler) GetMediaItem(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(item)
 }
 
+// DeleteMedia soft-deletes a media item.
+// @Summary Delete media item
+// @Description Soft-deletes a media record; the file stays on disk until hard-purged from trash.
+// @Tags media
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Media ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /media/{id} [delete]
 func (h *Handler) DeleteMedia(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -146,6 +188,17 @@ func (h *Handler) DeleteMedia(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// BatchMedia performs a bulk action on media items.
+// @Summary Batch media actions
+// @Description Applies an action (delete) to multiple media items.
+// @Tags media
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body batchRequest true "Action and media IDs"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /media/batch [post]
 func (h *Handler) BatchMedia(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

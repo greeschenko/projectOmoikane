@@ -28,6 +28,15 @@ type updateUserRequest struct {
 	Status   *string `json:"status,omitempty"`
 }
 
+// GetUsers returns all users (admin only).
+// @Summary List users
+// @Description Returns all users with sensitive fields (password) omitted.
+// @Tags users
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} map[string]interface{}
+// @Failure 500 {object} map[string]string
+// @Router /users [get]
 func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -46,6 +55,18 @@ func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// CreateUser creates a new user (admin only).
+// @Summary Create user
+// @Description Creates a user with the given role and status.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body createUserRequest true "User details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /users [post]
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -126,6 +147,19 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizeUserJSON(user))
 }
 
+// UpdateUser updates an existing user (admin only).
+// @Summary Update user
+// @Description Updates the provided fields of a user. Password, when supplied, is hashed.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Param body body updateUserRequest true "Fields to update"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /users/{id} [put]
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -202,6 +236,17 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizeUserJSON(user))
 }
 
+// DeleteUser soft-deletes a user (admin only).
+// @Summary Delete user
+// @Description Soft-deletes a user; the record moves to trash and can be restored.
+// @Tags users
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /users/{id} [delete]
 func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -246,6 +291,17 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// BatchUsers performs a bulk action on users (admin only).
+// @Summary Batch user actions
+// @Description Applies an action (delete, ban, activate) to multiple users.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body batchRequest true "Action and user IDs"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /users/batch [post]
 func (h *Handler) BatchUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

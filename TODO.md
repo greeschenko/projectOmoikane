@@ -255,7 +255,7 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 ## 🔲 Phase 19: Platform & Performance
 
-- [ ] OpenAPI documentation for all Go routes
+- [x] OpenAPI documentation for all Go routes (swaggo/swag, public Swagger UI at `/api/swagger/` + audit docs at `/api/audit/swagger/`)
 - [ ] API tokens / headless CMS mode
 - [ ] Cache layer (Redis or in-memory)
 - [ ] Image optimization (sharp, next/image, thumbnails)

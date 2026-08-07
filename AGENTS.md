@@ -1,11 +1,14 @@
 # Omoikane — Project Context for AI Agents
 
 ## Goal
-- Complete Phase 18 (audit log microservice) — pending
-- Phase 17 (bug fixes + feature completion) is DONE
+- Phase 19 (platform & performance) — in progress; item 1 (OpenAPI docs + public Swagger UI) DONE
+- Phase 18 (audit log microservice) — DONE
+- Phase 17 (bug fixes + feature completion) — DONE
 
 ## Constraints & Preferences
-- `make go-test` to verify all Go tests pass (~88 tests: 83 handler, 2 mailer, 3 middleware)
+- `make go-test` to verify all Go tests pass (100 tests: 95 handler + 2 mailer + 3 middleware)
+- `make swagger` regenerates both OpenAPI doc sets via swag (main + audit; run before committing if handler annotations changed)
+- Public Swagger UI: `/api/swagger/` (main API) and `/api/audit/swagger/` (audit microservice); nginx `proxy_redirect /swagger/` rewrites the trailing-slash redirect so prefixed URLs resolve
 - `make test` for full Playwright suite (desktop + mobile); DB reset twice: before desktop, between desktop and mobile
 - `make db-reset` (depends on `up`) for clean DB reset
 - `psql -c` needs separate flags per statement (DROP/CREATE in one call fails in transaction)
@@ -50,13 +53,14 @@
   - Blog: like/unlike button with heart icon
 
 ## Next Steps
-1. Phase 18: Audit log microservice
+1. Phase 19, item 2: API tokens / headless CMS mode
 2. (Optional) Wire UndoSnackbar into delete flows for undo-toast UX
 
 ## Critical Context
-- **Go tests**: 88/88 pass (83 handler + 2 mailer + 3 middleware; need running PostgreSQL)
+- **Go tests**: 100/100 pass (95 handler + 2 mailer + 3 middleware; need running PostgreSQL)
 - **Desktop Playwright**: 242/242 pass, 8 skipped — 0 failures
 - **Mobile Playwright**: 249/249 pass, 9 skipped — 0 failures
+- **Swagger**: swag v1.16.6 lib + swag CLI at `/home/olex/prodev/go/bin/swag` (GOPATH is `/home/olex/prodev/go`); docs generated with `--parseDependency --parseInternal --exclude` (main API excludes `cmd/audit`; audit service excludes `internal,cmd/api`); main API docs at `backend/docs/`, audit docs at `backend/cmd/audit/docs/`; both use relative `doc.json` URL so the UI works behind the nginx prefix; `@BasePath` must appear BEFORE `@securityDefinitions` or swag drops it; Go 1.22+ mux requires `GET /swagger/` (trailing slash wildcard), NOT `/swagger/*`
 - **`GetTrashCount`** queries `Unscoped().Where("deleted_at IS NOT NULL").Count()` across all 8 entity models — used for sidebar badge
 - Models with `gorm.Model`: Page, User, BlogPost, MediaItem, ContactMessage, Message, Tag, Category — all support GORM soft-delete via `DeletedAt`
 - Trash routes: `GET /trash`, `GET /trash/count`, `POST /trash/{entity}/{id}/restore`, `DELETE /trash/{entity}/{id}`, `DELETE /trash` — all admin-only

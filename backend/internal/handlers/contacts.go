@@ -17,6 +17,17 @@ type contactRequest struct {
 	RecaptchaToken string `json:"recaptchaToken,omitempty"`
 }
 
+// SubmitContact submits the public contact form.
+// @Summary Submit contact form
+// @Description Stores a contact form submission. Requires a valid reCAPTCHA token when reCAPTCHA is configured.
+// @Tags contacts
+// @Accept json
+// @Produce json
+// @Param body body contactRequest true "Contact form data"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /contact [post]
 func (h *Handler) SubmitContact(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -65,6 +76,14 @@ func (h *Handler) SubmitContact(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetContacts returns contact form submissions plus unread count (admin only).
+// @Summary List contact submissions
+// @Description Returns all contact form messages, newest first, plus the number of unread ones.
+// @Tags contacts
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /contacts [get]
 func (h *Handler) GetContacts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -89,6 +108,17 @@ func (h *Handler) GetContacts(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetContact returns a single contact submission (admin only).
+// @Summary Get contact submission
+// @Description Returns a single contact form message by ID.
+// @Tags contacts
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Contact ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /contacts/{id} [get]
 func (h *Handler) GetContact(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -110,6 +140,17 @@ func (h *Handler) GetContact(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizeContactJSON(msg))
 }
 
+// MarkContactRead marks a contact submission as read (admin only).
+// @Summary Mark contact read
+// @Description Marks a contact form message as read.
+// @Tags contacts
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Contact ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /contacts/{id}/read [post]
 func (h *Handler) MarkContactRead(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -130,6 +171,17 @@ func (h *Handler) MarkContactRead(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// DeleteContact soft-deletes a contact submission (admin only).
+// @Summary Delete contact submission
+// @Description Soft-deletes a contact form message; it moves to trash and can be restored.
+// @Tags contacts
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Contact ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /contacts/{id} [delete]
 func (h *Handler) DeleteContact(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

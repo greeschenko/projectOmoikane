@@ -12,6 +12,50 @@ import (
 	"gorm.io/gorm"
 )
 
+type createPostRequest struct {
+	Title         string   `json:"title"`
+	Slug          string   `json:"slug"`
+	Content       string   `json:"content"`
+	Excerpt       string   `json:"excerpt"`
+	Status        string   `json:"status"`
+	FeaturedImage string   `json:"featuredImage"`
+	Tags          []string `json:"tags"`
+	CategoryID    *uint    `json:"categoryId"`
+}
+
+type updatePostRequest struct {
+	Title         *string  `json:"title,omitempty"`
+	Slug          *string  `json:"slug,omitempty"`
+	Content       *string  `json:"content,omitempty"`
+	Excerpt       *string  `json:"excerpt,omitempty"`
+	Status        *string  `json:"status,omitempty"`
+	FeaturedImage *string  `json:"featuredImage,omitempty"`
+	CategoryID    *uint    `json:"categoryId,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+}
+
+type createTagRequest struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type createCategoryRequest struct {
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description"`
+}
+
+// DeleteTag deletes a blog tag (admin only).
+// @Summary Delete tag
+// @Description Soft-deletes a blog tag.
+// @Tags blog
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Tag ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /blog/tags/{id} [delete]
 func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -32,6 +76,17 @@ func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// DeleteCategory deletes a blog category (admin only).
+// @Summary Delete category
+// @Description Soft-deletes a blog category.
+// @Tags blog
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Category ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /blog/categories/{id} [delete]
 func (h *Handler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -63,6 +118,13 @@ func lookupUserName(h *Handler, userID uint) string {
 	return user.Name
 }
 
+// GetPosts returns published blog posts (public).
+// @Summary List published posts
+// @Description Returns blog posts with status published, newest first.
+// @Tags blog
+// @Produce json
+// @Success 200 {array} map[string]interface{}
+// @Router /blog/posts [get]
 func (h *Handler) GetPosts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -77,6 +139,14 @@ func (h *Handler) GetPosts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// GetAdminPosts returns all posts including drafts (admin only).
+// @Summary List all posts
+// @Description Returns all blog posts regardless of status, newest first.
+// @Tags blog
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} map[string]interface{}
+// @Router /admin/blog/posts [get]
 func (h *Handler) GetAdminPosts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -91,6 +161,16 @@ func (h *Handler) GetAdminPosts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// GetPost returns a single blog post by ID.
+// @Summary Get post by ID
+// @Description Returns a single blog post by its numeric ID.
+// @Tags blog
+// @Produce json
+// @Param id path int true "Post ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /blog/posts/{id} [get]
 func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -112,6 +192,15 @@ func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 }
 
+// GetPostBySlug returns a published post by slug (public).
+// @Summary Get post by slug
+// @Description Returns a single published blog post by its slug.
+// @Tags blog
+// @Produce json
+// @Param slug path string true "Post slug"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]string
+// @Router /blog/posts/slug/{slug} [get]
 func (h *Handler) GetPostBySlug(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -127,6 +216,17 @@ func (h *Handler) GetPostBySlug(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 }
 
+// CreatePost creates a new blog post.
+// @Summary Create post
+// @Description Creates a blog post. Slug defaults to a generated slug from the title. Tags are associated by name.
+// @Tags blog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body createPostRequest true "Post details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /blog/posts [post]
 func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -203,6 +303,19 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 }
 
+// UpdatePost updates an existing blog post.
+// @Summary Update post
+// @Description Updates the provided fields of a post. When tags is present, the tag set is replaced entirely.
+// @Tags blog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Post ID"
+// @Param body body updatePostRequest true "Fields to update"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /blog/posts/{id} [put]
 func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -298,6 +411,17 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 }
 
+// DeletePost soft-deletes a blog post.
+// @Summary Delete post
+// @Description Soft-deletes a post; the record moves to trash and can be restored.
+// @Tags blog
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Post ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /blog/posts/{id} [delete]
 func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -339,6 +463,17 @@ func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// BatchPosts performs a bulk action on posts.
+// @Summary Batch post actions
+// @Description Applies an action (delete, publish, draft) to multiple posts.
+// @Tags blog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body batchRequest true "Action and post IDs"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /blog/posts/batch [post]
 func (h *Handler) BatchPosts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -373,6 +508,17 @@ func (h *Handler) BatchPosts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// ToggleLike likes or unlikes a post for the current user.
+// @Summary Like / unlike a post
+// @Description Toggles the current user's like on a post and returns the new liked state and count.
+// @Tags blog
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Post ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /blog/posts/{id}/like [post]
 func (h *Handler) ToggleLike(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -422,6 +568,13 @@ func sanitizeTag(t models.Tag) map[string]interface{} {
 	}
 }
 
+// GetTags returns all blog tags (public).
+// @Summary List tags
+// @Description Returns all blog tags.
+// @Tags blog
+// @Produce json
+// @Success 200 {array} map[string]interface{}
+// @Router /blog/tags [get]
 func (h *Handler) GetTags(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -436,6 +589,17 @@ func (h *Handler) GetTags(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// CreateTag creates a blog tag (admin only).
+// @Summary Create tag
+// @Description Creates a blog tag. Slug defaults to a generated slug from the name.
+// @Tags blog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body createTagRequest true "Tag details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /blog/tags [post]
 func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -478,6 +642,13 @@ func sanitizeCategory(c models.Category) map[string]interface{} {
 	}
 }
 
+// GetCategories returns all blog categories (public).
+// @Summary List categories
+// @Description Returns all blog categories.
+// @Tags blog
+// @Produce json
+// @Success 200 {array} map[string]interface{}
+// @Router /blog/categories [get]
 func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -492,6 +663,17 @@ func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// CreateCategory creates a blog category (admin only).
+// @Summary Create category
+// @Description Creates a blog category. Slug defaults to a generated slug from the name.
+// @Tags blog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body createCategoryRequest true "Category details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /blog/categories [post]
 func (h *Handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

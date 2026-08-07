@@ -46,6 +46,13 @@ type resetPasswordRequest struct {
 	Password string `json:"password"`
 }
 
+// SetupStatus reports whether the site still needs initial admin setup.
+// @Summary Check setup status
+// @Description Returns whether an admin account still needs to be created (first run).
+// @Tags auth
+// @Produce json
+// @Success 200 {object} map[string]bool
+// @Router /setup/check [get]
 func (h *Handler) SetupStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -55,6 +62,16 @@ func (h *Handler) SetupStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"setupRequired": count == 0})
 }
 
+// Setup creates the initial admin account (only allowed before any user exists).
+// @Summary Initialize admin account
+// @Description Creates the first admin user. Only succeeds while the database has no users.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body setupRequest true "Email and password for the admin account"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /setup [post]
 func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -101,6 +118,18 @@ func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// Login authenticates a user and sets the session cookie.
+// @Summary User login
+// @Description Authenticates credentials, sets an HttpOnly session cookie and emits a login audit event.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body loginRequest true "Email and password"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -172,6 +201,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Register creates a new public user account.
+// @Summary Register a user
+// @Description Creates a new user account. Requires a valid reCAPTCHA token when reCAPTCHA is configured.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body registerRequest true "User details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /auth/register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -231,6 +270,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Logout clears the session cookie.
+// @Summary User logout
+// @Description Clears the session cookie and emits a logout audit event.
+// @Tags auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]bool
+// @Router /auth/logout [post]
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -258,6 +305,16 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// ForgotPassword emails a password reset link (rate limited).
+// @Summary Request password reset
+// @Description Emails a password reset link if the account exists. Rate limited to 3 requests per 15 minutes per IP.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body forgotPasswordRequest true "Account email"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /auth/forgot-password [post]
 func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -338,6 +395,16 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ResetPassword sets a new password using a valid reset token.
+// @Summary Reset password
+// @Description Sets a new password using a token from the password reset email.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body resetPasswordRequest true "Reset token and new password"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /auth/reset-password [post]
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -387,6 +454,15 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetProfile returns the currently authenticated user's profile.
+// @Summary Get current user profile
+// @Description Returns id, name, email, role and avatar for the authenticated user.
+// @Tags auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]string
+// @Router /settings/profile [get]
 func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

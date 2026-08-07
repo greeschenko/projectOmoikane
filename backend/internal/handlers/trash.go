@@ -17,6 +17,14 @@ type TrashItem struct {
 	DeletedAt time.Time `json:"deletedAt"`
 }
 
+// GetTrash returns all soft-deleted items across entities (admin only).
+// @Summary List trash items
+// @Description Returns soft-deleted pages, users, posts, media, contacts, messages, tags and categories.
+// @Tags trash
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} TrashItem
+// @Router /trash [get]
 func (h *Handler) GetTrash(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -97,6 +105,14 @@ func (h *Handler) GetTrash(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(items)
 }
 
+// GetTrashCount returns the total number of items in trash (admin only).
+// @Summary Trash count
+// @Description Returns the total number of soft-deleted items across all entities.
+// @Tags trash
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]int64
+// @Router /trash/count [get]
 func (h *Handler) GetTrashCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -113,6 +129,17 @@ func (h *Handler) GetTrashCount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]int64{"count": count})
 }
 
+// RestoreItem restores a soft-deleted item (admin only).
+// @Summary Restore trash item
+// @Description Restores a soft-deleted item by entity type and ID.
+// @Tags trash
+// @Produce json
+// @Security BearerAuth
+// @Param entity path string true "Entity type (page, user, post, media, contact, message, tag, category)"
+// @Param id path int true "Item ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /trash/{entity}/{id}/restore [post]
 func (h *Handler) RestoreItem(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -151,6 +178,17 @@ func (h *Handler) RestoreItem(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// HardDeleteItem permanently deletes a soft-deleted item (admin only).
+// @Summary Permanently delete trash item
+// @Description Hard-deletes an item by entity type and ID. Media files are removed from disk.
+// @Tags trash
+// @Produce json
+// @Security BearerAuth
+// @Param entity path string true "Entity type (page, user, post, media, contact, message, tag, category)"
+// @Param id path int true "Item ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /trash/{entity}/{id} [delete]
 func (h *Handler) HardDeleteItem(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -193,6 +231,15 @@ func (h *Handler) HardDeleteItem(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// EmptyTrash permanently deletes all (or one entity's) trash items (admin only).
+// @Summary Empty trash
+// @Description Hard-deletes all trash items, or only the given entity's items when ?entity= is provided.
+// @Tags trash
+// @Produce json
+// @Security BearerAuth
+// @Param entity query string false "Only empty this entity type (page, user, post, media, contact, message, tag, category)"
+// @Success 200 {object} map[string]bool
+// @Router /trash [delete]
 func (h *Handler) EmptyTrash(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

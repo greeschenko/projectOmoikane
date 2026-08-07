@@ -1,0 +1,136 @@
+basePath: /api/audit
+definitions:
+  gorm.DeletedAt:
+    properties:
+      time:
+        type: string
+      valid:
+        description: Valid is true if Time is not NULL
+        type: boolean
+    type: object
+  models.AuditLog:
+    properties:
+      action:
+        type: string
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      detail:
+        type: string
+      entityID:
+        type: integer
+      entityType:
+        type: string
+      id:
+        type: integer
+      ip:
+        type: string
+      updatedAt:
+        type: string
+      userAgent:
+        type: string
+      userID:
+        type: integer
+      userName:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Internal microservice that receives and stores audit log events emitted
+    by the main API. Not meant for direct public use.
+  title: Omoikane Audit Service
+  version: "1.0"
+paths:
+  /events:
+    post:
+      consumes:
+      - application/json
+      description: Stores an audit log event emitted by the main API.
+      parameters:
+      - description: Audit event
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.AuditLog'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Ingest audit event
+      tags:
+      - audit
+  /health:
+    get:
+      description: Returns the audit service status.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - system
+  /logs:
+    get:
+      description: Returns stored audit log entries. Supports filters and pagination
+        (limit <= 500).
+      parameters:
+      - description: Filter by entity type
+        in: query
+        name: entity
+        type: string
+      - description: Filter by action
+        in: query
+        name: action
+        type: string
+      - description: Filter by actor user ID
+        in: query
+        name: userId
+        type: integer
+      - description: Search user name or detail
+        in: query
+        name: search
+        type: string
+      - description: Max results (1-500, default 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List audit logs
+      tags:
+      - audit
+swagger: "2.0"

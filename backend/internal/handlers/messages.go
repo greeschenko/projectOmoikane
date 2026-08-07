@@ -9,6 +9,19 @@ import (
 	"omoikane-backend/internal/models"
 )
 
+type createMessageRequest struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+// GetMessages returns messages plus the current user's unread count.
+// @Summary List messages
+// @Description Returns all messages plus the number of messages unread by the current user.
+// @Tags messages
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /messages [get]
 func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -42,6 +55,17 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetMessage returns a single message by ID.
+// @Summary Get message
+// @Description Returns a single message by its numeric ID.
+// @Tags messages
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Message ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /messages/{id} [get]
 func (h *Handler) GetMessage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -66,6 +90,17 @@ func (h *Handler) GetMessage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(item)
 }
 
+// CreateMessage creates a new message (admin only).
+// @Summary Create message
+// @Description Creates a new message visible to authenticated users.
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body createMessageRequest true "Message details"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /messages [post]
 func (h *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -99,6 +134,17 @@ func (h *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(item)
 }
 
+// MarkRead marks a message as read by the current user.
+// @Summary Mark message read
+// @Description Marks a message as read for the current user.
+// @Tags messages
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Message ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /messages/{id}/read [post]
 func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -140,6 +186,17 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// DeleteMessage soft-deletes a message (admin only).
+// @Summary Delete message
+// @Description Soft-deletes a message; it moves to trash and can be restored.
+// @Tags messages
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Message ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /messages/{id} [delete]
 func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -162,6 +219,14 @@ func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// MarkAllRead marks all messages as read for the current user.
+// @Summary Mark all messages read
+// @Description Marks every message as read for the current user.
+// @Tags messages
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]bool
+// @Router /messages/read-all [post]
 func (h *Handler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -189,6 +254,14 @@ func (h *Handler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
+// DeleteAllMessages permanently deletes all messages (admin only).
+// @Summary Delete all messages
+// @Description Hard-deletes every message row.
+// @Tags messages
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]bool
+// @Router /messages [delete]
 func (h *Handler) DeleteAllMessages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
