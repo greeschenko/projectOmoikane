@@ -105,3 +105,47 @@ func TestDashboard_RequiresAdmin(t *testing.T) {
 		t.Errorf("Expected 403, got %d", resp.StatusCode)
 	}
 }
+
+func TestDashboardStats_ReturnsRecentData(t *testing.T) {
+	db := setupTestDB(t)
+	s := dashboardServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin-recent@test.com", "Pass1234!", "admin")
+	cookie := loginAs(t, s, "admin-recent@test.com", "Pass1234!")
+
+	// Create some users (registrations)
+	createTestUser(db, "User1", "u1@test.com", "Pass1234!", "user")
+	createTestUser(db, "User2", "u2@test.com", "Pass1234!", "user")
+
+	// Create some messages
+	db.Create(&models.Message{Title: "Msg1", Content: "Hello 1", ReadBy: "[]"})
+	db.Create(&models.Message{Title: "Msg2", Content: "Hello 2", ReadBy: "[]"})
+
+	resp := authenticatedRequest(t, "GET", s.URL+"/dashboard/stats", "", cookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := decodeJSON(t, readBody(t, resp))
+
+	// recentRegistrations should have entries (not empty array)
+	registrations, ok := data["recentRegistrations"].([]interface{})
+	if !ok {
+		t.Fatalf("Expected recentRegistrations to be array, got %T", data["recentRegistrations"])
+	}
+	if len(registrations) == 0 {
+		t.Error("Expected recentRegistrations to be non-empty")
+	}
+
+	// recentMessages should have entries
+	messages, ok := data["recentMessages"].([]interface{})
+	if !ok {
+		t.Fatalf("Expected recentMessages to be array, got %T", data["recentMessages"])
+	}
+	if len(messages) == 0 {
+		t.Error("Expected recentMessages to be non-empty")
+	}
+}

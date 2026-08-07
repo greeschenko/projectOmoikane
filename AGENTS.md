@@ -1,11 +1,13 @@
 # Omoikane — Project Context for AI Agents
 
 ## Goal
-- Complete Phase 15 (trash system + bulk actions) backend and frontend, verify with `make test`
+- Complete Phase 18 (audit log microservice) — pending
+- Phase 17 (bug fixes + feature completion) is DONE
 
 ## Constraints & Preferences
-- `make go-test` to verify all Go tests pass (~82 tests: 77 handler, 2 mailer, 3 middleware)
+- `make go-test` to verify all Go tests pass (~88 tests: 83 handler, 2 mailer, 3 middleware)
 - `make test` for full Playwright suite (desktop + mobile); DB reset twice: before desktop, between desktop and mobile
+- `make db-reset` (depends on `up`) for clean DB reset
 - `psql -c` needs separate flags per statement (DROP/CREATE in one call fails in transaction)
 - DB reset requires `pg_terminate_backend()` before DROP DATABASE (active connections)
 - DB reset commands must not be silenced (`2>/dev/null || true` removed) — errors must surface
@@ -15,7 +17,8 @@
 - Mobile Playwright has `actionTimeout: 15000` in config
 - `loginAsAdmin` uses `domcontentloaded` instead of `networkidle`, deletes all existing pages via API before re-creating 2 test pages — this populates trash with soft-deleted pages
 - Docker backend uses Air hot-reload; Go source changes are picked up automatically in the running container
-- All Phase 15 changes must keep all tests passing
+- Docker frontend requires restart + `npm install` when adding new npm packages
+- Full `npm install` in Makefile (was selective — caused missing `react-google-recaptcha`)
 
 ## Progress
 ### Done
@@ -26,80 +29,88 @@
 - **Phase 13b**: Rate limiting on forgot-password (3 req/15min per IP)
 - **Phase 13c**: Contact form with ReCAPTCHA — public POST + admin CRUD
 - **Mobile fix round 1**: 186→29 failures (201 pass), desktop still 231/231
-  - DB reset isolation (separate Desktop/Mobile resets, terminate connections)
-  - `01-setup` keeps submission test on mobile (creates admin user)
-  - `loginAsAdmin` uses `domcontentloaded` instead of `networkidle`, 15s mobile timeout
-  - `playwright.config.ts` added `actionTimeout: 15000` for mobile project
-  - **Root cause**: Duplicate AppBars on mobile (AdminAppBar z-index 1201 overlapped mobile AppBar hamburger). Fix: merge hamburger into AdminAppBar via `onMenuToggle` prop, eliminate separate mobile AppBar
 - **Phase 14**: All 230 mobile tests pass — 29 pre-existing failures eliminated
-  - Root cause: clicking buttons before API data fetch completes (`/api/users`, `/api/media`); server-rendered elements (filter input, "no media uploaded") resolve `waitFor` before React hydrates event handlers
-  - Fix: `page.waitForResponse(r => r.url().includes('/api/...') && r.status() === 200)` before button clicks ensures data loaded before interaction
-  - Last failure: `GetPages` handler ignored `menu=true` query param, returned all published pages regardless of `inMenu`; desktop rendered as `<Button>` (not `<Link>`), so `getByRole("link")` never matched, but mobile rendered as `<a>` via `ListItemButton component={Link}`
-- **Phase 15 plan**: Trash system + bulk actions, with polish items (undo snackbar, contacts confirm dialog, delete text updates)
-- **Phase 15 backend — Trash handlers**: `backend/internal/handlers/trash.go` created with `GetTrash`, `GetTrashCount`, `RestoreItem`, `HardDeleteItem`, `EmptyTrash` — supports pages, users, posts, media, contacts, messages, tags, categories
-- **Phase 15 backend — Media delete split**: `DeleteMedia` now soft-deletes only (file stays on disk); hard-delete from trash calls `os.Remove` via `HardDeleteItem`
-- **Phase 15 backend — Routes**: All trash routes added to `main.go`
-- **Phase 15 backend — Batch handlers**: `BatchUsers` (users.go), `BatchPages` (pages.go), `BatchPosts` (blog.go), `BatchMedia` (media.go) — wired to `main.go`
-- **Go backend**: Builds clean, all 82 tests pass (77 handler + 2 mailer + 3 middleware)
-- **Phase 15 frontend**: All features implemented and passing
-  - Trash page at `/admin/trash` with entity tabs, table, restore/hard-delete, empty state
-  - Trash nav item with `DeleteSweepIcon` + badge polling (`GET /api/trash/count` every 30s)
-  - Bulk action checkboxes + toolbars on Users (Delete/Ban/Activate), Pages (Publish/Draft/Delete), Blog (Publish/Draft/Delete), Media (Delete Selected)
-  - Delete confirmation dialog on Contacts page
-  - UndoSnackbar component created (not yet wired into delete flows — no tests written for it)
-  - Fixed Go batch handlers: `IDs []string` → `IDs []uint` to match frontend numeric JSON IDs (previously caused silent 400 errors, refetch never fired)
-  - **249/249 Playwright tests pass** (231 desktop + 9 skipped, 230 mobile + 1 skipped), **82/82 Go tests pass**
+- **Phase 15**: Trash system + bulk actions — 249/249 Playwright + 82/82 Go tests pass
+- **Phase 16**: Manual testing session completed — all items verified
+- **Phase 17**: Bug fixes + feature completion — 249/249 Playwright + 88/88 Go tests pass
+  - Rich text editor enhanced: toolbar (16 buttons), ProseMirror CSS, `minimal` prop, 300px height
+  - `@tiptap/extension-placeholder` installed
+  - Public header: removed Blog/Contact duplication
+  - Contact form: client-side email validation
+  - Avatar refresh: `avatar-changed` custom event
+  - Pages admin: status/menu badges, indentation reduced
+  - Blog: tag/category selectors in post form, sidebar sub-items removed, standalone pages deleted
+  - `DELETE /blog/categories/{id}` route wired
+  - `UpdatePost` now handles tags + categoryId
+  - `BlogPost` model: added `Tags []Tag` with `many2many`
+  - Dashboard: `recentRegistrations` + `recentMessages` return real data
+  - Media: multiupload
+  - Trash: badge refresh after restore/hard-delete via `trash-changed` event
+  - Messages: loading spinner
+  - Blog: like/unlike button with heart icon
 
 ## Next Steps
-1. (Optional) Wire UndoSnackbar into delete flows for undo-toast UX
+1. Phase 18: Audit log microservice
+2. (Optional) Wire UndoSnackbar into delete flows for undo-toast UX
 
 ## Critical Context
-- **Go tests**: 82/82 pass (77 handler + 2 mailer + 3 middleware; need running PostgreSQL) — last verified this session
-- **Desktop Playwright**: 231/231 pass, 8 skipped — 0 failures
-- **Mobile Playwright**: 230/230 pass, 9 skipped — 0 failures
+- **Go tests**: 88/88 pass (83 handler + 2 mailer + 3 middleware; need running PostgreSQL)
+- **Desktop Playwright**: 242/242 pass, 8 skipped — 0 failures
+- **Mobile Playwright**: 249/249 pass, 9 skipped — 0 failures
 - **`GetTrashCount`** queries `Unscoped().Where("deleted_at IS NOT NULL").Count()` across all 8 entity models — used for sidebar badge
-- **`osRemove` var** in `trash.go` replaces direct `os.Remove` calls for testability (can be swapped in tests)
 - Models with `gorm.Model`: Page, User, BlogPost, MediaItem, ContactMessage, Message, Tag, Category — all support GORM soft-delete via `DeletedAt`
 - Trash routes: `GET /trash`, `GET /trash/count`, `POST /trash/{entity}/{id}/restore`, `DELETE /trash/{entity}/{id}`, `DELETE /trash` — all admin-only
 - Batch routes: `POST /users/batch`, `POST /pages/batch`, `POST /blog/posts/batch`, `POST /media/batch` — admin/auth-protected
-- All Phase 15 changes must keep 461/461 tests passing (231 desktop + 230 mobile + 82 Go)
 - **Checkbox column** in users table shifts cell indices: `td:nth(2)` is email (was `nth(1)` before checkbox column was added)
 - **Bulk toolbar buttons** use exact labels: "Publish", "Draft", "Delete Selected", "Ban", "Activate", "Clear"
 - **Contacts page** has both card-level "Delete" button and dialog "Delete" button — use `.first()` or dialog scoping for disambiguation
-- **Trash count polling**: AdminLayout fetches `GET /api/trash/count` every 30s (interval on mount, cleared on unmount)
+- **Trash count**: AdminLayout listens for `trash-changed` event (fired by trash page after restore/hard-delete) + polls every 30s
+- **Avatar refresh**: AdminAppBar/PublicHeader listen for `avatar-changed` event (fired by SettingsForm after save)
 - All models use GORM `DeletedAt` for soft-delete: Page, User, BlogPost, MediaItem, ContactMessage, Message, Tag, Category
 
 ## Relevant Files
-### Phase 15 backend
-- `backend/internal/handlers/trash.go`: Trash endpoints — unified listing + restore/hard-delete/empty
-- `backend/internal/handlers/media.go`: Soft-delete only; file purged via trash handler
-- `backend/internal/handlers/users.go`: BatchUsers (delete/ban/activate) — `IDs []uint`
-- `backend/internal/handlers/pages.go`: BatchPages (delete/publish/draft) — `IDs []uint`
-- `backend/internal/handlers/blog.go`: BatchPosts (delete/publish/draft) — `IDs []uint`
-- `backend/internal/handlers/media.go`: BatchMedia (delete) — `IDs []uint`
-- `backend/cmd/api/main.go`: 5 trash routes + 4 batch routes wired
-- `backend/internal/handlers/media_test.go`: Updated test verifies file stays on disk after soft-delete
+### Phase 17 backend — Modified
+- `backend/internal/handlers/blog.go`: `UpdatePost` now handles tags (clear + re-associate) + categoryId
+- `backend/internal/handlers/dashboard.go`: `GetDashboardStats` returns real `recentRegistrations` + `recentMessages` (last 5)
+- `backend/internal/models/blog_post.go`: Added `Tags []Tag` field with `gorm:"many2many:blog_post_tags;"`
+- `backend/cmd/api/main.go`: Wired `DELETE /blog/categories/{id}` route
 
-### Phase 15 frontend — New
-- `frontend/components/UndoSnackbar.tsx`: Shared snackbar with undo button (not yet wired)
-- `frontend/app/admin/trash/page.tsx`: Trash page with entity tabs, table, restore/hard-delete, empty state
-- `frontend/e2e/23-admin-trash.spec.ts`: Trash page + restore/hard-delete E2E tests
-- `frontend/e2e/24-admin-contacts.spec.ts`: Contacts confirmation dialog E2E tests
+### Phase 17 backend — New tests
+- `backend/internal/handlers/blog_test.go`: `TestDeleteCategory_AdminDeletes`, `TestDeleteCategory_NonAdminRejected`, `TestUpdatePost_UpdatesTags`, `TestUpdatePost_UpdatesCategory`
+- `backend/internal/handlers/pages_test.go`: `TestReorderPages_WithParent_ScopesSiblings`
+- `backend/internal/handlers/dashboard_test.go`: `TestDashboardStats_ReturnsRecentData`
 
-### Phase 15 frontend — Modified
-- `frontend/components/AdminLayout.tsx`: Trash nav item with `DeleteSweepIcon` + badge polling on 30s interval
-- `frontend/app/admin/users/page.tsx`: Checkbox column, select-all, bulk toolbar (Delete/Ban/Activate)
-- `frontend/app/admin/blog/page.tsx`: Checkbox per post, bulk toolbar (Publish/Draft/Delete)
-- `frontend/app/admin/media/page.tsx`: Checkbox overlay on cards, bulk toolbar (Delete Selected); delete dialog text updated
-- `frontend/app/admin/pages/page.tsx`: Checkbox on each tree item + recursive `PageTreeList`/`PageTreeItem` props; bulk toolbar (Publish/Draft/Delete)
-- `frontend/app/admin/contacts/page.tsx`: Delete confirmation dialog (previously immediate delete)
-- `frontend/e2e/06-admin-users.spec.ts`: Bulk action tests added; email column index fixed; confirm button scoped to dialog
-- `frontend/e2e/07-admin-pages.spec.ts`: Bulk action tests added; confirm button scoped to dialog; count moved after waitFor
-- `frontend/e2e/08-admin-media.spec.ts`: Bulk action tests added; confirm button scoped to dialog; syntax fixed; button label "/delete/i" for media dialog
-- `frontend/e2e/22-admin-blog.spec.ts`: Bulk action tests added; loginAsAdmin in beforeEach; getByRole("checkbox"); waitForResponse before confirm click
-- `frontend/e2e/23-admin-trash.spec.ts`: Rewritten for non-empty state
-- `frontend/e2e/24-admin-contacts.spec.ts`: Added .first() on delete button locators
+### Phase 17 frontend — Modified
+- `frontend/components/RichTextEditor.tsx`: 16 toolbar buttons, `minimal` prop, `placeholder` prop, 300px height, ProseMirror-ready
+- `frontend/app/globals.css`: ProseMirror styles (headings, lists, blockquote, code, hr, links, placeholder)
+- `frontend/components/PublicHeader.tsx`: Removed Blog/Contact buttons + blogEnabled state; added `avatar-changed` listener
+- `frontend/components/AdminAppBar.tsx`: Added `avatar-changed` event listener for refresh
+- `frontend/components/SettingsForm.tsx`: Dispatches `avatar-changed` event after save
+- `frontend/app/(withHeader)/contact/page.tsx`: Client-side email regex validation, removed `noValidate`
+- `frontend/app/admin/pages/page.tsx`: Status badges (Chip), Menu badge, indentation `depth*16`
+- `frontend/app/admin/blog/page.tsx`: Autocomplete tags + Select category in post form
+- `frontend/components/AdminLayout.tsx`: Removed Tags/Categories sidebar items + unused imports; listens for `trash-changed` event
+- `frontend/app/admin/media/page.tsx`: Multiupload (multiple file selection, sequential upload)
+- `frontend/app/admin/trash/page.tsx`: Dispatches `trash-changed` event after restore/hard-delete
+- `frontend/app/admin/messages/page.tsx`: Loading spinner
+- `frontend/components/PostDetailClient.tsx`: Like/unlike button with heart icon
+- `frontend/app/admin/settings/page.tsx`: RichTextEditor `minimal` prop for email templates
+
+### Phase 17 frontend — Deleted
+- `frontend/app/admin/blog/tags/`: Removed (redundant with blog page tabs)
+- `frontend/app/admin/blog/categories/`: Removed (redundant with blog page tabs)
+
+### Phase 17 frontend — Test updates
+- `frontend/e2e/23-admin-tags-categories.spec.ts`: Rewritten for blog page tabs (not standalone pages)
+- `frontend/e2e/08-admin-media.spec.ts`: Updated upload button selectors for multiupload labels
+- `frontend/e2e/07-admin-pages.spec.ts`: Title extraction uses `p` element (not textContent which includes chips)
+- `frontend/e2e/08-admin-mobile.spec.ts`: Sidebar selector avoids hidden Next.js error overlay nav
+
+### Phase 15 files (still relevant)
+- `backend/internal/handlers/trash.go`: Trash endpoints
+- `frontend/app/admin/trash/page.tsx`: Trash page
+- `frontend/components/UndoSnackbar.tsx`: Shared snackbar (not yet wired)
 
 ### Documentation
 - `AGENTS.md`: This file
-- `TODO.md`: Phase 15 breakdown with backend done, frontend in progress
+- `TODO.md`: Phase 17 completed, Phase 18 (audit log) pending

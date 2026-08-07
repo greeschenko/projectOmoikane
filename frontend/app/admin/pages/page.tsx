@@ -5,7 +5,7 @@ import {
   Container, Typography, Button, TextField, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, FormControlLabel, Switch, Select, MenuItem, InputLabel, FormControl, Alert,
-  IconButton, CircularProgress, Checkbox,
+  IconButton, CircularProgress, Checkbox, Chip,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -385,7 +385,7 @@ function PageTreeItem({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         sx={{
-          display: "flex", alignItems: "center", gap: 1, py: 0.5, pl: depth * 24,
+          display: "flex", alignItems: "center", gap: 1, py: 0.5, pl: depth * 16,
           bgcolor: selectedIds.has(page.id) ? "action.selected" : isDragOver ? "action.hover" : "transparent",
           borderTop: isDragOver ? 2 : 0,
           borderColor: "primary.main",
@@ -400,6 +400,16 @@ function PageTreeItem({
         />
         <DragIndicatorIcon fontSize="small" color="disabled" sx={{ cursor: "grab" }} />
         <Typography sx={{ flexGrow: 1 }}>{page.title}</Typography>
+        <Chip
+          label={page.status === "published" ? "Published" : "Draft"}
+          size="small"
+          color={page.status === "published" ? "success" : "default"}
+          variant="outlined"
+          sx={{ height: 20, fontSize: "0.7rem" }}
+        />
+        {page.inMenu && (
+          <Chip label="Menu" size="small" variant="outlined" sx={{ height: 20, fontSize: "0.7rem" }} />
+        )}
         <IconButton
           size="small"
           onClick={() => window.open(buildViewUrl(page, pages), '_blank', 'noopener')}

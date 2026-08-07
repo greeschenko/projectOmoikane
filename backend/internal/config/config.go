@@ -17,6 +17,7 @@ type Config struct {
 	UploadDir       string
 	SMTP            SMTPConfig
 	RecaptchaSecret string
+	AuditServiceURL string
 }
 
 func Load() *Config {
@@ -33,6 +34,7 @@ func Load() *Config {
 			From: getEnv("SMTP_FROM", "noreply@omoikane.local"),
 		},
 		RecaptchaSecret: getEnv("RECAPTCHA_SECRET", ""),
+		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
 	}
 }
 

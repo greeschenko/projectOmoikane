@@ -7,6 +7,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - frontend
+      - audit-service
 
   frontend:
     build:
@@ -41,9 +42,31 @@ services:
       - SMTP_PASS=
       - SMTP_FROM=noreply@omoikane.local
       - RECAPTCHA_SECRET=
+      - AUDIT_SERVICE_URL=http://audit-service:8081
     depends_on:
       postgres:
         condition: service_healthy
+      audit-service:
+        condition: service_healthy
+
+  audit-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/audit
+    environment:
+      - AUDIT_DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane_audit sslmode=disable
+      - AUDIT_PORT=8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8081/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   postgres:
     image: postgres:16-alpine
@@ -55,6 +78,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U omoikane"]
       interval: 2s

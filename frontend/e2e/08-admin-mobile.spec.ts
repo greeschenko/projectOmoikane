@@ -21,7 +21,7 @@ test.describe("Mobile admin responsive layout", () => {
       await page.goto("/admin");
       const hamburger = page.getByRole("button", { name: /menu|hamburger|toggle sidebar/i });
       await hamburger.click();
-      const sidebar = page.locator("nav, aside, [role='navigation']").first();
+      const sidebar = page.locator("aside, [role='navigation']:visible, nav[aria-label]:visible").first();
       await expect(sidebar).toBeVisible();
     });
 
@@ -29,7 +29,7 @@ test.describe("Mobile admin responsive layout", () => {
       await page.goto("/admin");
       await page.getByRole("button", { name: /menu|hamburger|toggle sidebar/i }).click();
       await page.getByRole("link", { name: /users/i }).click();
-      await expect(page.locator("nav, aside, [role='navigation']").first()).not.toBeVisible();
+      await expect(page.locator("aside, [role='navigation']:visible, nav[aria-label]:visible").first()).not.toBeVisible();
     });
 
     test("admin page has no horizontal scroll", async ({ page }) => {

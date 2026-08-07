@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Container, Typography, Button, Card, CardContent, CardActions,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Box, Chip, Alert,
+  TextField, Box, Chip, Alert, CircularProgress,
 } from "@mui/material";
 
 interface Message {
@@ -17,17 +17,20 @@ interface Message {
 
 export default function AdminMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
 
   const fetchMessages = useCallback(async () => {
+    setLoading(true);
     const res = await fetch("/api/messages");
     if (res.ok) {
       const data = await res.json();
       setMessages(data.messages ?? []);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => { fetchMessages(); }, [fetchMessages]);
@@ -71,7 +74,11 @@ export default function AdminMessages() {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {messages.length === 0 ? (
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : messages.length === 0 ? (
         <Typography color="text.secondary" sx={{ textAlign: "center", py: 4 }}>
           No messages yet
         </Typography>

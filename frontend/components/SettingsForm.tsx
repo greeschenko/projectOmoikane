@@ -59,6 +59,7 @@ export default function SettingsForm() {
       return;
     }
     setProfileSuccess(true);
+    window.dispatchEvent(new Event("avatar-changed"));
   }
 
   async function handlePasswordSubmit(e: React.FormEvent) {

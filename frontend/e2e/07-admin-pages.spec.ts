@@ -93,7 +93,7 @@ test.describe("Admin Pages", () => {
     test("edit button opens form pre-filled with page data", async ({ page }) => {
       await page.goto("/admin/pages");
       const firstItem = page.locator("main li").first();
-      const title = await firstItem.textContent();
+      const title = await firstItem.locator("p").first().textContent();
       await firstItem.getByRole("button", { name: /edit|pencil/i }).click();
       await expect(page.getByLabel(/^Title\b/i)).toHaveValue(title?.trim() ?? "");
     });

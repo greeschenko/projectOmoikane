@@ -62,6 +62,7 @@ export default function AdminTrash() {
     await fetch(`/api/trash/${restoreTarget.entity}/${restoreTarget.id}/restore`, { method: "POST" });
     setRestoreTarget(null);
     fetchTrash();
+    window.dispatchEvent(new Event("trash-changed"));
   }
 
   async function handleHardDelete() {
@@ -69,6 +70,7 @@ export default function AdminTrash() {
     await fetch(`/api/trash/${deleteTarget.entity}/${deleteTarget.id}`, { method: "DELETE" });
     setDeleteTarget(null);
     fetchTrash();
+    window.dispatchEvent(new Event("trash-changed"));
   }
 
   return (

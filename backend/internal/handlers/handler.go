@@ -18,6 +18,7 @@ type Handler struct {
 	SMTPPass        string
 	SMTPFrom        string
 	RecaptchaSecret string
+	AuditServiceURL string
 }
 
 func (h *Handler) Auth(next http.HandlerFunc) http.HandlerFunc {

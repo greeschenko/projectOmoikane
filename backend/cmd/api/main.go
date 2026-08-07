@@ -31,6 +31,7 @@ func main() {
 		SMTPPass:        cfg.SMTP.Pass,
 		SMTPFrom:        cfg.SMTP.From,
 		RecaptchaSecret: cfg.RecaptchaSecret,
+		AuditServiceURL: cfg.AuditServiceURL,
 	}
 
 	mux := http.NewServeMux()
@@ -92,6 +93,7 @@ func main() {
 	mux.HandleFunc("DELETE /blog/tags/{id}", h.Admin(h.DeleteTag))
 	mux.HandleFunc("GET /blog/categories", h.GetCategories)
 	mux.HandleFunc("POST /blog/categories", h.Admin(h.CreateCategory))
+	mux.HandleFunc("DELETE /blog/categories/{id}", h.Admin(h.DeleteCategory))
 
 	// Pages
 	mux.HandleFunc("GET /pages", h.GetPages)
@@ -116,6 +118,9 @@ func main() {
 	mux.HandleFunc("PUT /users/{id}", h.Admin(h.UpdateUser))
 	mux.HandleFunc("DELETE /users/{id}", h.Admin(h.DeleteUser))
 	mux.HandleFunc("POST /users/batch", h.Admin(h.BatchUsers))
+
+	// Audit logs (admin only)
+	mux.HandleFunc("GET /audit-logs", h.Admin(h.GetAuditLogs))
 
 	// Trash system (admin only)
 	mux.HandleFunc("GET /trash", h.Admin(h.GetTrash))

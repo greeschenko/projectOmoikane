@@ -12,12 +12,11 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import ArticleIcon from "@mui/icons-material/Article";
 import BookIcon from "@mui/icons-material/Book";
-import SellIcon from "@mui/icons-material/Sell";
-import CategoryIcon from "@mui/icons-material/Category";
 import MailIcon from "@mui/icons-material/Mail";
 import CollectionsIcon from "@mui/icons-material/Collections";
 import SettingsIcon from "@mui/icons-material/Settings";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
+import HistoryIcon from "@mui/icons-material/History";
 import AdminAppBar from "./AdminAppBar";
 
 const navItems = [
@@ -25,12 +24,11 @@ const navItems = [
   { label: "Users", href: "/admin/users", icon: <PeopleIcon /> },
   { label: "Pages", href: "/admin/pages", icon: <ArticleIcon /> },
   { label: "Blog", href: "/admin/blog", icon: <BookIcon /> },
-  { label: "Tags", href: "/admin/blog/tags", icon: <SellIcon />, indent: true },
-  { label: "Categories", href: "/admin/blog/categories", icon: <CategoryIcon />, indent: true },
   { label: "Messages", href: "/admin/messages", icon: <MailIcon /> },
   { label: "Contacts", href: "/admin/contacts", icon: <MailIcon /> },
   { label: "Media", href: "/admin/media", icon: <CollectionsIcon /> },
   { label: "Trash", href: "/admin/trash", icon: <DeleteSweepIcon /> },
+  { label: "Audit Log", href: "/admin/audit-logs", icon: <HistoryIcon /> },
   { label: "Settings", href: "/admin/settings", icon: <SettingsIcon /> },
 ];
 
@@ -61,7 +59,12 @@ export default function AdminLayout({
     };
     fetchTrashCount();
     const interval = setInterval(fetchTrashCount, 30000);
-    return () => clearInterval(interval);
+    const onTrashChanged = () => fetchTrashCount();
+    window.addEventListener("trash-changed", onTrashChanged);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("trash-changed", onTrashChanged);
+    };
   }, []);
 
   const sidebarContent = (

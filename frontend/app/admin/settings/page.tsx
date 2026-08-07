@@ -143,6 +143,7 @@ export default function AdminSettings() {
             <RichTextEditor
               value={resetEmailBodyHTML}
               onChange={(html: string) => setResetEmailBodyHTML(html)}
+              minimal
             />
           </Box>
         )}

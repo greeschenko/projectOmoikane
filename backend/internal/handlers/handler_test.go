@@ -35,19 +35,15 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("Failed to connect to test DB: %v", err)
 	}
+	if err := db.Exec("DROP SCHEMA IF EXISTS public CASCADE").Error; err != nil {
+		t.Fatalf("Failed to drop public schema: %v", err)
+	}
+	if err := db.Exec("CREATE SCHEMA public").Error; err != nil {
+		t.Fatalf("Failed to create public schema: %v", err)
+	}
 	if err := database.AutoMigrate(db); err != nil {
 		t.Fatalf("Failed to migrate test DB: %v", err)
 	}
-	t.Cleanup(func() {
-		tables := []string{
-			"users", "pages", "blog_posts", "tags", "blog_post_tags",
-			"categories", "likes", "media_items", "messages", "site_settings",
-			"password_reset_tokens", "contact_messages",
-		}
-		for _, table := range tables {
-			db.Exec("DROP TABLE IF EXISTS " + table + " CASCADE")
-		}
-	})
 	return db
 }
 

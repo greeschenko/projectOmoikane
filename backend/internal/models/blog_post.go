@@ -16,6 +16,7 @@ type BlogPost struct {
 	Status        string     `gorm:"default:draft;not null"`
 	PublishDate   *time.Time
 	FeaturedImage string
-	LikeCount     int `gorm:"default:0"`
+	LikeCount     int  `gorm:"default:0"`
 	CategoryID    *uint
+	Tags          []Tag `gorm:"many2many:blog_post_tags;"`
 }

@@ -157,3 +157,47 @@ func TestReorderPages_UpdatesOrder(t *testing.T) {
 		t.Errorf("Expected first page ID %d, got %v", p2.ID, firstPage["id"])
 	}
 }
+
+func TestReorderPages_WithParent_ScopesSiblings(t *testing.T) {
+	db := setupTestDB(t)
+	s := pagesServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin@test.com", "Pass1234!", "admin")
+	cookie := loginAs(t, s, "admin@test.com", "Pass1234!")
+
+	parent := createTestPage(db, "Parent", "parent", "published", 0)
+	c1 := createTestPage(db, "Child1", "child1", "published", 0)
+	c2 := createTestPage(db, "Child2", "child2", "published", 1)
+	c3 := createTestPage(db, "Child3", "child3", "published", 2)
+
+	// Set parent for children
+	db.Model(&c1).Update("parent_id", parent.ID)
+	db.Model(&c2).Update("parent_id", parent.ID)
+	db.Model(&c3).Update("parent_id", parent.ID)
+
+	// Reorder only children 2,3,1
+	body := fmt.Sprintf(`{"parentId":%d,"pageIds":[%d,%d,%d]}`, parent.ID, c2.ID, c3.ID, c1.ID)
+	resp := authenticatedRequest(t, "PUT", s.URL+"/pages/reorder", body, cookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	// Verify children reordered
+	var pages []models.Page
+	db.Where("parent_id = ?", parent.ID).Order("sort_order asc").Find(&pages)
+	if len(pages) != 3 {
+		t.Fatalf("Expected 3 children, got %d", len(pages))
+	}
+	if pages[0].ID != c2.ID {
+		t.Errorf("Expected first child ID %d, got %d", c2.ID, pages[0].ID)
+	}
+	if pages[1].ID != c3.ID {
+		t.Errorf("Expected second child ID %d, got %d", c3.ID, pages[1].ID)
+	}
+	if pages[2].ID != c1.ID {
+		t.Errorf("Expected third child ID %d, got %d", c1.ID, pages[2].ID)
+	}
+}

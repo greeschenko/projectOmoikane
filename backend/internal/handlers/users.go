@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"omoikane-backend/internal/audit"
+	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 
 	"golang.org/x/crypto/bcrypt"
@@ -101,6 +104,24 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorID := middleware.GetUserID(r)
+	var actorName string
+	if actorID > 0 {
+		var actor models.User
+		h.DB.First(&actor, actorID)
+		actorName = actor.Name
+	} else {
+		actorName = "system"
+	}
+	audit.Emit(h.AuditServiceURL, audit.Event{
+		UserID:     actorID,
+		UserName:   actorName,
+		Action:     "create",
+		EntityType: "user",
+		EntityID:   user.ID,
+		Detail:     fmt.Sprintf("Created user %s (%s)", user.Name, user.Email),
+	})
+
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(sanitizeUserJSON(user))
 }
@@ -159,6 +180,25 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.DB.First(&user, user.ID)
+
+	actorID := middleware.GetUserID(r)
+	var actorName string
+	if actorID > 0 {
+		var actor models.User
+		h.DB.First(&actor, actorID)
+		actorName = actor.Name
+	} else {
+		actorName = "system"
+	}
+	audit.Emit(h.AuditServiceURL, audit.Event{
+		UserID:     actorID,
+		UserName:   actorName,
+		Action:     "update",
+		EntityType: "user",
+		EntityID:   user.ID,
+		Detail:     fmt.Sprintf("Updated user %s", user.Name),
+	})
+
 	json.NewEncoder(w).Encode(sanitizeUserJSON(user))
 }
 
@@ -184,6 +224,24 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to delete user"})
 		return
 	}
+
+	actorID := middleware.GetUserID(r)
+	var actorName string
+	if actorID > 0 {
+		var actor models.User
+		h.DB.First(&actor, actorID)
+		actorName = actor.Name
+	} else {
+		actorName = "system"
+	}
+	audit.Emit(h.AuditServiceURL, audit.Event{
+		UserID:     actorID,
+		UserName:   actorName,
+		Action:     "delete",
+		EntityType: "user",
+		EntityID:   user.ID,
+		Detail:     fmt.Sprintf("Deleted user %s", user.Name),
+	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
@@ -218,6 +276,23 @@ func (h *Handler) BatchUsers(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown action"})
 		return
 	}
+
+	actorID := middleware.GetUserID(r)
+	var actorName string
+	if actorID > 0 {
+		var actor models.User
+		h.DB.First(&actor, actorID)
+		actorName = actor.Name
+	} else {
+		actorName = "system"
+	}
+	audit.Emit(h.AuditServiceURL, audit.Event{
+		UserID:     actorID,
+		UserName:   actorName,
+		Action:     "batch_" + req.Action,
+		EntityType: "user",
+		Detail:     fmt.Sprintf("Batch %s on %d users", req.Action, len(req.IDs)),
+	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }

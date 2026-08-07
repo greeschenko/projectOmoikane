@@ -44,12 +44,37 @@ func (h *Handler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 	h.DB.Model(&models.BlogPost{}).Count(&postCount)
 	h.DB.Model(&models.MediaItem{}).Count(&mediaCount)
 
+	var recentUsers []models.User
+	h.DB.Order("created_at DESC").Limit(5).Find(&recentUsers)
+	registrations := make([]map[string]interface{}, 0, len(recentUsers))
+	for _, u := range recentUsers {
+		registrations = append(registrations, map[string]interface{}{
+			"id":   u.ID,
+			"name": u.Name,
+			"email": u.Email,
+			"role": u.Role,
+			"createdAt": u.CreatedAt,
+		})
+	}
+
+	var recentMessages []models.Message
+	h.DB.Order("created_at DESC").Limit(5).Find(&recentMessages)
+	messages := make([]map[string]interface{}, 0, len(recentMessages))
+	for _, m := range recentMessages {
+		messages = append(messages, map[string]interface{}{
+			"id":        m.ID,
+			"title":     m.Title,
+			"content":   m.Content,
+			"createdAt": m.CreatedAt,
+		})
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"userCount":    userCount,
-		"pageCount":    pageCount,
-		"blogCount":    postCount,
-		"mediaCount":   mediaCount,
-		"recentMessages": []interface{}{},
-		"recentRegistrations": []interface{}{},
+		"userCount":          userCount,
+		"pageCount":          pageCount,
+		"blogCount":          postCount,
+		"mediaCount":         mediaCount,
+		"recentMessages":     messages,
+		"recentRegistrations": registrations,
 	})
 }

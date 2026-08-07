@@ -9,3 +9,119 @@ body {
   max-width: 100vw;
   overflow-x: hidden;
 }
+
+/* TipTap / ProseMirror editor styles */
+.tiptap {
+  outline: none;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1rem 0 0.5rem;
+}
+
+.tiptap h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.8rem 0 0.4rem;
+}
+
+.tiptap h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0.6rem 0 0.3rem;
+}
+
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap ul {
+  list-style: disc;
+}
+
+.tiptap ol {
+  list-style: decimal;
+}
+
+.tiptap li {
+  margin: 0.25rem 0;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid #e0e0e0;
+  margin: 0.75rem 0;
+  padding: 0.5rem 1rem;
+  color: #666;
+  background: #fafafa;
+  border-radius: 0 4px 4px 0;
+}
+
+.tiptap pre {
+  background: #282c34;
+  color: #abb2bf;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.875rem;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.tiptap pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+.tiptap code {
+  background: #f0f0f0;
+  color: #e83e8c;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.875em;
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 2px solid #e0e0e0;
+  margin: 1.5rem 0;
+}
+
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.5rem 0;
+}
+
+.tiptap a.editor-link {
+  color: #1976d2;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tiptap a.editor-link:hover {
+  color: #1565c0;
+}
+
+.tiptap mark {
+  background-color: #fff59d;
+  padding: 0 0.15rem;
+}

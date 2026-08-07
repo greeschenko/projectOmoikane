@@ -33,6 +33,17 @@ export default function AdminAppBar({
         if (data.avatar) setAvatarUrl(data.avatar);
       })
       .catch(() => {});
+
+    const onAvatarChanged = () => {
+      fetch("/api/settings/profile")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.avatar) setAvatarUrl(data.avatar);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("avatar-changed", onAvatarChanged);
+    return () => window.removeEventListener("avatar-changed", onAvatarChanged);
   }, []);
 
   async function handleLogout() {

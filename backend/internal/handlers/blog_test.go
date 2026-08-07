@@ -28,6 +28,7 @@ func blogServer(db *gorm.DB) *httptest.Server {
 	mux.HandleFunc("POST /blog/tags", h.Admin(h.CreateTag))
 	mux.HandleFunc("GET /blog/categories", h.GetCategories)
 	mux.HandleFunc("POST /blog/categories", h.Admin(h.CreateCategory))
+	mux.HandleFunc("DELETE /blog/categories/{id}", h.Admin(h.DeleteCategory))
 	return httptest.NewServer(mux)
 }
 
@@ -436,5 +437,128 @@ func TestGetCategories_ListAll(t *testing.T) {
 	cats := decodeJSONArray(t, readBody(t, resp))
 	if len(cats) != 2 {
 		t.Errorf("Expected 2 categories, got %d", len(cats))
+	}
+}
+
+func TestDeleteCategory_AdminDeletes(t *testing.T) {
+	db := setupTestDB(t)
+	s := blogServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin-cat@test.com", "Pass1234!", "admin")
+	cookie := loginAs(t, s, "admin-cat@test.com", "Pass1234!")
+
+	cat := models.Category{Name: "ToDelete", Slug: "to-delete"}
+	db.Create(&cat)
+
+	body := fmt.Sprintf(`{"id":%d}`, cat.ID)
+	resp := authenticatedRequest(t, "DELETE", fmt.Sprintf("%s/blog/categories/%d", s.URL, cat.ID), body, cookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+	data := decodeJSON(t, readBody(t, resp))
+	if data["success"] != true {
+		t.Errorf("Expected success=true, got %v", data["success"])
+	}
+
+	// Verify deleted
+	resp2, _ := http.Get(s.URL + "/blog/categories")
+	defer resp2.Body.Close()
+	cats := decodeJSONArray(t, readBody(t, resp2))
+	if len(cats) != 0 {
+		t.Errorf("Expected 0 categories after delete, got %d", len(cats))
+	}
+}
+
+func TestDeleteCategory_NonAdminRejected(t *testing.T) {
+	db := setupTestDB(t)
+	s := blogServer(db)
+	defer s.Close()
+
+	createTestUser(db, "User", "user-cat@test.com", "Pass1234!", "user")
+	cookie := loginAs(t, s, "user-cat@test.com", "Pass1234!")
+
+	cat := models.Category{Name: "NoDelete", Slug: "no-delete"}
+	db.Create(&cat)
+
+	resp := authenticatedRequest(t, "DELETE", fmt.Sprintf("%s/blog/categories/%d", s.URL, cat.ID), "", cookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 403 {
+		t.Errorf("Expected 403, got %d", resp.StatusCode)
+	}
+}
+
+func TestUpdatePost_UpdatesTags(t *testing.T) {
+	db := setupTestDB(t)
+	s := blogServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin-tags@test.com", "Pass1234!", "admin")
+	cookie := loginAs(t, s, "admin-tags@test.com", "Pass1234!")
+
+	author := models.User{}
+	db.Where("email = ?", "admin-tags@test.com").First(&author)
+
+	// Create tags
+	tag1 := models.Tag{Name: "Go", Slug: "go"}
+	tag2 := models.Tag{Name: "Rust", Slug: "rust"}
+	tag3 := models.Tag{Name: "Python", Slug: "python"}
+	db.Create(&tag1)
+	db.Create(&tag2)
+	db.Create(&tag3)
+
+	// Create post with tag1
+	post := createTestPost(db, "Tagged Post", "tagged-post", "published", author.ID)
+	db.Model(&post).Association("Tags").Append(&tag1)
+
+	// Update to have tag2 and tag3
+	body := fmt.Sprintf(`{"title":"Updated Tags","tags":["Rust","Python"]}`)
+	resp := authenticatedRequest(t, "PUT", fmt.Sprintf("%s/blog/posts/%d", s.URL, post.ID), body, cookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := decodeJSON(t, readBody(t, resp))
+	tags := data["tags"].([]interface{})
+	if len(tags) != 2 {
+		t.Errorf("Expected 2 tags, got %d", len(tags))
+	}
+}
+
+func TestUpdatePost_UpdatesCategory(t *testing.T) {
+	db := setupTestDB(t)
+	s := blogServer(db)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin-cat2@test.com", "Pass1234!", "admin")
+	cookie := loginAs(t, s, "admin-cat2@test.com", "Pass1234!")
+
+	author := models.User{}
+	db.Where("email = ?", "admin-cat2@test.com").First(&author)
+
+	cat1 := models.Category{Name: "News", Slug: "news"}
+	cat2 := models.Category{Name: "Tutorials", Slug: "tutorials"}
+	db.Create(&cat1)
+	db.Create(&cat2)
+
+	post := createTestPost(db, "Categorized", "categorized", "published", author.ID)
+	db.Model(&post).Update("category_id", cat1.ID)
+
+	body := fmt.Sprintf(`{"categoryId":%d}`, cat2.ID)
+	resp := authenticatedRequest(t, "PUT", fmt.Sprintf("%s/blog/posts/%d", s.URL, post.ID), body, cookie)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	data := decodeJSON(t, readBody(t, resp))
+	if data["categoryId"] != float64(cat2.ID) {
+		t.Errorf("Expected categoryId %d, got %v", cat2.ID, data["categoryId"])
 	}
 }

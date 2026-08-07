@@ -20,19 +20,23 @@ up:
 		if [ $$i -eq 60 ]; then echo "Frontend not ready after 60s"; exit 1; fi; \
 		sleep 2; \
 	done
-	docker exec docker-frontend-1 npm install 2>/dev/null || true
+	docker exec docker-frontend-1 npm install --legacy-peer-deps 2>/dev/null || true
 
 down:
 	docker compose -f docker/docker-compose.yml down --remove-orphans
 
 reset:
 	docker compose -f docker/docker-compose.yml restart frontend
-	docker exec docker-frontend-1 npm install 2>/dev/null || true
+	docker exec docker-frontend-1 npm install --legacy-peer-deps 2>/dev/null || true
 
 db-reset: up
+	docker compose -f docker/docker-compose.yml stop audit-service
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='omoikane' AND pid<>pg_backend_pid();"
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane;"
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "CREATE DATABASE omoikane;"
+	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane_audit;"
+	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "CREATE DATABASE omoikane_audit;"
+	docker compose -f docker/docker-compose.yml start audit-service
 	docker compose -f docker/docker-compose.yml restart backend
 	@echo "Waiting for backend to be ready..."
 	@for i in $$(seq 1 30); do \
@@ -41,6 +45,15 @@ db-reset: up
 			break; \
 		fi; \
 		if [ $$i -eq 30 ]; then echo "Backend not ready after 30s"; exit 1; fi; \
+		sleep 2; \
+	done
+	@echo "Waiting for audit service to be ready..."
+	@for i in $$(seq 1 15); do \
+		if curl -s http://localhost/api/audit/health 2>/dev/null | grep -q '"status":"ok"'; then \
+			echo "Audit service ready after $$i seconds"; \
+			break; \
+		fi; \
+		if [ $$i -eq 15 ]; then echo "Audit service not ready after 15s"; exit 1; fi; \
 		sleep 2; \
 	done
 	@echo "Restarting frontend for clean state..."

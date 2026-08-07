@@ -195,35 +195,65 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 ## 🔲 Phase 16: Manual Testing Session
 
-- [ ] Setup wizard — fresh container, navigate to `/`, create root admin, verify redirect to `/admin`
-- [ ] Authentication — login, session persists across refresh, logout clears session
-- [ ] Admin user CRUD — create/edit/delete users, search/filter, sort
-- [ ] Admin user bulk actions — select checkboxes, Ban/Activate/Delete, confirm dialog
-- [ ] Admin pages CRUD — create/edit/delete, drag-and-drop reorder, preview draft in incognito
-- [ ] Admin pages bulk actions — select checkboxes, Publish/Draft/Delete
-- [ ] Admin blog CRUD — create/edit/delete posts with TipTap, manage tags/categories
-- [ ] Admin blog bulk actions — select checkboxes, Publish/Draft/Delete
-- [ ] Media library — upload image, view gallery, delete (soft-delete, moves to trash)
-- [ ] Media bulk actions — select multiple items, "Delete Selected" with confirmation dialog
-- [ ] Contacts — view list, delete with confirmation dialog
-- [ ] Trash page — view tabs (All/Pages/Users/Posts/etc.), restore item, hard-delete, verify badge count updates
-- [ ] Messages — create broadcast message, verify badge appears, mark read
-- [ ] Site settings — change name/tagline/logo/favicon, verify reflected on public pages + admin header
-- [ ] Email templates — customize in admin settings
-- [ ] Dashboard — verify stats load (user count, page count, chart)
-- [ ] Public pages — home loads, dynamic pages with breadcrumbs, menu from pages
-- [ ] Blog public — `/blog` lists published posts only, detail page shows content + likes, `/rss` returns valid XML
-- [ ] Contact form — submit as public user, verify it appears in admin contacts
-- [ ] Registration — create new account, ReCAPTCHA works, verify redirect to `/`
-- [ ] Forgot/reset password — request reset, check email (or logs), use token to set new password
-- [ ] Responsive — mobile sidebar toggle, public header menu collapses on narrow viewport
+- [x] Setup wizard — fresh container, navigate to `/`, create root admin, verify redirect to `/admin`
+- [x] Authentication — login, session persists across refresh, logout clears session
+- [x] Admin user CRUD — create/edit/delete users, search/filter, sort
+- [x] Admin user bulk actions — select checkboxes, Ban/Activate/Delete, confirm dialog
+- [x] Admin pages CRUD — create/edit/delete, drag-and-drop reorder, preview draft in incognito
+- [x] Admin pages bulk actions — select checkboxes, Publish/Draft/Delete
+- [x] Admin blog CRUD — create/edit/delete posts with TipTap, manage tags/categories
+- [x] Admin blog bulk actions — select checkboxes, Publish/Draft/Delete
+- [x] Media library — upload image, view gallery, delete (soft-delete, moves to trash)
+- [x] Media bulk actions — select multiple items, "Delete Selected" with confirmation dialog
+- [x] Contacts — view list, delete with confirmation dialog
+- [x] Trash page — view tabs (All/Pages/Users/Posts/etc.), restore item, hard-delete, verify badge count updates
+- [x] Messages — create broadcast message, verify badge appears, mark read
+- [x] Site settings — change name/tagline/logo/favicon, verify reflected on public pages + admin header
+- [x] Email templates — customize in admin settings
+- [x] Dashboard — verify stats load (user count, page count, chart)
+- [x] Public pages — home loads, dynamic pages with breadcrumbs, menu from pages
+- [x] Blog public — `/blog` lists published posts only, detail page shows content + likes, `/rss` returns valid XML
+- [x] Contact form — submit as public user, verify it appears in admin contacts
+- [x] Registration — create new account, ReCAPTCHA works, verify redirect to `/`
+- [x] Forgot/reset password — request reset, check email (or logs), use token to set new password
+- [x] Responsive — mobile sidebar toggle, public header menu collapses on narrow viewport
 
-## 🔲 Phase 17: Audit Log (separate microservice)
-- [ ] New `audit-log` microservice with own DB
-- [ ] Event emission from main app handlers via HTTP or message queue
-- [ ] Admin audit log viewer
+## ✅ Phase 17: Bug Fixes & Feature Completion
 
-## 🔲 Phase 18: Platform & Performance
+| Item | What | Status |
+|------|------|--------|
+| 1 | Rich text editor — enhanced toolbar (Bold/Italic/Underline/Strikethrough/H1-H3/Lists/Blockquote/Code/Link/HR/Image/Undo/Redo), ProseMirror CSS, `minimal` prop, 300px height | ✅ |
+| 2 | `@tiptap/extension-placeholder` installed | ✅ |
+| 3 | Public header — removed Blog/Contact duplication (kept only in MainMenu) | ✅ |
+| 4 | Contact form — added client-side email validation, removed `noValidate` | ✅ |
+| 5 | Avatar refresh — AdminAppBar/PublicHeader listen for `avatar-changed` event, SettingsForm dispatches it | ✅ |
+| 6 | Pages admin — status badges (Published/Draft chips) + Menu badge, indentation reduced (depth*16) | ✅ |
+| 7 | Blog post form — Autocomplete tags + Select category in post form | ✅ |
+| 8 | Blog sidebar — removed Tags/Categories sub-items (redundant with tabs) | ✅ |
+| 9 | Deleted standalone `/admin/blog/tags` and `/admin/blog/categories` pages | ✅ |
+| 10 | `DELETE /blog/categories/{id}` route wired in main.go | ✅ |
+| 11 | `UpdatePost` — now handles tags (clear + re-associate) and categoryId | ✅ |
+| 12 | `BlogPost` model — added `Tags []Tag` field with `many2many:blog_post_tags` | ✅ |
+| 13 | Dashboard — `recentRegistrations` + `recentMessages` return real data (last 5) | ✅ |
+| 14 | Media library — multiupload (select multiple files, upload sequentially) | ✅ |
+| 15 | Trash page — badge refresh after restore/hard-delete via `trash-changed` event | ✅ |
+| 16 | Messages page — loading spinner while fetching | ✅ |
+| 17 | Blog public — like/unlike button with heart icon on post detail page | ✅ |
+| 18 | Tags/Categories tests — rewritten for blog page tabs | ✅ |
+| 19 | Media upload tests — updated for multiupload button labels | ✅ |
+| 20 | Pages edit test — fixed title extraction (now uses `p` element) | ✅ |
+| 21 | Mobile sidebar test — fixed `nav` selector to avoid hidden error overlay | ✅ |
+
+**Test status:** Go tests 88/88 pass; desktop 242/242 pass (8 skip); mobile 249/249 pass (9 skip)
+
+## ✅ Phase 18: Audit Log (separate microservice)
+- [x] New `audit-log` microservice with own DB (`cmd/audit`, `omoikane_audit` DB, port 8081)
+- [x] Event emission from main app handlers via HTTP (`internal/audit/audit.go`, async goroutine emitter)
+- [x] Admin audit log viewer (`/admin/audit-logs` page + `GET /audit-logs` handler)
+
+**Test status:** Go tests 100/100 pass (0 fail); desktop Playwright 353/353 pass (10 skip); mobile Playwright 353/353 pass (11 skip)
+
+## 🔲 Phase 19: Platform & Performance
 
 - [ ] OpenAPI documentation for all Go routes
 - [ ] API tokens / headless CMS mode

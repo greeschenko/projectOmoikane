@@ -28,8 +28,8 @@ function formatSize(bytes: number): string {
 export default function AdminMediaPage() {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<MediaItem | null>(null);
@@ -45,39 +45,42 @@ export default function AdminMediaPage() {
   useEffect(() => { fetchMedia(); }, [fetchMedia]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    setSelectedFile(file);
+    const files = Array.from(e.target.files ?? []);
     setError("");
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setError("File too large (max 10MB)");
-        setSelectedFile(null);
-        setPreview(null);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => setPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      setPreview(null);
+    const valid = files.filter((f) => f.size <= 10 * 1024 * 1024);
+    if (valid.length < files.length) {
+      setError("Some files exceeded 10MB limit and were skipped");
     }
+    setSelectedFiles(valid);
+    const newPreviews: string[] = [];
+    valid.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        newPreviews.push(reader.result as string);
+        if (newPreviews.length === valid.length) setPreviews([...newPreviews]);
+      };
+      reader.readAsDataURL(file);
+    });
+    if (valid.length === 0) setPreviews([]);
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
     setUploading(true);
     setError("");
-    const formData = new FormData();
-    formData.append("file", selectedFile);
     try {
-      const res = await fetch("/api/media", { method: "POST", body: formData });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Upload failed");
+      for (const file of selectedFiles) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/media", { method: "POST", body: formData });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error ?? "Upload failed");
+        }
       }
       setUploadOpen(false);
-      setSelectedFile(null);
-      setPreview(null);
+      setSelectedFiles([]);
+      setPreviews([]);
       fetchMedia();
     } catch (err: any) {
       setError(err.message);
@@ -180,30 +183,34 @@ export default function AdminMediaPage() {
       )}
 
       {/* Upload Dialog */}
-      <Dialog open={uploadOpen} onClose={() => { setUploadOpen(false); setSelectedFile(null); setPreview(null); setError(""); }} maxWidth="sm" fullWidth>
+      <Dialog open={uploadOpen} onClose={() => { setUploadOpen(false); setSelectedFiles([]); setPreviews([]); setError(""); }} maxWidth="sm" fullWidth>
         <DialogTitle>Upload Media</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}>
-              Choose File
-              <input type="file" hidden accept="image/*" onChange={handleFileSelect} />
+              Choose Files
+              <input type="file" hidden accept="image/*" multiple onChange={handleFileSelect} />
             </Button>
-            {selectedFile && (
+            {selectedFiles.length > 0 && (
               <Typography variant="body2" sx={{ mt: 1 }}>
-                {selectedFile.name} ({formatSize(selectedFile.size)})
+                {selectedFiles.length} file(s) selected
               </Typography>
             )}
-            {preview && (
-              <Box sx={{ mt: 2, maxHeight: 300, overflow: "hidden", borderRadius: 1 }}>
-                <img src={preview} alt="Preview" style={{ maxWidth: "100%", maxHeight: 300, objectFit: "contain" }} />
+            {previews.length > 0 && (
+              <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 1, maxHeight: 300, overflow: "auto" }}>
+                {previews.map((src, i) => (
+                  <Box key={i} sx={{ width: 100, height: 100, borderRadius: 1, overflow: "hidden" }}>
+                    <img src={src} alt={`Preview ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </Box>
+                ))}
               </Box>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setUploadOpen(false); setSelectedFile(null); setPreview(null); setError(""); }}>Cancel</Button>
-          <Button variant="contained" onClick={handleUpload} disabled={!selectedFile || uploading}>
-            {uploading ? <CircularProgress size={24} /> : "Upload"}
+          <Button onClick={() => { setUploadOpen(false); setSelectedFiles([]); setPreviews([]); setError(""); }}>Cancel</Button>
+          <Button variant="contained" onClick={handleUpload} disabled={selectedFiles.length === 0 || uploading}>
+            {uploading ? <CircularProgress size={24} /> : `Upload ${selectedFiles.length > 0 ? `(${selectedFiles.length})` : ""}`}
           </Button>
         </DialogActions>
       </Dialog>

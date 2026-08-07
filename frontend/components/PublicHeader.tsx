@@ -17,7 +17,6 @@ export default function PublicHeader({
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [siteName, setSiteName] = useState("Omoikane");
   const [logo, setLogo] = useState("");
-  const [blogEnabled, setBlogEnabled] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
@@ -26,7 +25,6 @@ export default function PublicHeader({
       .then((data) => {
         if (data.siteName) setSiteName(data.siteName);
         if (data.logo) setLogo(data.logo);
-        if (data.blogEnabled !== undefined) setBlogEnabled(data.blogEnabled);
       })
       .catch(() => {});
     if (session) {
@@ -37,6 +35,20 @@ export default function PublicHeader({
         })
         .catch(() => {});
     }
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    const onAvatarChanged = () => {
+      fetch("/api/settings/profile")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.avatar) setAvatarUrl(data.avatar);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("avatar-changed", onAvatarChanged);
+    return () => window.removeEventListener("avatar-changed", onAvatarChanged);
   }, [session]);
 
   async function handleLogout() {
@@ -54,14 +66,6 @@ export default function PublicHeader({
             {siteName}
           </Link>
         </Typography>
-        {blogEnabled && (
-          <Button color="inherit" component={Link} href="/blog" sx={{ mr: 1 }}>
-            Blog
-          </Button>
-        )}
-        <Button color="inherit" component={Link} href="/contact" sx={{ mr: 1 }}>
-          Contact
-        </Button>
         <MainMenu />
         <Box sx={{ flexGrow: 1 }} />
         {session ? (

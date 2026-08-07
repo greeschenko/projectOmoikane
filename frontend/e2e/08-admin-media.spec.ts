@@ -33,7 +33,7 @@ test.describe("Admin Media Library", () => {
       mimeType: "image/png",
       buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),
     });
-    await page.getByRole("button", { name: /^upload$/i }).last().click();
+    await page.getByRole("dialog").getByRole("button", { name: /upload/i }).last().click();
     await expect(page.getByText("test.png")).toBeVisible();
   });
 
@@ -47,11 +47,11 @@ test.describe("Admin Media Library", () => {
       mimeType: "image/png",
       buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),
     });
-    await page.getByRole("button", { name: /^upload$/i }).last().click();
+    await page.getByRole("dialog").getByRole("button", { name: /upload/i }).last().click();
     await expect(page.getByText("delete-me.png")).toBeVisible();
     await page.getByRole("button", { name: /delete/i }).first().click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    await page.getByRole("button", { name: /^delete$/i }).last().click();
+    await page.getByRole("dialog").getByRole("button", { name: /^delete$/i }).click();
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByText("delete-me.png", { exact: true })).toHaveCount(0);
   });
@@ -78,7 +78,7 @@ test.describe("Admin Media Library", () => {
           mimeType: "image/png",
           buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),
         });
-        await page.getByRole("button", { name: /^upload$/i }).last().click();
+        await page.getByRole("dialog").getByRole("button", { name: /upload/i }).last().click();
         await expect(page.getByText(name)).toBeVisible();
       }
       await page.locator('input[type="checkbox"]').first().check();

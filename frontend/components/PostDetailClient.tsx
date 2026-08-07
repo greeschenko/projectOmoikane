@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Container, Typography, Box, Chip, Button, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField,
+  DialogContent, DialogActions, TextField, IconButton,
 } from "@mui/material";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import FavoriteIcon from "@mui/icons-material/Favorite";
 
 interface Post {
   id: string;
@@ -32,6 +34,19 @@ export default function PostDetailClient({
   const [editTitle, setEditTitle] = useState(post.title);
   const [editContent, setEditContent] = useState(post.content);
   const [editStatus, setEditStatus] = useState(post.status);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(post.likeCount);
+
+  async function handleLike() {
+    try {
+      const res = await fetch(`/api/blog/posts/${post.id}/like`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setLiked(data.liked);
+        setLikeCount(data.count);
+      }
+    } catch { /* ignore */ }
+  }
 
   async function handleSave() {
     const res = await fetch(`/api/blog/posts/${post.id}`, {
@@ -57,8 +72,11 @@ export default function PostDetailClient({
         <Typography variant="body2" color="text.secondary">
           {new Date(post.publishDate || post.createdAt).toLocaleDateString()}
         </Typography>
+        <IconButton onClick={handleLike} size="small" color={liked ? "error" : "default"} aria-label={liked ? "Unlike" : "Like"}>
+          {liked ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+        </IconButton>
         <Typography variant="body2" color="text.secondary">
-          {post.likeCount} {post.likeCount === 1 ? "like" : "likes"}
+          {likeCount} {likeCount === 1 ? "like" : "likes"}
         </Typography>
         {canEdit && (
           <Button variant="outlined" size="small" onClick={() => setEditOpen(true)}>

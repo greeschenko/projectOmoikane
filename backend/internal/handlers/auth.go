@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"omoikane-backend/internal/auth"
+	"omoikane-backend/internal/audit"
 	"omoikane-backend/internal/mailer"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
@@ -155,6 +156,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   86400,
 	})
 
+	audit.Emit(h.AuditServiceURL, audit.Event{
+		UserID:     user.ID,
+		UserName:   user.Name,
+		Action:     "login",
+		EntityType: "user",
+		EntityID:   user.ID,
+		IP:         r.RemoteAddr,
+		UserAgent:  r.UserAgent(),
+	})
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"role":    user.Role,
@@ -222,6 +233,19 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	userID := middleware.GetUserID(r)
+	if userID > 0 {
+		var user models.User
+		h.DB.First(&user, userID)
+		audit.Emit(h.AuditServiceURL, audit.Event{
+			UserID:     userID,
+			UserName:   user.Name,
+			Action:     "logout",
+			EntityType: "user",
+			EntityID:   userID,
+		})
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",

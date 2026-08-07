@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Select, MenuItem, InputLabel, FormControl, Alert,
   IconButton, Chip, Tabs, Tab, CircularProgress, FormHelperText,
-  FormControlLabel, Switch, Checkbox,
+  FormControlLabel, Switch, Checkbox, Autocomplete,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -62,6 +62,7 @@ export default function AdminBlog() {
   const [deleteType, setDeleteType] = useState<"post" | "tag" | "category">("post");
   const [formData, setFormData] = useState({
     title: "", slug: "", content: "", status: "draft" as "draft" | "published",
+    tags: [] as string[], categoryId: "" as string,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [tagFormOpen, setTagFormOpen] = useState(false);
@@ -113,7 +114,7 @@ export default function AdminBlog() {
 
   function openCreate() {
     setEditingPost(null);
-    setFormData({ title: "", slug: "", content: "", status: "published" });
+    setFormData({ title: "", slug: "", content: "", status: "published", tags: [], categoryId: "" });
     setFormErrors({});
     setFormOpen(true);
   }
@@ -125,6 +126,8 @@ export default function AdminBlog() {
       slug: post.slug,
       content: post.content,
       status: post.status,
+      tags: post.tags || [],
+      categoryId: post.categoryId || "",
     });
     setFormErrors({});
     setFormOpen(true);
@@ -146,7 +149,11 @@ export default function AdminBlog() {
       return;
     }
     if (!validatePostForm(slug)) return;
-    const payload = { ...formData, slug };
+    const payload = {
+      ...formData,
+      slug,
+      categoryId: formData.categoryId || null,
+    };
     const url = editingPost
       ? `/api/blog/posts/${editingPost.id}`
       : "/api/blog/posts";
@@ -462,6 +469,32 @@ export default function AdminBlog() {
               >
                 <MenuItem value="draft">Draft</MenuItem>
                 <MenuItem value="published">Published</MenuItem>
+              </Select>
+            </FormControl>
+            <Autocomplete
+              multiple
+              freeSolo
+              options={tags.map((t) => t.name)}
+              value={formData.tags}
+              onChange={(_, newValue) => setFormData({ ...formData, tags: newValue })}
+              renderInput={(params) => <TextField {...params} label="Tags" placeholder="Add tag" />}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />
+                ))
+              }
+            />
+            <FormControl fullWidth>
+              <InputLabel>Category</InputLabel>
+              <Select
+                label="Category"
+                value={formData.categoryId}
+                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+              >
+                <MenuItem value="">None</MenuItem>
+                {categories.map((cat) => (
+                  <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>

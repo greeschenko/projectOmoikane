@@ -24,16 +24,18 @@ func connectAndClean(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Skipf("Database not available: %v", err)
 	}
-	t.Cleanup(func() {
-		tables := []string{
-			"users", "pages", "blog_posts", "tags", "blog_post_tags",
-			"categories", "likes", "media_items", "messages", "site_settings",
-		}
-		for _, table := range tables {
-			db.Exec("DROP TABLE IF EXISTS " + table + " CASCADE")
-		}
-	})
+	resetSchema(t, db)
 	return db
+}
+
+func resetSchema(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	if err := db.Exec("DROP SCHEMA IF EXISTS public CASCADE").Error; err != nil {
+		t.Fatalf("Failed to drop public schema: %v", err)
+	}
+	if err := db.Exec("CREATE SCHEMA public").Error; err != nil {
+		t.Fatalf("Failed to create public schema: %v", err)
+	}
 }
 
 func TestDatabase_Connect_Success(t *testing.T) {
