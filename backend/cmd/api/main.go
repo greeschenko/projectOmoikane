@@ -6,6 +6,7 @@ import (
 	"time"
 
 	_ "omoikane-backend/docs"
+	"omoikane-backend/internal/cache"
 	"omoikane-backend/internal/config"
 	"omoikane-backend/internal/database"
 	"omoikane-backend/internal/handlers"
@@ -45,6 +46,18 @@ func main() {
 		AuditServiceURL: cfg.AuditServiceURL,
 	}
 
+	// Cache layer (Redis); backend keeps working if Redis is unavailable
+	var c cache.Cache = cache.NoopCache{}
+	if cfg.RedisURL != "" {
+		if rc, err := cache.NewRedis(cfg.RedisURL, 30*time.Second); err != nil {
+			log.Printf("WARNING: cache disabled (%v)", err)
+		} else {
+			c = rc
+		}
+	}
+	h.Cache = c
+	cacheTTL := 30 * time.Second
+
 	mux := http.NewServeMux()
 
 	// Swagger UI (public)
@@ -66,7 +79,7 @@ func main() {
 	mux.HandleFunc("POST /auth/reset-password", h.ResetPassword)
 
 	// Settings
-	mux.HandleFunc("GET /settings", h.GetSettings) // public (read)
+	mux.HandleFunc("GET /settings", middleware.CacheRead(c, cacheTTL, h.GetSettings)) // public (read)
 	mux.HandleFunc("PUT /settings", h.Admin(h.UpdateSettings))
 	mux.HandleFunc("GET /settings/profile", h.Auth(h.GetProfile))
 	mux.HandleFunc("PUT /settings/profile", h.Auth(h.UpdateProfile))
@@ -93,9 +106,9 @@ func main() {
 	mux.HandleFunc("POST /media/batch", h.Auth(h.BatchMedia))
 
 	// Blog
-	mux.HandleFunc("GET /blog/posts", h.GetPosts)
+	mux.HandleFunc("GET /blog/posts", middleware.CacheRead(c, cacheTTL, h.GetPosts))
 	mux.HandleFunc("GET /admin/blog/posts", h.Admin(h.GetAdminPosts))
-	mux.HandleFunc("GET /blog/posts/slug/{slug}", h.GetPostBySlug)
+	mux.HandleFunc("GET /blog/posts/slug/{slug}", middleware.CacheRead(c, cacheTTL, h.GetPostBySlug))
 	mux.HandleFunc("GET /blog/posts/{id}", h.GetPost)
 	mux.HandleFunc("POST /blog/posts", h.Auth(h.CreatePost))
 	mux.HandleFunc("PUT /blog/posts/{id}", h.Auth(h.UpdatePost))
@@ -110,8 +123,8 @@ func main() {
 	mux.HandleFunc("DELETE /blog/categories/{id}", h.Admin(h.DeleteCategory))
 
 	// Pages
-	mux.HandleFunc("GET /pages", h.GetPages)
-	mux.HandleFunc("GET /pages/slug/{slug}", h.GetPageBySlug)
+	mux.HandleFunc("GET /pages", middleware.CacheRead(c, cacheTTL, h.GetPages))
+	mux.HandleFunc("GET /pages/slug/{slug}", middleware.CacheRead(c, cacheTTL, h.GetPageBySlug))
 	mux.HandleFunc("GET /pages/{id}", h.GetPage)
 	mux.HandleFunc("POST /pages", h.Auth(h.CreatePage))
 	mux.HandleFunc("PUT /pages/{id}", h.Auth(h.UpdatePage))

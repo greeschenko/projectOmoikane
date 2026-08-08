@@ -163,6 +163,7 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		"resetEmailSubject": settings.ResetEmailSubject,
 		"resetEmailBodyHTML": settings.ResetEmailBodyHTML,
 	})
+	h.flushCache()
 }
 
 // UpdateProfile updates the current user's profile.

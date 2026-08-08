@@ -145,6 +145,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(sanitizeUserJSON(user))
+	h.flushCache()
 }
 
 // UpdateUser updates an existing user (admin only).
@@ -234,6 +235,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 	json.NewEncoder(w).Encode(sanitizeUserJSON(user))
+	h.flushCache()
 }
 
 // DeleteUser soft-deletes a user (admin only).
@@ -289,6 +291,7 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 // BatchUsers performs a bulk action on users (admin only).
@@ -351,4 +354,5 @@ func (h *Handler) BatchUsers(w http.ResponseWriter, r *http.Request) {
 	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }

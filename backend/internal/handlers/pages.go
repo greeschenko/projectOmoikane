@@ -242,6 +242,7 @@ func (h *Handler) CreatePage(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(sanitizePageJSON(page))
+	h.flushCache()
 }
 
 // UpdatePage updates an existing page.
@@ -346,6 +347,7 @@ func (h *Handler) UpdatePage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	json.NewEncoder(w).Encode(sanitizePageJSON(page))
+	h.flushCache()
 }
 
 // DeletePage soft-deletes a page.
@@ -398,6 +400,7 @@ func (h *Handler) DeletePage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 // ReorderPages sets the sort order of pages.
@@ -428,6 +431,7 @@ func (h *Handler) ReorderPages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 // BatchPages performs a bulk action on pages.
@@ -490,6 +494,7 @@ func (h *Handler) BatchPages(w http.ResponseWriter, r *http.Request) {
 	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 func sanitizePageJSON(p models.Page) map[string]interface{} {

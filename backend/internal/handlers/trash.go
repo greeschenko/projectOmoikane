@@ -176,6 +176,7 @@ func (h *Handler) RestoreItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 // HardDeleteItem permanently deletes a soft-deleted item (admin only).
@@ -229,6 +230,7 @@ func (h *Handler) HardDeleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 // EmptyTrash permanently deletes all (or one entity's) trash items (admin only).
@@ -276,6 +278,7 @@ func (h *Handler) EmptyTrash(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 var osRemove = func(path string) error {

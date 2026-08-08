@@ -18,6 +18,7 @@ type Config struct {
 	SMTP            SMTPConfig
 	RecaptchaSecret string
 	AuditServiceURL string
+	RedisURL        string
 }
 
 func Load() *Config {
@@ -35,6 +36,7 @@ func Load() *Config {
 		},
 		RecaptchaSecret: getEnv("RECAPTCHA_SECRET", ""),
 		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
+		RedisURL:        getEnv("REDIS_URL", ""),
 	}
 }
 

@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
 	"time"
 
+	"omoikane-backend/internal/cache"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 
@@ -23,6 +25,14 @@ type Handler struct {
 	SMTPFrom        string
 	RecaptchaSecret string
 	AuditServiceURL string
+	Cache           cache.Cache
+}
+
+// flushCache invalidates the response cache after any write to a cached entity.
+func (h *Handler) flushCache() {
+	if h.Cache != nil {
+		h.Cache.Flush(context.Background())
+	}
 }
 
 // LookupToken resolves a raw API token to (userID, role, ok). Used by the

@@ -74,6 +74,7 @@ func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 // DeleteCategory deletes a blog category (admin only).
@@ -105,6 +106,7 @@ func (h *Handler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 func lookupUserName(h *Handler, userID uint) string {
@@ -301,6 +303,7 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
+	h.flushCache()
 }
 
 // UpdatePost updates an existing blog post.
@@ -409,6 +412,7 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	})
 
 	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
+	h.flushCache()
 }
 
 // DeletePost soft-deletes a blog post.
@@ -461,6 +465,7 @@ func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
 	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 // BatchPosts performs a bulk action on posts.
@@ -506,6 +511,7 @@ func (h *Handler) BatchPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
 }
 
 // ToggleLike likes or unlikes a post for the current user.
@@ -558,6 +564,7 @@ func (h *Handler) ToggleLike(w http.ResponseWriter, r *http.Request) {
 		"liked":  liked,
 		"count":  post.LikeCount,
 	})
+	h.flushCache()
 }
 
 func sanitizeTag(t models.Tag) map[string]interface{} {
@@ -631,6 +638,7 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		"name": tag.Name,
 		"slug": tag.Slug,
 	})
+	h.flushCache()
 }
 
 func sanitizeCategory(c models.Category) map[string]interface{} {
@@ -707,6 +715,7 @@ func (h *Handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 		"slug":        cat.Slug,
 		"description": cat.Description,
 	})
+	h.flushCache()
 }
 
 func sanitizePostJSON(h *Handler, p models.BlogPost) map[string]interface{} {

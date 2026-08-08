@@ -43,11 +43,19 @@ services:
       - SMTP_FROM=noreply@omoikane.local
       - RECAPTCHA_SECRET=
       - AUDIT_SERVICE_URL=http://audit-service:8081
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
       audit-service:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
 
   audit-service:
     build:

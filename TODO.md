@@ -267,14 +267,16 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 **Test status:** Go tests 107/107 pass (0 fail)
 
-## 🔲 Phase 21: Cache Layer (Redis)
+## ✅ Phase 21: Cache Layer (Redis)
 
-- [ ] `redis` container added to docker-compose + go-redis client in backend config
-- [ ] TTL cache for public GET endpoints (pages, blog list/detail, settings, sitemap data)
-- [ ] Cache invalidation on writes (create/update/delete page, post, settings)
-- [ ] Admin/authenticated requests bypass cache (no draft leakage)
-- [ ] Graceful degradation — backend works if Redis is down (cache-aside with fallthrough)
-- [ ] Go tests for cache hit/miss + invalidation
+- [x] `redis` container added to docker-compose + go-redis client in backend config
+- [x] TTL cache for public GET endpoints (pages, blog list/detail, settings)
+- [x] Cache invalidation on writes (create/update/delete page, post, settings, tags/categories, users, trash)
+- [x] Admin/authenticated requests bypass cache (no draft leakage)
+- [x] Graceful degradation — backend works if Redis is down (noop cache fallback)
+- [x] Go tests for cache hit/miss, query-key variance, auth bypass, flush + integration test (miniredis)
+
+**Test status:** Go tests 111/111 pass (0 fail)
 
 ## 🔲 Phase 22: Image Optimization
 
