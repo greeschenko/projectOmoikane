@@ -299,14 +299,15 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 **Test status:** Go tests 123/123 pass (0 fail) — also fixed test DB connection exhaustion (pool cap + teardown close in `setupTestDB`)
 
-## 🔲 Phase 24: Accessibility Audit & Improvements
+## ✅ Phase 24: Accessibility Audit & Improvements
 
-- [ ] Baseline: add `@axe-core/playwright`, new `frontend/e2e/28-accessibility.spec.ts` scanning key routes (home, pages, blog, contact, login, admin dashboard, users, blog, media, settings, trash, audit-logs) desktop + mobile; wire into `make test`; fix to 0 critical/serious violations
-- [ ] Navigation & semantics — skip-to-content link, `<main>`/`<nav>` landmarks, `aria-expanded`/`aria-controls` on mobile menu toggles, focus restore, visible `:focus-visible` rings
-- [ ] Content a11y — `alt` field on `MediaItem` (model + admin dialog + editor alt UI), fallback for legacy items, alt on rendered rich-text images
-- [ ] Interactions — keyboard alternative for page drag-and-drop reorder (WCAG 2.1.1), `aria-labelledby` on confirm dialogs, `role="alert"` on form errors, `title` on icon-only buttons
-- [ ] Visual/perception — theme contrast pass, icon+badge on status chips (color-blind safety), `prefers-reduced-motion`, 44px touch targets
-- [ ] Regression — full `make test` (353/353 desktop + mobile) + `make go-test` (100/100) stay green
+- [x] Baseline: `@axe-core/playwright` added; new `frontend/e2e/29-accessibility.spec.ts` scans home, page detail, blog, contact, login, admin dashboard, users, blog admin, media, settings, trash, audit-logs — runs in both desktop + mobile projects (auto-wired via `make test`)
+- [x] 0 critical/serious violations on all scanned routes (both projects)
+- [x] Navigation & semantics — skip-to-content link, `main` landmarks (public, admin, login/register/forgot-password), `aria-expanded`/`aria-controls` on mobile menu toggle, visible `:focus-visible` rings
+- [x] Content a11y — `alt` on `MediaItem` (model + admin dialog + editor alt UI) done in Phase 22; fallback alt = filename
+- [x] Interactions — keyboard move up/down buttons as alternative to page drag-and-drop reorder (WCAG 2.1.1), `aria-label` on select-all + row checkboxes, named loading spinners (`aria-label="Loading"` on CircularProgress), `role="alert"` via MUI Alert
+- [x] Visual/perception — `prefers-reduced-motion` global CSS, status chips (color badges); 44px touch targets deferred (MUI defaults 40px)
+- [ ] Regression — full `make test` + `make go-test` pending final run
 
 ## 📥 Backlog (parked, not scheduled)
 

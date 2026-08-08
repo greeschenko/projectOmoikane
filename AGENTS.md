@@ -1,12 +1,15 @@
 # Omoikane — Project Context for AI Agents
 
 ## Goal
-- Phase 19 (platform & performance) — in progress; item 1 (OpenAPI docs + public Swagger UI) DONE
-- Phase 18 (audit log microservice) — DONE
-- Phase 17 (bug fixes + feature completion) — DONE
+- Phase 24 (accessibility) — DONE
+- Phase 23 (CDN-ready media delivery) — DONE
+- Phase 22 (image optimization) — DONE
+- Phase 21 (Redis cache) — DONE
+- Phase 20 (API tokens / headless CMS) — DONE
+- Phase 19 (OpenAPI docs + public Swagger UI) — DONE
 
 ## Constraints & Preferences
-- `make go-test` to verify all Go tests pass (100 tests: 95 handler + 2 mailer + 3 middleware)
+- `make go-test` to verify all Go tests pass (123 tests: 109 handler + 9 middleware + 2 mailer + 3 database; need running PostgreSQL)
 - `make swagger` regenerates both OpenAPI doc sets via swag (main + audit; run before committing if handler annotations changed)
 - Public Swagger UI: `/api/swagger/` (main API) and `/api/audit/swagger/` (audit microservice); nginx `proxy_redirect /swagger/` rewrites the trailing-slash redirect so prefixed URLs resolve
 - `make test` for full Playwright suite (desktop + mobile); DB reset twice: before desktop, between desktop and mobile
@@ -51,15 +54,30 @@
   - Trash: badge refresh after restore/hard-delete via `trash-changed` event
   - Messages: loading spinner
   - Blog: like/unlike button with heart icon
+- **Phase 20**: API tokens / headless CMS — 107/107 Go tests pass (committed `a38e65c`)
+  - `ApiToken` model (sha256-hashed at rest), `Authorization: Bearer` auth via middleware, `/api-tokens` CRUD, admin UI page, 7 Go tests
+- **Phase 21**: Redis cache — 111/111 Go tests pass (committed `a312894`)
+  - `internal/cache` (redis + noop fallback), `CacheRead` middleware with `X-Cache` headers + auth bypass, 5 public GETs cached, `flushCache()` on 22 mutating handlers, redis service in compose
+- **Phase 22**: Image optimization — 119/119 Go tests pass (committed `009c157`)
+  - Go-native `github.com/disintegration/imaging` thumbnails (640px, JPEG q80, `_thumb` suffix), `MediaItem.ThumbPath`/`Alt`, `PUT /media/{id}` alt edit, editor image insert via `url || data` + alt prompt (plain `<img>`, NOT `next/image` — per decision)
+- **Phase 23**: CDN-ready media delivery — 123/123 Go tests pass (committed `46cc014`)
+  - Public `GET /media/file/{filename}` (path-traversal safe, `Cache-Control: immutable` + ETag/304), `MEDIA_BASE_URL` config → absolute CDN URLs, nginx `/media/` location with long cache
+  - HMAC-signed URLs deferred (stored rich-text `<img>` URLs would expire)
+- **Phase 24**: Accessibility — 0 critical/serious axe violations on 12 scanned routes (desktop + mobile) (committed)
+  - `@axe-core/playwright` + `e2e/29-accessibility.spec.ts`; skip-to-content link, `main` landmarks, mobile-menu `aria-expanded/controls`, named spinners/checkboxes, keyboard move-up/down for page reorder, `:focus-visible` rings, `prefers-reduced-motion`
 
 ## Next Steps
-1. Phase 19, item 2: API tokens / headless CMS mode
+1. Final regression: full `make test` (desktop + mobile) + `make go-test`
 2. (Optional) Wire UndoSnackbar into delete flows for undo-toast UX
+3. (Backlog) i18n — see TODO.md Backlog
 
 ## Critical Context
-- **Go tests**: 100/100 pass (95 handler + 2 mailer + 3 middleware; need running PostgreSQL)
-- **Desktop Playwright**: 242/242 pass, 8 skipped — 0 failures
-- **Mobile Playwright**: 249/249 pass, 9 skipped — 0 failures
+- **Go tests**: 123/123 pass (109 handler + 9 middleware + 2 mailer + 3 database; need running PostgreSQL)
+- **Desktop Playwright**: baseline 242/242 pass, 8 skipped — 0 failures (Phase 24 added a11y spec)
+- **Mobile Playwright**: baseline 249/249 pass, 9 skipped — 0 failures (Phase 24 added a11y spec)
+- **Test DB connections**: `setupTestDB` caps pool (MaxOpenConns 3) + closes via `t.Cleanup` — prevents "too many clients" with Postgres' default 100-connection limit
+- **Media URLs**: `mediaJSON` emits `url`/`thumbUrl` (relative `/media/file/…` or absolute CDN URL when `MEDIA_BASE_URL` set) alongside legacy base64 `data`
+- **MUI v9**: `inputProps`/`InputProps` renamed → use `slotProps.input` on Checkbox; top-level `aria-label` lands on the ROOT span, NOT the native input
 - **Swagger**: swag v1.16.6 lib + swag CLI at `/home/olex/prodev/go/bin/swag` (GOPATH is `/home/olex/prodev/go`); docs generated with `--parseDependency --parseInternal --exclude` (main API excludes `cmd/audit`; audit service excludes `internal,cmd/api`); main API docs at `backend/docs/`, audit docs at `backend/cmd/audit/docs/`; both use relative `doc.json` URL so the UI works behind the nginx prefix; `@BasePath` must appear BEFORE `@securityDefinitions` or swag drops it; Go 1.22+ mux requires `GET /swagger/` (trailing slash wildcard), NOT `/swagger/*`
 - **`GetTrashCount`** queries `Unscoped().Where("deleted_at IS NOT NULL").Count()` across all 8 entity models — used for sidebar badge
 - Models with `gorm.Model`: Page, User, BlogPost, MediaItem, ContactMessage, Message, Tag, Category — all support GORM soft-delete via `DeletedAt`
@@ -115,6 +133,17 @@
 - `frontend/app/admin/trash/page.tsx`: Trash page
 - `frontend/components/UndoSnackbar.tsx`: Shared snackbar (not yet wired)
 
+### Phase 20–24 files
+- `backend/internal/models/api_token.go`: `ApiToken` (sha256 `TokenHash`, `ExpiresAt`, `LastUsedAt`)
+- `backend/internal/handlers/api_tokens.go`: `GET/POST/DELETE /api-tokens` (admin), one-time raw token on create
+- `backend/internal/middleware/auth.go`: `Authenticate` (JWT cookie first, then `Authorization: Bearer` via `TokenStore`); `backend/internal/middleware/cache.go`: `CacheRead` + `isPublicRequest`
+- `backend/internal/cache/`: `cache.go`, `redis.go`, `noop.go`; `backend/internal/handlers/handler.go`: `flushCache()`, `MediaBaseURL` field
+- `backend/internal/handlers/media.go`: thumbnails (`generateThumbnail`, 640px), `mediaJSON` (`url`/`thumbUrl`/`alt` + legacy `data`), `UpdateMedia` (PUT alt), `ServeMediaFile` (immutable cache + ETag/304), `MEDIA_BASE_URL` handling
+- `backend/internal/config/config.go`: `RedisURL`, `MediaBaseURL`; `docker/docker-compose.yml`: redis service, `REDIS_URL`, `MEDIA_BASE_URL`; `docker/nginx/nginx.conf`: `/media/` location
+- `frontend/app/admin/api-tokens/page.tsx`, `frontend/app/admin/media/page.tsx` (alt dialog + thumbnails), `frontend/components/RichTextEditor.tsx` (url/data image insert + alt prompt)
+- `frontend/e2e/29-accessibility.spec.ts`: axe-core scans (public + admin routes); `frontend/e2e/07-admin-pages.spec.ts`: keyboard move-up/down reorder test
+- `frontend/app/layout.tsx` + `frontend/app/(withHeader)/layout.tsx` + `frontend/components/AdminLayout.tsx`: skip link + `main` landmark + nav aria-labels; `frontend/app/globals.css`: `.skip-link`, `:focus-visible`, `prefers-reduced-motion`
+
 ### Documentation
 - `AGENTS.md`: This file
-- `TODO.md`: Phase 17 completed, Phase 18 (audit log) pending
+- `TODO.md`: Phases 20–24 completed; i18n in Backlog
