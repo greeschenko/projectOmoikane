@@ -10,13 +10,16 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+
+	"github.com/disintegration/imaging"
 
 	"omoikane-backend/internal/models"
 )
 
 // UploadMedia uploads a file via multipart form (field "file").
 // @Summary Upload media file
-// @Description Uploads a file (multipart/form-data, field name "file"). Returns the media item with base64-encoded data.
+// @Description Uploads a file (multipart/form-data, field name "file"). Images get an auto-generated thumbnail. Returns the media item with base64-encoded data plus url/thumbUrl/alt fields.
 // @Tags media
 // @Accept multipart/form-data
 // @Produce json
@@ -67,6 +70,14 @@ func (h *Handler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		MimeType: mimeType,
 		Size:     int64(len(data)),
 		FilePath: dst,
+		Alt:      filepath.Base(header.Filename),
+	}
+
+	// Generate thumbnail for images
+	if strings.HasPrefix(mimeType, "image/") {
+		if thumb, terr := generateThumbnail(dst); terr == nil {
+			item.ThumbPath = thumb
+		}
 	}
 	h.DB.Create(&item)
 
@@ -74,15 +85,48 @@ func (h *Handler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"media": map[string]interface{}{
-			"id":        item.ID,
-			"filename":  item.Filename,
-			"mimeType":  item.MimeType,
-			"size":      item.Size,
-			"data":      encoded,
-			"createdAt": item.CreatedAt,
-		},
+		"media": mediaJSON(item, encoded),
 	})
+}
+
+// generateThumbnail creates a 640px-wide resized copy of the image at srcPath.
+func generateThumbnail(srcPath string) (string, error) {
+	img, err := imaging.Open(srcPath, imaging.AutoOrientation(true))
+	if err != nil {
+		return "", err
+	}
+	thumb := imaging.Resize(img, 640, 0, imaging.Lanczos)
+	ext := filepath.Ext(srcPath)
+	thumbPath := strings.TrimSuffix(srcPath, ext) + "_thumb" + ext
+	if err := imaging.Save(thumb, thumbPath, imaging.JPEGQuality(80)); err != nil {
+		return "", err
+	}
+	return thumbPath, nil
+}
+
+func mediaURL(item models.MediaItem) string {
+	return "/media/file/" + filepath.Base(item.FilePath)
+}
+
+func thumbURL(item models.MediaItem) string {
+	if item.ThumbPath == "" {
+		return ""
+	}
+	return "/media/file/" + filepath.Base(item.ThumbPath)
+}
+
+func mediaJSON(item models.MediaItem, base64Data string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":        item.ID,
+		"filename":  item.Filename,
+		"mimeType":  item.MimeType,
+		"size":      item.Size,
+		"alt":       item.Alt,
+		"url":       mediaURL(item),
+		"thumbUrl":  thumbURL(item),
+		"data":      base64Data,
+		"createdAt": item.CreatedAt,
+	}
 }
 
 func readFileBase64(mimeType, path string) string {
@@ -95,7 +139,7 @@ func readFileBase64(mimeType, path string) string {
 
 // GetMedia returns all media items with base64-encoded file data.
 // @Summary List media
-// @Description Returns all media items, newest first, each with base64-encoded data.
+// @Description Returns all media items, newest first, each with base64-encoded data plus url/thumbUrl/alt fields.
 // @Tags media
 // @Produce json
 // @Security BearerAuth
@@ -109,14 +153,7 @@ func (h *Handler) GetMedia(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]map[string]interface{}, 0)
 	for _, item := range items {
-		result = append(result, map[string]interface{}{
-			"id":        item.ID,
-			"filename":  item.Filename,
-			"mimeType":  item.MimeType,
-			"size":      item.Size,
-			"data":      readFileBase64(item.MimeType, item.FilePath),
-			"createdAt": item.CreatedAt,
-		})
+		result = append(result, mediaJSON(item, readFileBase64(item.MimeType, item.FilePath)))
 	}
 
 	json.NewEncoder(w).Encode(result)
@@ -129,7 +166,7 @@ func (h *Handler) GetMedia(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Media ID"
-// @Success 200 {object} models.MediaItem
+// @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Router /media/{id} [get]
@@ -151,7 +188,56 @@ func (h *Handler) GetMediaItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(item)
+	json.NewEncoder(w).Encode(mediaJSON(item, readFileBase64(item.MimeType, item.FilePath)))
+}
+
+// UpdateMedia updates a media item's alt text.
+// @Summary Update media item
+// @Description Updates the alt text of a media item.
+// @Tags media
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Media ID"
+// @Param body body map[string]string true "alt text"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /media/{id} [put]
+func (h *Handler) UpdateMedia(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid media ID"})
+		return
+	}
+
+	var req struct {
+		Alt string `json:"alt"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	var item models.MediaItem
+	if err := h.DB.First(&item, id).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Media not found"})
+		return
+	}
+
+	if err := h.DB.Model(&item).Update("alt", req.Alt).Error; err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to update media"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // DeleteMedia soft-deletes a media item.

@@ -278,13 +278,16 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 **Test status:** Go tests 111/111 pass (0 fail)
 
-## 🔲 Phase 22: Image Optimization
+## ✅ Phase 22: Image Optimization
 
-- [ ] `sharp` on backend — generate thumbnails at upload (sizes, quality, format)
-- [ ] MediaItem stores thumbnail + full-res file paths; media list returns thumbnail + full-res URLs
-- [ ] Replace base64 data-URI delivery with real file URLs on admin + public rendering
-- [ ] Frontend `next/image` with configured domains/remote patterns
-- [ ] Editor image embed uses optimized URLs; alt text support (aligns with Phase 24)
+- [x] Go-native `github.com/disintegration/imaging` thumbnails at upload (auto-orient, 640px Lanczos, JPEG q80, `_thumb` suffix) — `sharp` NOT used (per decision)
+- [x] `MediaItem` gains `ThumbPath` + `Alt`; media list returns `url`/`thumbUrl`/`alt` alongside legacy `data`
+- [x] Plain `<img>` + thumbnail delivery on admin media grid + editor embed (NOT `next/image` — per decision)
+- [x] Editor image embed uses optimized `url`/`thumbUrl`; alt text prompt on insert (aligns with Phase 24)
+- [x] `PUT /media/{id}` update route (alt text edit dialog in admin UI) + swagger regenerated
+- [x] Go tests for real-PNG thumbnail generation + alt update
+
+**Test status:** Go tests 119/119 pass (0 fail)
 
 ## 🔲 Phase 23: CDN-ready Media Delivery
 

@@ -3,6 +3,9 @@ package handlers_test
 import (
 	"bytes"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +19,18 @@ import (
 	"gorm.io/gorm"
 )
 
+func makeRealPNG() []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	for i := 0; i < 8; i++ {
+		for j := 0; j < 8; j++ {
+			img.Set(i, j, color.RGBA{uint8(i * 30), uint8(j * 30), 120, 255})
+		}
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	return buf.Bytes()
+}
+
 func mediaServer(db *gorm.DB, uploadDir string) *httptest.Server {
 	h := &handlers.Handler{DB: db, JWTSecret: testJWTSecret, UploadDir: uploadDir}
 	mux := http.NewServeMux()
@@ -23,6 +38,7 @@ func mediaServer(db *gorm.DB, uploadDir string) *httptest.Server {
 	mux.HandleFunc("GET /media", h.Auth(h.GetMedia))
 	mux.HandleFunc("POST /media", h.Auth(h.UploadMedia))
 	mux.HandleFunc("GET /media/{id}", h.Auth(h.GetMediaItem))
+	mux.HandleFunc("PUT /media/{id}", h.Auth(h.UpdateMedia))
 	mux.HandleFunc("DELETE /media/{id}", h.Auth(h.DeleteMedia))
 	return httptest.NewServer(mux)
 }
@@ -194,18 +210,8 @@ func TestUploadMedia_ImageDetectsMime(t *testing.T) {
 	createTestUser(db, "Admin", "admin@test.com", "Pass1234!", "admin")
 	cookie := loginAs(t, s, "admin@test.com", "Pass1234!")
 
-	// Minimal PNG (1x1 pixel)
-	pngData := []byte{
-		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG header
-		0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-		0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-		0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
-		0x54, 0x08, 0xD7, 0x63, 0x60, 0x60, 0x00, 0x00,
-		0x00, 0x04, 0x00, 0x01, 0x27, 0x34, 0x27, 0x00,
-		0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, // IEND chunk
-		0x42, 0x60, 0x82,
-	}
+	// Real PNG via image/png encoder (handcrafted minimal PNGs fail decode)
+	pngData := makeRealPNG()
 
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
@@ -227,5 +233,51 @@ func TestUploadMedia_ImageDetectsMime(t *testing.T) {
 	mediaItem := data["media"].(map[string]interface{})
 	if mediaItem["mimeType"] != "image/png" {
 		t.Errorf("Expected mimeType 'image/png', got %v", mediaItem["mimeType"])
+	}
+
+	// Images should get a thumbnail + url fields
+	if mediaItem["thumbUrl"] == "" {
+		t.Error("Expected thumbUrl for image upload")
+	}
+	if mediaItem["url"] == "" {
+		t.Error("Expected url for image upload")
+	}
+}
+
+func TestUpdateMedia_UpdatesAltText(t *testing.T) {	db := setupTestDB(t)
+	dir := t.TempDir()
+	s := mediaServer(db, dir)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin@test.com", "Pass1234!", "admin")
+	cookie := loginAs(t, s, "admin@test.com", "Pass1234!")
+
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	fw, _ := w.CreateFormFile("file", "pic.png")
+	fw.Write([]byte("hello"))
+	w.Close()
+
+	req, _ := http.NewRequest("POST", s.URL+"/media", &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.AddCookie(cookie)
+	resp, _ := http.DefaultClient.Do(req)
+	data := decodeJSON(t, readBody(t, resp))
+	mediaItem := data["media"].(map[string]interface{})
+	resp.Body.Close()
+
+	id := int(mediaItem["id"].(float64))
+	updResp := authenticatedRequest(t, "PUT", fmt.Sprintf("%s/media/%d", s.URL, id),
+		`{"alt":"A red apple"}`, cookie)
+	defer updResp.Body.Close()
+	if updResp.StatusCode != 200 {
+		t.Fatalf("Expected 200 on alt update, got %d", updResp.StatusCode)
+	}
+
+	getResp := authenticatedRequest(t, "GET", fmt.Sprintf("%s/media/%d", s.URL, id), "", cookie)
+	defer getResp.Body.Close()
+	got := decodeJSON(t, readBody(t, getResp))
+	if got["alt"] != "A red apple" {
+		t.Fatalf("Expected alt 'A red apple', got %v", got["alt"])
 	}
 }

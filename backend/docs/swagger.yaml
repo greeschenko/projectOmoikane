@@ -1,13 +1,5 @@
 basePath: /api
 definitions:
-  gorm.DeletedAt:
-    properties:
-      time:
-        type: string
-      valid:
-        description: Valid is true if Time is not NULL
-        type: boolean
-    type: object
   internal_handlers.TrashItem:
     properties:
       deletedAt:
@@ -264,25 +256,6 @@ definitions:
       role:
         type: string
       status:
-        type: string
-    type: object
-  omoikane-backend_internal_models.MediaItem:
-    properties:
-      createdAt:
-        type: string
-      deletedAt:
-        $ref: '#/definitions/gorm.DeletedAt'
-      filePath:
-        type: string
-      filename:
-        type: string
-      id:
-        type: integer
-      mimeType:
-        type: string
-      size:
-        type: integer
-      updatedAt:
         type: string
     type: object
 info:
@@ -1206,7 +1179,7 @@ paths:
   /media:
     get:
       description: Returns all media items, newest first, each with base64-encoded
-        data.
+        data plus url/thumbUrl/alt fields.
       produces:
       - application/json
       responses:
@@ -1225,8 +1198,9 @@ paths:
     post:
       consumes:
       - multipart/form-data
-      description: Uploads a file (multipart/form-data, field name "file"). Returns
-        the media item with base64-encoded data.
+      description: Uploads a file (multipart/form-data, field name "file"). Images
+        get an auto-generated thumbnail. Returns the media item with base64-encoded
+        data plus url/thumbUrl/alt fields.
       parameters:
       - description: File to upload
         in: formData
@@ -1308,7 +1282,8 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/omoikane-backend_internal_models.MediaItem'
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
@@ -1324,6 +1299,50 @@ paths:
       security:
       - BearerAuth: []
       summary: Get media item
+      tags:
+      - media
+    put:
+      consumes:
+      - application/json
+      description: Updates the alt text of a media item.
+      parameters:
+      - description: Media ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: alt text
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update media item
       tags:
       - media
   /media/batch:

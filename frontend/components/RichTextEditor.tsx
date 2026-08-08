@@ -32,6 +32,9 @@ interface MediaItem {
   id: string;
   filename: string;
   data: string;
+  url?: string;
+  thumbUrl?: string;
+  alt?: string;
 }
 
 interface RichTextEditorProps {
@@ -137,8 +140,9 @@ export default function RichTextEditor({
     }
   };
 
-  const insertImage = (src: string) => {
-    editor?.chain().focus().setImage({ src }).run();
+  const insertImage = (src: string, alt?: string) => {
+    const attrs = alt ? { src, alt } : { src };
+    editor?.chain().focus().setImage(attrs).run();
     setImageDialogOpen(false);
   };
 
@@ -349,13 +353,16 @@ export default function RichTextEditor({
                     cursor: "pointer",
                     "&:hover": { opacity: 0.8 },
                   }}
-                  onClick={() => insertImage(item.data)}
+                  onClick={() => {
+                    const alt = window.prompt("Alt text (optional):", item.alt || "") || undefined;
+                    insertImage(item.url || item.data, alt);
+                  }}
                 >
                   <CardMedia
                     component="img"
                     height={80}
-                    image={item.data}
-                    alt={item.filename}
+                    image={item.thumbUrl || item.data}
+                    alt={item.alt || item.filename}
                     sx={{ objectFit: "cover" }}
                   />
                   <Box sx={{ p: 0.5 }}>

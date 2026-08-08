@@ -102,6 +102,7 @@ func main() {
 	mux.HandleFunc("GET /media", h.Auth(h.GetMedia))
 	mux.HandleFunc("POST /media", h.Auth(h.UploadMedia))
 	mux.HandleFunc("GET /media/{id}", h.Auth(h.GetMediaItem))
+	mux.HandleFunc("PUT /media/{id}", h.Auth(h.UpdateMedia))
 	mux.HandleFunc("DELETE /media/{id}", h.Auth(h.DeleteMedia))
 	mux.HandleFunc("POST /media/batch", h.Auth(h.BatchMedia))
 

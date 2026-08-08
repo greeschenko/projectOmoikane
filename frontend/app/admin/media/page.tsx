@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Box, Button, Card, CardMedia, CardContent, Typography,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  IconButton, Grid, Alert, Chip, CircularProgress, Checkbox,
+  IconButton, Grid, Alert, Chip, CircularProgress, Checkbox, TextField,
 } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InsertPhotoIcon from "@mui/icons-material/InsertPhoto";
+import EditIcon from "@mui/icons-material/Edit";
 
 interface MediaItem {
   id: string;
@@ -16,6 +17,9 @@ interface MediaItem {
   mimeType: string;
   size: number;
   data: string;
+  alt?: string;
+  url?: string;
+  thumbUrl?: string;
   createdAt: string;
 }
 
@@ -33,6 +37,8 @@ export default function AdminMediaPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<MediaItem | null>(null);
+  const [editTarget, setEditTarget] = useState<MediaItem | null>(null);
+  const [altText, setAltText] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<string | null>(null);
 
@@ -101,6 +107,27 @@ export default function AdminMediaPage() {
     }
   };
 
+  const openEdit = (item: MediaItem) => {
+    setEditTarget(item);
+    setAltText(item.alt ?? "");
+  };
+
+  const handleSaveAlt = async () => {
+    if (!editTarget) return;
+    try {
+      const res = await fetch(`/api/media/${editTarget.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alt: altText }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setEditTarget(null);
+      fetchMedia();
+    } catch {
+      setError("Failed to update alt text");
+    }
+  };
+
   async function handleBulkAction() {
     if (!bulkAction || selectedIds.size === 0) return;
     await fetch("/api/media/batch", {
@@ -161,19 +188,27 @@ export default function AdminMediaPage() {
                 <CardMedia
                   component="img"
                   height="140"
-                  image={item.data}
-                  alt={item.filename}
+                  image={item.thumbUrl || item.data}
+                  alt={item.alt || item.filename}
                   sx={{ objectFit: "cover" }}
                 />
                 <CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                   <Typography variant="body2" noWrap title={item.filename}>
                     {item.filename}
                   </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap title={item.alt || "No alt text"}>
+                    {item.alt ? `Alt: ${item.alt}` : "No alt text"}
+                  </Typography>
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 0.5 }}>
                     <Chip label={formatSize(item.size)} size="small" variant="outlined" />
-                    <IconButton size="small" color="error" aria-label="Delete" onClick={() => setDeleteTarget(item)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    <Box>
+                      <IconButton size="small" aria-label={`Edit alt for ${item.filename}`} onClick={() => openEdit(item)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" color="error" aria-label="Delete" onClick={() => setDeleteTarget(item)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </Box>
                 </CardContent>
               </Card>
@@ -224,6 +259,28 @@ export default function AdminMediaPage() {
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
           <Button variant="contained" color="error" onClick={handleDelete}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Alt Text Edit Dialog */}
+      <Dialog open={!!editTarget} onClose={() => setEditTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Edit Alt Text</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Alt text describes the image for screen readers and SEO.
+          </Typography>
+          <TextField
+            label="Alt text"
+            value={altText}
+            onChange={(e) => setAltText(e.target.value)}
+            fullWidth
+            autoFocus
+            margin="dense"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditTarget(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveAlt}>Save</Button>
         </DialogActions>
       </Dialog>
 
