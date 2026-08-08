@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -32,9 +33,14 @@ func makeRealPNG() []byte {
 }
 
 func mediaServer(db *gorm.DB, uploadDir string) *httptest.Server {
-	h := &handlers.Handler{DB: db, JWTSecret: testJWTSecret, UploadDir: uploadDir}
+	return mediaServerWithBaseURL(db, uploadDir, "")
+}
+
+func mediaServerWithBaseURL(db *gorm.DB, uploadDir, baseURL string) *httptest.Server {
+	h := &handlers.Handler{DB: db, JWTSecret: testJWTSecret, UploadDir: uploadDir, MediaBaseURL: baseURL}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/login", h.Login)
+	mux.HandleFunc("GET /media/file/{filename}", h.ServeMediaFile)
 	mux.HandleFunc("GET /media", h.Auth(h.GetMedia))
 	mux.HandleFunc("POST /media", h.Auth(h.UploadMedia))
 	mux.HandleFunc("GET /media/{id}", h.Auth(h.GetMediaItem))
@@ -244,7 +250,8 @@ func TestUploadMedia_ImageDetectsMime(t *testing.T) {
 	}
 }
 
-func TestUpdateMedia_UpdatesAltText(t *testing.T) {	db := setupTestDB(t)
+func TestUpdateMedia_UpdatesAltText(t *testing.T) {
+	db := setupTestDB(t)
 	dir := t.TempDir()
 	s := mediaServer(db, dir)
 	defer s.Close()
@@ -279,5 +286,129 @@ func TestUpdateMedia_UpdatesAltText(t *testing.T) {	db := setupTestDB(t)
 	got := decodeJSON(t, readBody(t, getResp))
 	if got["alt"] != "A red apple" {
 		t.Fatalf("Expected alt 'A red apple', got %v", got["alt"])
+	}
+}
+
+func TestServeMediaFile_ServesFileWithCacheHeaders(t *testing.T) {
+	db := setupTestDB(t)
+	dir := t.TempDir()
+	s := mediaServer(db, dir)
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin@test.com", "Pass1234!", "admin")
+	cookie := loginAs(t, s, "admin@test.com", "Pass1234!")
+
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	fw, _ := w.CreateFormFile("file", "logo.png")
+	fw.Write(makeRealPNG())
+	w.Close()
+
+	req, _ := http.NewRequest("POST", s.URL+"/media", &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.AddCookie(cookie)
+	resp, _ := http.DefaultClient.Do(req)
+	data := decodeJSON(t, readBody(t, resp))
+	mediaItem := data["media"].(map[string]interface{})
+	resp.Body.Close()
+
+	url := mediaItem["url"].(string)
+	if !strings.HasPrefix(url, "/media/file/") {
+		t.Fatalf("Expected url starting /media/file/, got %q", url)
+	}
+
+	fileResp, err := http.Get(s.URL + url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fileResp.Body.Close()
+
+	if fileResp.StatusCode != 200 {
+		t.Fatalf("Expected 200, got %d", fileResp.StatusCode)
+	}
+	if cc := fileResp.Header.Get("Cache-Control"); cc != "public, max-age=31536000, immutable" {
+		t.Errorf("Expected immutable Cache-Control, got %q", cc)
+	}
+	if etag := fileResp.Header.Get("Etag"); etag == "" {
+		t.Error("Expected ETag header")
+	}
+	body, _ := io.ReadAll(fileResp.Body)
+	if len(body) == 0 {
+		t.Error("Expected non-empty body")
+	}
+
+	// Conditional request returns 304
+	condReq, _ := http.NewRequest("GET", s.URL+url, nil)
+	condReq.Header.Set("If-None-Match", fileResp.Header.Get("Etag"))
+	condResp, err := http.DefaultClient.Do(condReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer condResp.Body.Close()
+	if condResp.StatusCode != 304 {
+		t.Errorf("Expected 304 on If-None-Match, got %d", condResp.StatusCode)
+	}
+}
+
+func TestServeMediaFile_PathTraversalRejected(t *testing.T) {
+	db := setupTestDB(t)
+	s := mediaServer(db, t.TempDir())
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/media/file/..%2F..%2Fetc%2Fpasswd")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 400 && resp.StatusCode != 404 {
+		t.Errorf("Expected 400/404 for path traversal, got %d", resp.StatusCode)
+	}
+}
+
+func TestServeMediaFile_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+	s := mediaServer(db, t.TempDir())
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/media/file/does-not-exist.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 404 {
+		t.Errorf("Expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaURL_RespectsMediaBaseURL(t *testing.T) {
+	db := setupTestDB(t)
+	dir := t.TempDir()
+	s := mediaServerWithBaseURL(db, dir, "https://cdn.example.com/media")
+	defer s.Close()
+
+	createTestUser(db, "Admin", "admin@test.com", "Pass1234!", "admin")
+	cookie := loginAs(t, s, "admin@test.com", "Pass1234!")
+
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	fw, _ := w.CreateFormFile("file", "cdn-test.png")
+	fw.Write(makeRealPNG())
+	w.Close()
+
+	req, _ := http.NewRequest("POST", s.URL+"/media", &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.AddCookie(cookie)
+	resp, _ := http.DefaultClient.Do(req)
+	data := decodeJSON(t, readBody(t, resp))
+	mediaItem := data["media"].(map[string]interface{})
+	resp.Body.Close()
+
+	url, ok := mediaItem["url"].(string)
+	if !ok || !strings.HasPrefix(url, "https://cdn.example.com/media/") {
+		t.Errorf("Expected absolute CDN url, got %v", mediaItem["url"])
+	}
+	thumb, ok := mediaItem["thumbUrl"].(string)
+	if !ok || !strings.HasPrefix(thumb, "https://cdn.example.com/media/") {
+		t.Errorf("Expected absolute CDN thumbUrl, got %v", mediaItem["thumbUrl"])
 	}
 }

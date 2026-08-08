@@ -44,6 +44,7 @@ func main() {
 		SMTPFrom:        cfg.SMTP.From,
 		RecaptchaSecret: cfg.RecaptchaSecret,
 		AuditServiceURL: cfg.AuditServiceURL,
+		MediaBaseURL:    cfg.MediaBaseURL,
 	}
 
 	// Cache layer (Redis); backend keeps working if Redis is unavailable
@@ -99,6 +100,7 @@ func main() {
 	mux.HandleFunc("DELETE /messages/{id}", h.Admin(h.DeleteMessage))
 
 	// Media
+	mux.HandleFunc("GET /media/file/{filename}", h.ServeMediaFile) // public, CDN-ready
 	mux.HandleFunc("GET /media", h.Auth(h.GetMedia))
 	mux.HandleFunc("POST /media", h.Auth(h.UploadMedia))
 	mux.HandleFunc("GET /media/{id}", h.Auth(h.GetMediaItem))

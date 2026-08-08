@@ -44,6 +44,7 @@ services:
       - RECAPTCHA_SECRET=
       - AUDIT_SERVICE_URL=http://audit-service:8081
       - REDIS_URL=redis://redis:6379/0
+      - MEDIA_BASE_URL=
     depends_on:
       postgres:
         condition: service_healthy

@@ -19,6 +19,7 @@ type Config struct {
 	RecaptchaSecret string
 	AuditServiceURL string
 	RedisURL        string
+	MediaBaseURL    string
 }
 
 func Load() *Config {
@@ -37,6 +38,7 @@ func Load() *Config {
 		RecaptchaSecret: getEnv("RECAPTCHA_SECRET", ""),
 		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
 		RedisURL:        getEnv("REDIS_URL", ""),
+		MediaBaseURL:    getEnv("MEDIA_BASE_URL", ""),
 	}
 }
 

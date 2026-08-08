@@ -25,6 +25,7 @@ type Handler struct {
 	SMTPFrom        string
 	RecaptchaSecret string
 	AuditServiceURL string
+	MediaBaseURL    string
 	Cache           cache.Cache
 }
 

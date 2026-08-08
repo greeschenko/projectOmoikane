@@ -35,6 +35,17 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("Failed to connect to test DB: %v", err)
 	}
+	// Cap the pool + close on teardown so ~120 sequential tests stay under
+	// Postgres' max_connections (default 100).
+	if sqlDB, serr := db.DB(); serr == nil {
+		sqlDB.SetMaxOpenConns(3)
+		sqlDB.SetMaxIdleConns(3)
+	}
+	t.Cleanup(func() {
+		if sqlDB, serr := db.DB(); serr == nil {
+			sqlDB.Close()
+		}
+	})
 	if err := db.Exec("DROP SCHEMA IF EXISTS public CASCADE").Error; err != nil {
 		t.Fatalf("Failed to drop public schema: %v", err)
 	}

@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -85,7 +87,7 @@ func (h *Handler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"media": mediaJSON(item, encoded),
+		"media": h.mediaJSON(item, encoded),
 	})
 }
 
@@ -104,29 +106,79 @@ func generateThumbnail(srcPath string) (string, error) {
 	return thumbPath, nil
 }
 
-func mediaURL(item models.MediaItem) string {
-	return "/media/file/" + filepath.Base(item.FilePath)
+func (h *Handler) mediaURL(item models.MediaItem) string {
+	return h.mediaPathURL(filepath.Base(item.FilePath))
 }
 
-func thumbURL(item models.MediaItem) string {
+func (h *Handler) thumbURL(item models.MediaItem) string {
 	if item.ThumbPath == "" {
 		return ""
 	}
-	return "/media/file/" + filepath.Base(item.ThumbPath)
+	return h.mediaPathURL(filepath.Base(item.ThumbPath))
 }
 
-func mediaJSON(item models.MediaItem, base64Data string) map[string]interface{} {
+func (h *Handler) mediaPathURL(filename string) string {
+	if h.MediaBaseURL != "" {
+		return strings.TrimRight(h.MediaBaseURL, "/") + "/" + filename
+	}
+	return "/media/file/" + filename
+}
+
+func (h *Handler) mediaJSON(item models.MediaItem, base64Data string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":        item.ID,
 		"filename":  item.Filename,
 		"mimeType":  item.MimeType,
 		"size":      item.Size,
 		"alt":       item.Alt,
-		"url":       mediaURL(item),
-		"thumbUrl":  thumbURL(item),
+		"url":       h.mediaURL(item),
+		"thumbUrl":  h.thumbURL(item),
 		"data":      base64Data,
 		"createdAt": item.CreatedAt,
 	}
+}
+
+// ServeMediaFile serves an uploaded file by its stored filename (public, CDN-ready).
+// @Summary Serve media file
+// @Description Serves an uploaded file by stored filename (path-traversal safe). Response carries immutable Cache-Control plus ETag/Last-Modified for conditional requests.
+// @Tags media
+// @Produce octet-stream
+// @Param filename path string true "Stored media filename"
+// @Success 200 {file} binary
+// @Success 304 "Not Modified (ETag/Last-Modified match)"
+// @Failure 400 {object} map[string]string "Invalid filename"
+// @Failure 404 {object} map[string]string "File not found"
+// @Router /media/file/{filename} [get]
+func (h *Handler) ServeMediaFile(w http.ResponseWriter, r *http.Request) {
+	filename := r.PathValue("filename")
+	if filename == "" || filepath.Base(filename) != filename {
+		http.Error(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+	full := filepath.Join(h.UploadDir, filename)
+	file, err := os.Open(full)
+	if err != nil {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil || info.IsDir() {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	if mimeType := itemMimeType(full); mimeType != "" {
+		w.Header().Set("Content-Type", mimeType)
+	}
+	w.Header().Set("ETag", fmt.Sprintf("%q", fmt.Sprintf("%x-%x", info.ModTime().Unix(), info.Size())))
+	http.ServeContent(w, r, info.Name(), info.ModTime(), file)
+}
+
+func itemMimeType(path string) string {
+	return mime.TypeByExtension(filepath.Ext(path))
 }
 
 func readFileBase64(mimeType, path string) string {
@@ -153,7 +205,7 @@ func (h *Handler) GetMedia(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]map[string]interface{}, 0)
 	for _, item := range items {
-		result = append(result, mediaJSON(item, readFileBase64(item.MimeType, item.FilePath)))
+		result = append(result, h.mediaJSON(item, readFileBase64(item.MimeType, item.FilePath)))
 	}
 
 	json.NewEncoder(w).Encode(result)
@@ -188,7 +240,7 @@ func (h *Handler) GetMediaItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(mediaJSON(item, readFileBase64(item.MimeType, item.FilePath)))
+	json.NewEncoder(w).Encode(h.mediaJSON(item, readFileBase64(item.MimeType, item.FilePath)))
 }
 
 // UpdateMedia updates a media item's alt text.
