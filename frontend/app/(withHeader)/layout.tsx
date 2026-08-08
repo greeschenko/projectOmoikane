@@ -23,7 +23,7 @@ export default async function PublicLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <PublicHeader session={session} />
-      <Box component="main" sx={{ flexGrow: 1 }}>
+      <Box component="main" id="main-content" sx={{ flexGrow: 1 }}>
         {children}
       </Box>
       <PublicFooter />

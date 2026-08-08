@@ -191,6 +191,31 @@ test.describe("Admin Pages", () => {
       expect(await dragIcons.count()).toBeGreaterThanOrEqual(1);
     });
 
+    test("keyboard move buttons reorder via API", async ({ page }) => {
+      const res1 = await page.request.post("/api/pages", {
+        data: { title: "Move A", slug: "move-a", content: "A" },
+      });
+      const pageA = await res1.json();
+      const res2 = await page.request.post("/api/pages", {
+        data: { title: "Move B", slug: "move-b", content: "B" },
+      });
+      const pageB = await res2.json();
+
+      await page.goto("/admin/pages");
+      const moveUp = page.getByRole("button", { name: /move .* up/i });
+      const moveDown = page.getByRole("button", { name: /move .* down/i });
+      await expect(moveUp.first()).toBeVisible();
+      await expect(moveDown.first()).toBeVisible();
+
+      const reorderRequest = page.waitForRequest((req) => req.url().includes("/api/pages/reorder"));
+      const bItem = page.locator("li", { hasText: "Move B" });
+      await bItem.getByRole("button", { name: /move .* up/i }).click();
+      const reorderRes = await reorderRequest;
+      const body = reorderRes.postDataJSON();
+      expect(reorderRes.method()).toBe("PUT");
+      expect(body.pageIds.indexOf(pageB.id)).toBeLessThan(body.pageIds.indexOf(pageA.id));
+    });
+
     test("reorder API updates sort order", async ({ page }) => {
       const res1 = await page.request.post("/api/pages", {
         data: { title: "Reorder A", slug: "reorder-a", content: "A" },

@@ -57,11 +57,17 @@ export default function MainMenu() {
   if (isMobile) {
     return (
       <>
-        <IconButton color="inherit" aria-label="menu" onClick={() => setMobileOpen(true)}>
+        <IconButton
+          color="inherit"
+          aria-label="Open menu"
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-navigation-menu"
+          onClick={() => setMobileOpen(true)}
+        >
           <MenuIcon />
         </IconButton>
         <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
-          <Box sx={{ width: 250 }} role="navigation">
+          <Box id="mobile-navigation-menu" sx={{ width: 250 }} role="navigation" aria-label="Main navigation">
             <List>
               {blogEnabled && (
                 <ListItem disablePadding>

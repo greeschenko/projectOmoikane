@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <Container maxWidth="xs" sx={{ mt: 8 }}>
+    <Container component="main" id="main-content" maxWidth="xs" sx={{ mt: 8 }}>
       <Paper sx={{ p: 4 }}>
         <Typography variant="h5" gutterBottom>
           Reset Password

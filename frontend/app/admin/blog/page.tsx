@@ -315,7 +315,7 @@ export default function AdminBlog() {
 
           {loading ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-              <CircularProgress />
+              <CircularProgress aria-label="Loading" />
             </Box>
           ) : filteredPosts.length === 0 ? (
             <Paper sx={{ p: 4, textAlign: "center" }}>

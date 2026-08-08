@@ -12,6 +12,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PreviewIcon from "@mui/icons-material/Preview";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import RichTextEditor from "@/components/RichTextEditor";
 
 interface Page {
@@ -161,7 +163,7 @@ export default function AdminPages() {
       <Paper sx={{ p: 2 }}>
         {pagesLoading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-            <CircularProgress />
+            <CircularProgress aria-label="Loading" />
           </Box>
         ) : pages.length === 0 ? (
           <Typography color="text.secondary">No pages yet.</Typography>
@@ -376,6 +378,15 @@ function PageTreeItem({
 
   const isDragOver = dragOverId === page.id;
 
+  function handleMove(direction: "up" | "down") {
+    const reordered = [...siblings];
+    const index = reordered.findIndex((p) => p.id === page.id);
+    const swap = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || swap < 0 || swap >= reordered.length) return;
+    [reordered[index], reordered[swap]] = [reordered[swap], reordered[index]];
+    onReorder(page.parentId, reordered.map((p) => p.id));
+  }
+
   return (
     <li>
       <Box
@@ -399,6 +410,12 @@ function PageTreeItem({
           size="small"
         />
         <DragIndicatorIcon fontSize="small" color="disabled" sx={{ cursor: "grab" }} />
+        <IconButton size="small" onClick={() => handleMove("up")} aria-label={`Move ${page.title} up`}>
+          <ArrowUpwardIcon fontSize="small" />
+        </IconButton>
+        <IconButton size="small" onClick={() => handleMove("down")} aria-label={`Move ${page.title} down`}>
+          <ArrowDownwardIcon fontSize="small" />
+        </IconButton>
         <Typography sx={{ flexGrow: 1 }}>{page.title}</Typography>
         <Chip
           label={page.status === "published" ? "Published" : "Draft"}

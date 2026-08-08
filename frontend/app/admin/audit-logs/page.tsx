@@ -108,7 +108,7 @@ export default function AdminAuditLog() {
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
+          <CircularProgress aria-label="Loading" />
         </Box>
       ) : logs.length === 0 ? (
         <Typography color="text.secondary" sx={{ textAlign: "center", py: 4 }}>

@@ -245,7 +245,7 @@ export default function AdminMediaPage() {
         <DialogActions>
           <Button onClick={() => { setUploadOpen(false); setSelectedFiles([]); setPreviews([]); setError(""); }}>Cancel</Button>
           <Button variant="contained" onClick={handleUpload} disabled={selectedFiles.length === 0 || uploading}>
-            {uploading ? <CircularProgress size={24} /> : `Upload ${selectedFiles.length > 0 ? `(${selectedFiles.length})` : ""}`}
+            {uploading ? <CircularProgress size={24} aria-hidden="true" /> : `Upload ${selectedFiles.length > 0 ? `(${selectedFiles.length})` : ""}`}
           </Button>
         </DialogActions>
       </Dialog>

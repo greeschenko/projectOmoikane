@@ -145,6 +145,7 @@ export default function AdminUsers() {
         <Button variant="contained" onClick={openCreate}>New User</Button>
       </Box>
       <TextField
+        label="Search users"
         placeholder="Search users..."
         size="small"
         value={filter}
@@ -169,6 +170,7 @@ export default function AdminUsers() {
                   indeterminate={selectedIds.size > 0 && !allFilteredSelected}
                   checked={allFilteredSelected}
                   onChange={toggleSelectAll}
+                  slotProps={{ input: { "aria-label": "Select all users" } }}
                 />
               </TableCell>
               {(["name", "email", "role", "status", "createdAt"] as const).map((field) => (
@@ -200,7 +202,7 @@ export default function AdminUsers() {
               filtered.map((user) => (
               <TableRow key={user.id} selected={selectedIds.has(user.id)}>
                 <TableCell padding="checkbox">
-                  <Checkbox checked={selectedIds.has(user.id)} onChange={() => toggleSelect(user.id)} />
+                  <Checkbox checked={selectedIds.has(user.id)} onChange={() => toggleSelect(user.id)} slotProps={{ input: { "aria-label": `Select ${user.name}` } }} />
                 </TableCell>
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>

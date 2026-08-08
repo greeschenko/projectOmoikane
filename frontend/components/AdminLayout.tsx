@@ -103,20 +103,21 @@ export default function AdminLayout({
       <Box sx={{ display: "flex", flex: 1 }}>
         <Box
           component="main"
+          id="main-content"
           sx={{ flexGrow: 1, p: 3, mt: 0, order: { md: 1 } }}
         >
           {children}
         </Box>
         {isMobile ? (
           <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
-            <Box sx={{ width: 250 }} role="navigation">
+            <Box sx={{ width: 250 }} role="navigation" aria-label="Admin navigation">
               {sidebarContent}
             </Box>
           </Drawer>
         ) : (
           <Drawer variant="permanent" sx={{ width: 240, flexShrink: 0, order: { md: -1 } }}>
             <Toolbar />
-            <Box role="navigation">{sidebarContent}</Box>
+            <Box role="navigation" aria-label="Admin navigation">{sidebarContent}</Box>
           </Drawer>
         )}
       </Box>
