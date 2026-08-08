@@ -34,7 +34,7 @@ test.describe("Admin Media Library", () => {
       buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),
     });
     await page.getByRole("dialog").getByRole("button", { name: /upload/i }).last().click();
-    await expect(page.getByText("test.png")).toBeVisible();
+    await expect(page.getByText("test.png", { exact: true })).toBeVisible();
   });
 
   test("delete media removes it from gallery", async ({ page }) => {
@@ -48,8 +48,8 @@ test.describe("Admin Media Library", () => {
       buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),
     });
     await page.getByRole("dialog").getByRole("button", { name: /upload/i }).last().click();
-    await expect(page.getByText("delete-me.png")).toBeVisible();
-    await page.getByRole("button", { name: /delete/i }).first().click();
+    await expect(page.getByText("delete-me.png", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Delete", exact: true }).first().click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByRole("dialog").getByRole("button", { name: /^delete$/i }).click();
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
@@ -79,7 +79,7 @@ test.describe("Admin Media Library", () => {
           buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64"),
         });
         await page.getByRole("dialog").getByRole("button", { name: /upload/i }).last().click();
-        await expect(page.getByText(name)).toBeVisible();
+        await expect(page.getByText(name, { exact: true })).toBeVisible();
       }
       await page.locator('input[type="checkbox"]').first().check();
       if (await page.locator('input[type="checkbox"]').count() > 1) {
@@ -90,7 +90,7 @@ test.describe("Admin Media Library", () => {
       await page.getByRole("dialog").getByRole("button", { name: /delete/i }).click();
       await refetchResponse;
       await page.waitForTimeout(500);
-      await expect(page.getByText("bulk1.png")).not.toBeVisible();
+      await expect(page.getByText("bulk1.png", { exact: true })).not.toBeVisible();
     });
   });
 });

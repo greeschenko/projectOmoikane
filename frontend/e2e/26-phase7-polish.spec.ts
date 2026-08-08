@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./helpers";
+import { loginAsAdmin, waitForHydration } from "./helpers";
 
 test.describe("Phase 7 — Blog View Button", () => {
   test.beforeEach(async ({ page }) => {
@@ -83,11 +83,12 @@ test.describe("Phase 7 — Login Redirect", () => {
     expect(reg.ok()).toBeTruthy();
 
     await page.goto("/login");
+    await waitForHydration(page, "form");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill("TestPass123!");
     await page.getByRole("button", { name: /sign in|login/i }).click();
 
-    await expect(page).toHaveURL("/");
+    await expect(page).toHaveURL("/", { timeout: 10000 });
   });
 });
 

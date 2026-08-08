@@ -1,5 +1,21 @@
 import { test, expect, type Page } from "@playwright/test";
 
+// Waits until React has hydrated the element matching `selector`. Before
+// hydration, native form submission or clicks land before React attaches its
+// handlers (visible as a GET to "/login?" or a dialog that never opens).
+// React attaches internal `__reactProps$*` expando properties during commit.
+export async function waitForHydration(page: Page, selector: string): Promise<void> {
+  await page.waitForFunction(
+    (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
+      return Object.keys(el).some((k) => k.startsWith("__reactProps$"));
+    },
+    selector,
+    { timeout: 15000 }
+  );
+}
+
 export function isMobile(): boolean {
   return test.info().project.name === "mobile";
 }
