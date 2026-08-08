@@ -289,13 +289,15 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 **Test status:** Go tests 119/119 pass (0 fail)
 
-## 🔲 Phase 23: CDN-ready Media Delivery
+## ✅ Phase 23: CDN-ready Media Delivery
 
-- [ ] Public media serving route (`/media/{filename}`) behind nginx
-- [ ] Cache headers: immutable (`Cache-Control: public, max-age=31536000, immutable`) + ETag/Last-Modified
-- [ ] Configurable `MEDIA_BASE_URL` (env / site setting) so files can be served from a CDN
-- [ ] Optional HMAC-signed URLs for private/expiring media
-- [ ] nginx `location` block for media with long cache + `try_files` for CDN offload
+- [x] Public media serving route `GET /media/file/{filename}` (path-traversal safe, no auth) behind nginx `/media/` location
+- [x] Cache headers: `Cache-Control: public, max-age=31536000, immutable` + ETag/Last-Modified with conditional 304 responses
+- [x] Configurable `MEDIA_BASE_URL` (env / compose) — media URLs become absolute CDN URLs when set; backend + nginx fall back to self-served `/media/file/`
+- [ ] HMAC-signed URLs — deferred: stored rich-text `<img src>` URLs would expire and break rendered content; revisit if private-media is needed
+- [x] nginx `location /media/` block with long cache header for CDN offload
+
+**Test status:** Go tests 123/123 pass (0 fail) — also fixed test DB connection exhaustion (pool cap + teardown close in `setupTestDB`)
 
 ## 🔲 Phase 24: Accessibility Audit & Improvements
 
