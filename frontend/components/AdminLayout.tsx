@@ -17,6 +17,7 @@ import CollectionsIcon from "@mui/icons-material/Collections";
 import SettingsIcon from "@mui/icons-material/Settings";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import HistoryIcon from "@mui/icons-material/History";
+import KeyIcon from "@mui/icons-material/Key";
 import AdminAppBar from "./AdminAppBar";
 
 const navItems = [
@@ -29,6 +30,7 @@ const navItems = [
   { label: "Media", href: "/admin/media", icon: <CollectionsIcon /> },
   { label: "Trash", href: "/admin/trash", icon: <DeleteSweepIcon /> },
   { label: "Audit Log", href: "/admin/audit-logs", icon: <HistoryIcon /> },
+  { label: "API Tokens", href: "/admin/api-tokens", icon: <KeyIcon /> },
   { label: "Settings", href: "/admin/settings", icon: <SettingsIcon /> },
 ];
 

@@ -253,12 +253,54 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 
 **Test status:** Go tests 100/100 pass (0 fail); desktop Playwright 353/353 pass (10 skip); mobile Playwright 353/353 pass (11 skip)
 
-## 🔲 Phase 19: Platform & Performance
+## ✅ Phase 19: OpenAPI Documentation
 
 - [x] OpenAPI documentation for all Go routes (swaggo/swag, public Swagger UI at `/api/swagger/` + audit docs at `/api/audit/swagger/`)
-- [ ] API tokens / headless CMS mode
-- [ ] Cache layer (Redis or in-memory)
-- [ ] Image optimization (sharp, next/image, thumbnails)
-- [ ] CDN-ready media delivery
-- [ ] Accessibility audit & improvements
-- [ ] i18n / multi-language support
+
+## ✅ Phase 20: API Tokens / Headless CMS Mode
+
+- [x] `ApiToken` model — hashed token, name, role, expiresAt, lastUsedAt
+- [x] Token auth middleware — `Authorization: Bearer <token>` accepted alongside the JWT cookie (extends `extractClaims`)
+- [x] Admin UI to create/revoke tokens (`/admin/api-tokens`)
+- [x] Go tests for token auth paths (valid, invalid, expired, revoked, scopes)
+- [x] Document token auth in Swagger (`BearerAuth` scheme) + `make swagger`
+
+**Test status:** Go tests 107/107 pass (0 fail)
+
+## 🔲 Phase 21: Cache Layer (Redis)
+
+- [ ] `redis` container added to docker-compose + go-redis client in backend config
+- [ ] TTL cache for public GET endpoints (pages, blog list/detail, settings, sitemap data)
+- [ ] Cache invalidation on writes (create/update/delete page, post, settings)
+- [ ] Admin/authenticated requests bypass cache (no draft leakage)
+- [ ] Graceful degradation — backend works if Redis is down (cache-aside with fallthrough)
+- [ ] Go tests for cache hit/miss + invalidation
+
+## 🔲 Phase 22: Image Optimization
+
+- [ ] `sharp` on backend — generate thumbnails at upload (sizes, quality, format)
+- [ ] MediaItem stores thumbnail + full-res file paths; media list returns thumbnail + full-res URLs
+- [ ] Replace base64 data-URI delivery with real file URLs on admin + public rendering
+- [ ] Frontend `next/image` with configured domains/remote patterns
+- [ ] Editor image embed uses optimized URLs; alt text support (aligns with Phase 24)
+
+## 🔲 Phase 23: CDN-ready Media Delivery
+
+- [ ] Public media serving route (`/media/{filename}`) behind nginx
+- [ ] Cache headers: immutable (`Cache-Control: public, max-age=31536000, immutable`) + ETag/Last-Modified
+- [ ] Configurable `MEDIA_BASE_URL` (env / site setting) so files can be served from a CDN
+- [ ] Optional HMAC-signed URLs for private/expiring media
+- [ ] nginx `location` block for media with long cache + `try_files` for CDN offload
+
+## 🔲 Phase 24: Accessibility Audit & Improvements
+
+- [ ] Baseline: add `@axe-core/playwright`, new `frontend/e2e/28-accessibility.spec.ts` scanning key routes (home, pages, blog, contact, login, admin dashboard, users, blog, media, settings, trash, audit-logs) desktop + mobile; wire into `make test`; fix to 0 critical/serious violations
+- [ ] Navigation & semantics — skip-to-content link, `<main>`/`<nav>` landmarks, `aria-expanded`/`aria-controls` on mobile menu toggles, focus restore, visible `:focus-visible` rings
+- [ ] Content a11y — `alt` field on `MediaItem` (model + admin dialog + editor alt UI), fallback for legacy items, alt on rendered rich-text images
+- [ ] Interactions — keyboard alternative for page drag-and-drop reorder (WCAG 2.1.1), `aria-labelledby` on confirm dialogs, `role="alert"` on form errors, `title` on icon-only buttons
+- [ ] Visual/perception — theme contrast pass, icon+badge on status chips (color-blind safety), `prefers-reduced-motion`, 44px touch targets
+- [ ] Regression — full `make test` (353/353 desktop + mobile) + `make go-test` (100/100) stay green
+
+## 📥 Backlog (parked, not scheduled)
+
+- [ ] i18n / multi-language support — currently deferred; UI-only localization (next-intl + language switcher) is the likely scope if picked up

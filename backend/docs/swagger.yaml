@@ -49,6 +49,18 @@ definitions:
       subject:
         type: string
     type: object
+  internal_handlers.createApiTokenRequest:
+    properties:
+      description:
+        type: string
+      expiresInDays:
+        description: 0 = never
+        type: integer
+      name:
+        type: string
+      role:
+        type: string
+    type: object
   internal_handlers.createCategoryRequest:
     properties:
       description:
@@ -300,6 +312,90 @@ paths:
       summary: List all posts
       tags:
       - blog
+  /api-tokens:
+    get:
+      description: Returns all API tokens without their secrets (hashes only).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List API tokens
+      tags:
+      - api-tokens
+    post:
+      consumes:
+      - application/json
+      description: Creates a new API token. The raw token is returned only once; store
+        the SHA-256 hash instead.
+      parameters:
+      - description: Token name, role and optional expiry in days
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.createApiTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create API token
+      tags:
+      - api-tokens
+  /api-tokens/{id}:
+    delete:
+      description: Soft-deletes an API token so it can no longer authenticate.
+      parameters:
+      - description: Token ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Revoke API token
+      tags:
+      - api-tokens
   /audit-logs:
     get:
       description: Returns audit log entries from the audit microservice. Supports

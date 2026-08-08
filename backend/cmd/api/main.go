@@ -136,6 +136,11 @@ func main() {
 	// Audit logs (admin only)
 	mux.HandleFunc("GET /audit-logs", h.Admin(h.GetAuditLogs))
 
+	// API tokens (admin only, for headless CMS access)
+	mux.HandleFunc("GET /api-tokens", h.Admin(h.GetApiTokens))
+	mux.HandleFunc("POST /api-tokens", h.Admin(h.CreateApiToken))
+	mux.HandleFunc("DELETE /api-tokens/{id}", h.Admin(h.DeleteApiToken))
+
 	// Trash system (admin only)
 	mux.HandleFunc("GET /trash", h.Admin(h.GetTrash))
 	mux.HandleFunc("GET /trash/count", h.Admin(h.GetTrashCount))
