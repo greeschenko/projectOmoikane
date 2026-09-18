@@ -4,7 +4,14 @@ import { loginAsAdmin, waitForHydration } from "./helpers";
 async function createToken(page: Page, name: string) {
   await page.goto("/admin/api-tokens");
   await waitForHydration(page, "main");
-  await page.getByRole("button", { name: /new token/i }).click();
+  const newTokenBtn = page.getByRole("button", { name: /new token/i });
+  // Guard against the hydration race (see AGENTS.md): a click that lands
+  // before React attaches the handler opens no dialog. Retry once if so.
+  await newTokenBtn.click();
+  await expect(page.getByLabel("Name")).toBeVisible({ timeout: 3000 }).catch(async () => {
+    await newTokenBtn.click();
+    await expect(page.getByLabel("Name")).toBeVisible({ timeout: 15000 });
+  });
   await page.getByLabel("Name").fill(name);
   await page.getByRole("button", { name: /create/i }).last().click();
   await expect(page.getByText(/token created/i)).toBeVisible();
