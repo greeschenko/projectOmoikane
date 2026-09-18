@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Container, Typography, Button, TextField, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Select, MenuItem, InputLabel, FormControl, Alert,
+  Box, Select, MenuItem, InputLabel, FormControl, Alert, Grid,
   IconButton, Chip, Tabs, Tab, CircularProgress, FormHelperText,
   FormControlLabel, Switch, Checkbox, Autocomplete,
 } from "@mui/material";
@@ -22,6 +22,7 @@ interface BlogPost {
   content: string;
   excerpt: string;
   authorId: string;
+  authorName?: string;
   status: "draft" | "published";
   publishDate: string;
   featuredImage: string;
@@ -326,7 +327,11 @@ export default function AdminBlog() {
           ) : (
             <Paper>
               <Box sx={{ display: "flex", flexDirection: "column" }}>
-                  {filteredPosts.map((post) => (
+                  {filteredPosts.map((post) => {
+                    const categoryName = post.categoryId
+                      ? categories.find((c) => c.id === post.categoryId)?.name
+                      : undefined;
+                    return (
                     <Box
                       key={post.id}
                       sx={{
@@ -343,33 +348,52 @@ export default function AdminBlog() {
                           setSelectedIds(next);
                         }}
                       />
-                      <Box sx={{ flex: 1 }}>
-                      <Typography variant="subtitle1">{post.title}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        /blog/{post.slug}
-                      </Typography>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="subtitle1">{post.title}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          /blog/{post.slug}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {post.authorName ? `by ${post.authorName}` : "by Unknown"}
+                          {post.publishDate ? ` · ${new Date(post.publishDate).toLocaleDateString()}` : ""}
+                          {post.likeCount ? ` · ${post.likeCount} like${post.likeCount === 1 ? "" : "s"}` : ""}
+                        </Typography>
+                        {(categoryName || (post.tags && post.tags.length > 0)) && (
+                          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
+                            {categoryName && (
+                              <Chip label={categoryName} size="small" variant="outlined" color="primary" sx={{ height: 20, fontSize: "0.7rem" }} />
+                            )}
+                            {post.tags?.slice(0, 5).map((tag) => (
+                              <Chip key={tag} label={tag} size="small" variant="outlined" sx={{ height: 20, fontSize: "0.7rem" }} />
+                            ))}
+                            {(post.tags?.length ?? 0) > 5 && (
+                              <Chip label={`+${post.tags!.length - 5}`} size="small" variant="outlined" sx={{ height: 20, fontSize: "0.7rem" }} />
+                            )}
+                          </Box>
+                        )}
+                      </Box>
+                      <Chip
+                        label={post.status}
+                        color={post.status === "published" ? "success" : "default"}
+                        size="small"
+                      />
+                      <IconButton component={Link} href={`/blog/${post.slug}`} target="_blank" size="small" aria-label="view">
+                        <VisibilityIcon />
+                      </IconButton>
+                      <IconButton onClick={() => openEdit(post)} size="small">
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton onClick={() => { setDeleteTarget(post); setDeleteType("post"); }} size="small" color="error">
+                        <DeleteIcon />
+                      </IconButton>
                     </Box>
-                    <Chip
-                      label={post.status}
-                      color={post.status === "published" ? "success" : "default"}
-                      size="small"
-                    />
-                    <IconButton component={Link} href={`/blog/${post.slug}`} target="_blank" size="small" aria-label="view">
-                      <VisibilityIcon />
-                    </IconButton>
-                    <IconButton onClick={() => openEdit(post)} size="small">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton onClick={() => { setDeleteTarget(post); setDeleteType("post"); }} size="small" color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                ))}
-              </Box>
-            </Paper>
-          )}
-        </>
-      )}
+                    );
+                  })}
+                </Box>
+              </Paper>
+            )}
+          </>
+        )}
 
       {tabIndex === 1 && (
         <>
@@ -434,70 +458,80 @@ export default function AdminBlog() {
       )}
 
       {/* Post Form Dialog */}
-      <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle>{editingPost ? "Edit Post" : "New Blog Post"}</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
-            <TextField
-              label="Title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              error={!!formErrors.title}
-              helperText={formErrors.title}
-              required
-            />
-            <TextField
-              label="Slug"
-              value={formData.slug}
-              onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-              error={!!formErrors.slug}
-              helperText={formErrors.slug}
-              required
-            />
-            <Typography variant="body2" color="text.secondary">Content</Typography>
-            <RichTextEditor
-              value={formData.content}
-              onChange={(html: string) => setFormData({ ...formData, content: html })}
-            />
-            {formErrors.content && <FormHelperText error>{formErrors.content}</FormHelperText>}
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
-                label="Status"
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as "draft" | "published" })}
-              >
-                <MenuItem value="draft">Draft</MenuItem>
-                <MenuItem value="published">Published</MenuItem>
-              </Select>
-            </FormControl>
-            <Autocomplete
-              multiple
-              freeSolo
-              options={tags.map((t) => t.name)}
-              value={formData.tags}
-              onChange={(_, newValue) => setFormData({ ...formData, tags: newValue })}
-              renderInput={(params) => <TextField {...params} label="Tags" placeholder="Add tag" />}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />
-                ))
-              }
-            />
-            <FormControl fullWidth>
-              <InputLabel>Category</InputLabel>
-              <Select
-                label="Category"
-                value={formData.categoryId}
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-              >
-                <MenuItem value="">None</MenuItem>
-                {categories.map((cat) => (
-                  <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
+          <Grid container spacing={2} sx={{ mt: 0 }}>
+            <Grid size={{ xs: 12, md: 8.4 }}>
+              <Box sx={{ mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">Content</Typography>
+              </Box>
+              <RichTextEditor
+                value={formData.content}
+                onChange={(html: string) => setFormData({ ...formData, content: html })}
+                error={!!formErrors.content}
+                helperText={formErrors.content}
+              />
+              {formErrors.content && <FormHelperText error>{formErrors.content}</FormHelperText>}
+            </Grid>
+            <Grid size={{ xs: 12, md: 3.6 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <TextField
+                  label="Title"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  error={!!formErrors.title}
+                  helperText={formErrors.title}
+                  required
+                />
+                <TextField
+                  label="Slug"
+                  value={formData.slug}
+                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                  error={!!formErrors.slug}
+                  helperText={formErrors.slug}
+                  required
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    label="Status"
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as "draft" | "published" })}
+                  >
+                    <MenuItem value="draft">Draft</MenuItem>
+                    <MenuItem value="published">Published</MenuItem>
+                  </Select>
+                </FormControl>
+                <Autocomplete
+                  multiple
+                  freeSolo
+                  options={tags.map((t) => t.name)}
+                  value={formData.tags}
+                  onChange={(_, newValue) => setFormData({ ...formData, tags: newValue })}
+                  renderInput={(params) => <TextField {...params} label="Tags" placeholder="Add tag" />}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />
+                    ))
+                  }
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    label="Category"
+                    value={formData.categoryId}
+                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    {categories.map((cat) => (
+                      <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setFormOpen(false)}>Cancel</Button>

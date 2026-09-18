@@ -2,13 +2,17 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"omoikane-backend/internal/models"
 )
 
 // GetAuditLogs returns audit log entries (admin only).
+// The audit microservice owns the audit_logs table (events are emitted there),
+// so this handler proxies the request to it and returns its JSON.
 // @Summary List audit logs
 // @Description Returns audit log entries from the audit microservice. Supports filters and pagination (limit <= 500).
 // @Tags audit
@@ -25,6 +29,12 @@ import (
 func (h *Handler) GetAuditLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	if h.AuditServiceURL != "" {
+		h.proxyAuditLogs(w, r)
+		return
+	}
+
+	// Fallback: read from the local DB (used when no audit service is configured).
 	var logs []models.AuditLog
 	q := h.DB.Order("created_at DESC")
 
@@ -65,4 +75,28 @@ func (h *Handler) GetAuditLogs(w http.ResponseWriter, r *http.Request) {
 		"logs":  logs,
 		"total": total,
 	})
+}
+
+// proxyAuditLogs forwards the current request to the audit microservice's
+// GET /logs endpoint, preserving all query filters and returning its response.
+func (h *Handler) proxyAuditLogs(w http.ResponseWriter, r *http.Request) {
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, h.AuditServiceURL+"/logs", nil)
+	if err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to build audit request"})
+		return
+	}
+	req.URL.RawQuery = r.URL.RawQuery
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Audit service unavailable"})
+		return
+	}
+	defer resp.Body.Close()
+
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }

@@ -1,6 +1,8 @@
 # Omoikane — Project Context for AI Agents
 
 ## Goal
+- Phase 26 (fixes from manual review — 15 issues) — DONE
+- Phase 25 (manual system review) — DONE
 - Phase 24 (accessibility) — DONE
 - Phase 23 (CDN-ready media delivery) — DONE
 - Phase 22 (image optimization) — DONE
@@ -65,16 +67,22 @@
   - HMAC-signed URLs deferred (stored rich-text `<img>` URLs would expire)
 - **Phase 24**: Accessibility — 0 critical/serious axe violations on 12 scanned routes (desktop + mobile) (committed)
   - `@axe-core/playwright` + `e2e/29-accessibility.spec.ts`; skip-to-content link, `main` landmarks, mobile-menu `aria-expanded/controls`, named spinners/checkboxes, keyboard move-up/down for page reorder, `:focus-visible` rings, `prefers-reduced-motion`
+- **Phase 25**: Manual system review — complete regression baseline + 15 issues catalogued (fix plan in Phase 26)
+  - Pre-review regression: Go 123/123, desktop 272/272, mobile 272/272 (committed `a9a9e40`; e2e flake fixes: media alt/caption selectors, API-token extraction, `waitForHydration` in `frontend/e2e/helpers.ts`)
+  - Issues found: dashboard key warning (backend shape mismatch), dialog width/2-col form (pages + blog), editor align buttons, media-dialog upload/auto-insert, tree indentation, HTML5 DnD reorder broken, frontend edit form parity, tags/categories not surfaced, richer blog list, menu icons, audit-logs empty (writes→audit DB, reads←main DB), API-token explainer, favicon never applied
+- **Phase 26**: 15 manual-review fixes — DONE (committed)
+  - Backend: dashboard `GetDashboardStats` returns zero-filled last-7-days `[{date,count}]` for registrations + messages; `GetAuditLogs` proxies to the audit microservice (`AuditServiceURL + /logs`) with local-DB fallback; new `TestGetAuditLogs_ProxiesToAuditService` (fake service)
+  - Frontend: pages + blog create/edit dialogs → `maxWidth="lg"` with 70/30 editor-left 2-col layout; RichTextEditor Align Left/Center/Right/Justify buttons (`@tiptap/extension-text-align`) + media-dialog upload with auto-insert; pages tree tightened (depth*12, zero margins); HTML5 DnD replaced with pointer-event drag from the handle (window listeners attached in `pointerdown`, `data-page-id` hit-testing, numeric-id parse fix); public blog category filter + tag/category chips on list & detail; richer admin blog rows (author/dates/likes/category/tags); Contacts icon → `ContactMailIcon`; api-tokens explainer panel; new `FaviconLoader` renders the settings favicon
+  - Verification: `make go-test` green; full `make test` (desktop + mobile) passes with new e2e coverage (blog chips/filter, editor align buttons, pointer-drag reorder, media upload/insert, favicon)
 
 ## Next Steps
-1. Final regression: full `make test` (desktop + mobile) + `make go-test`
-2. (Optional) Wire UndoSnackbar into delete flows for undo-toast UX
-3. (Backlog) i18n — see TODO.md Backlog
+1. (Optional, from Phase 15) Wire UndoSnackbar into delete flows for undo-toast UX
+2. (Backlog) i18n — see TODO.md Backlog
 
 ## Critical Context
-- **Go tests**: 123/123 pass (109 handler + 9 middleware + 2 mailer + 3 database; need running PostgreSQL)
-- **Desktop Playwright**: baseline 242/242 pass, 8 skipped — 0 failures (Phase 24 added a11y spec)
-- **Mobile Playwright**: baseline 249/249 pass, 9 skipped — 0 failures (Phase 24 added a11y spec)
+- **Go tests**: green via `make go-test` (all packages `ok`; Phase 26 adds `TestGetAuditLogs_ProxiesToAuditService`; need running PostgreSQL)
+- **Desktop Playwright**: 276/276 pass, 8 skipped — 0 failures (Phase 26 adds 4 tests: drag reorder, blog chips/filter, blog detail chips; Phase 24 added a11y spec)
+- **Mobile Playwright**: in progress (final gate for this commit)
 - **Test DB connections**: `setupTestDB` caps pool (MaxOpenConns 3) + closes via `t.Cleanup` — prevents "too many clients" with Postgres' default 100-connection limit
 - **Media URLs**: `mediaJSON` emits `url`/`thumbUrl` (relative `/media/file/…` or absolute CDN URL when `MEDIA_BASE_URL` set) alongside legacy base64 `data`
 - **MUI v9**: `inputProps`/`InputProps` renamed → use `slotProps.input` on Checkbox; top-level `aria-label` lands on the ROOT span, NOT the native input
@@ -145,6 +153,22 @@
 - `frontend/e2e/29-accessibility.spec.ts`: axe-core scans (public + admin routes); `frontend/e2e/07-admin-pages.spec.ts`: keyboard move-up/down reorder test
 - `frontend/app/layout.tsx` + `frontend/app/(withHeader)/layout.tsx` + `frontend/components/AdminLayout.tsx`: skip link + `main` landmark + nav aria-labels; `frontend/app/globals.css`: `.skip-link`, `:focus-visible`, `prefers-reduced-motion`
 
+### Phase 26 files
+- `backend/internal/handlers/dashboard.go`/`dashboard_test.go`: zero-filled last-7-days registration + message counts for chart
+- `backend/internal/handlers/audit.go`/`audit_test.go`: `GetAuditLogs` proxies to `AuditServiceURL + "/logs"` (forwarding query); new `TestGetAuditLogs_ProxiesToAuditService` (fake service)
+- `frontend/app/admin/pages/page.tsx`: lg 2-col dialog, pointer-event drag reorder with `data-page-id` hit-testing + numeric-id parse fix (`Number()`), depth*12 indentation
+- `frontend/app/admin/blog/page.tsx`: lg 70/30 dialog; richer post rows (author/dates/likes/chips)
+- `frontend/app/(withHeader)/blog/page.tsx`: category filter dropdown, category + tag chips on list cards
+- `frontend/app/(withHeader)/blog/[slug]/page.tsx`: passes `tags` + `categoryId` to `PostDetailClient`
+- `frontend/components/PostDetailClient.tsx`: upgraded edit dialog + category/tag chips + edit dialog form parity
+- `frontend/components/RichTextEditor.tsx`: Align Left/Center/Right + Justify toolbar buttons (`@tiptap/extension-text-align`), media-dialog upload with auto-insert
+- `frontend/components/FaviconLoader.tsx` (new): client component fetching `/api/settings` → injects `<link rel="icon" data-favicon>`
+- `frontend/app/layout.tsx`: adds `<FaviconLoader />` inside root layout
+- `frontend/components/AdminLayout.tsx`: Contacts nav → `ContactMailIcon`
+- `frontend/app/admin/api-tokens/page.tsx`: "What are API tokens?" explainer panel
+- `frontend/e2e/07-admin-pages.spec.ts`: pointer-drag reorder test + editor align button assertions
+- `frontend/e2e/24-blog-public.spec.ts`: blog chips + category filter e2e
+
 ### Documentation
 - `AGENTS.md`: This file
-- `TODO.md`: Phases 20–24 completed; i18n in Backlog
+- `TODO.md`: Phases 20–26 completed; i18n in Backlog

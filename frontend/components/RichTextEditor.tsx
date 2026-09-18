@@ -7,9 +7,11 @@ import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
+import TextAlign from "@tiptap/extension-text-align";
 import {
-  Box, ToggleButton, ToggleButtonGroup, FormHelperText, Dialog, DialogTitle,
+  Box, ToggleButton, FormHelperText, Dialog, DialogTitle,
   DialogContent, IconButton, Card, CardMedia, Typography, Divider, Tooltip,
+  Button, CircularProgress,
 } from "@mui/material";
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
@@ -27,6 +29,11 @@ import RedoIcon from "@mui/icons-material/Redo";
 import CloseIcon from "@mui/icons-material/Close";
 import TitleIcon from "@mui/icons-material/Title";
 import FormatClearIcon from "@mui/icons-material/FormatClear";
+import FormatAlignLeftIcon from "@mui/icons-material/FormatAlignLeft";
+import FormatAlignCenterIcon from "@mui/icons-material/FormatAlignCenter";
+import FormatAlignRightIcon from "@mui/icons-material/FormatAlignRight";
+import FormatAlignJustifyIcon from "@mui/icons-material/FormatAlignJustify";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 interface MediaItem {
   id: string;
@@ -86,6 +93,8 @@ export default function RichTextEditor({
 }: RichTextEditorProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const editor = useEditor({
     extensions: [
@@ -106,6 +115,7 @@ export default function RichTextEditor({
           openOnClick: false,
           HTMLAttributes: { class: "editor-link" },
         }),
+        TextAlign.configure({ types: ["heading", "paragraph"] }),
       ]),
     ],
     content: value,
@@ -144,6 +154,40 @@ export default function RichTextEditor({
     const attrs = alt ? { src, alt } : { src };
     editor?.chain().focus().setImage(attrs).run();
     setImageDialogOpen(false);
+    setUploadError("");
+  };
+
+  // Upload a new file straight from the editor dialog, refresh the grid and
+  // auto-insert the resulting image into the document.
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/media", { method: "POST", body });
+      if (!res.ok) {
+        setUploadError("Upload failed — please try again.");
+        return;
+      }
+      const data = await res.json();
+      const item: MediaItem | undefined = data?.media;
+      if (!item) {
+        setUploadError("Upload failed — no media returned.");
+        return;
+      }
+      // Refresh the picker grid so the new file is selectable later too.
+      setMediaItems((items) => [item, ...items.filter((m) => m.id !== item.id)]);
+      const alt = window.prompt("Alt text (optional):", item.alt || "") || undefined;
+      insertImage(item.url || item.data, alt);
+    } catch {
+      setUploadError("Upload failed — please try again.");
+    } finally {
+      setUploading(false);
+      if (e.target) e.target.value = "";
+    }
   };
 
   const addLink = () => {
@@ -259,6 +303,33 @@ export default function RichTextEditor({
               <Divider orientation="vertical" flexItem sx={{ mx: 0.25 }} />
 
               <ToolbarButton
+                active={editor.isActive({ textAlign: "left" })}
+                onClick={() => editor.chain().focus().setTextAlign("left").run()}
+                icon={<FormatAlignLeftIcon fontSize="small" />}
+                label="Align Left"
+              />
+              <ToolbarButton
+                active={editor.isActive({ textAlign: "center" })}
+                onClick={() => editor.chain().focus().setTextAlign("center").run()}
+                icon={<FormatAlignCenterIcon fontSize="small" />}
+                label="Align Center"
+              />
+              <ToolbarButton
+                active={editor.isActive({ textAlign: "right" })}
+                onClick={() => editor.chain().focus().setTextAlign("right").run()}
+                icon={<FormatAlignRightIcon fontSize="small" />}
+                label="Align Right"
+              />
+              <ToolbarButton
+                active={editor.isActive({ textAlign: "justify" })}
+                onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+                icon={<FormatAlignJustifyIcon fontSize="small" />}
+                label="Justify"
+              />
+
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.25 }} />
+
+              <ToolbarButton
                 active={editor.isActive("link")}
                 onClick={addLink}
                 icon={<LinkIcon fontSize="small" />}
@@ -336,12 +407,30 @@ export default function RichTextEditor({
           </IconButton>
         </DialogTitle>
         <DialogContent>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+            <Button
+              variant="contained"
+              component="label"
+              startIcon={<UploadFileIcon />}
+              disabled={uploading}
+              aria-label="Upload Image"
+            >
+              Upload Image
+              <input type="file" hidden accept="image/*" onChange={handleUpload} />
+            </Button>
+            {uploading && <CircularProgress size={20} aria-label="Uploading" />}
+            {uploadError && (
+              <Typography color="error" variant="body2">
+                {uploadError}
+              </Typography>
+            )}
+          </Box>
           {mediaItems.length === 0 ? (
             <Typography
               color="text.secondary"
               sx={{ py: 4, textAlign: "center" }}
             >
-              No images uploaded yet. Upload media from the Media page.
+              No images yet — upload one above, or from the Media page.
             </Typography>
           ) : (
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>

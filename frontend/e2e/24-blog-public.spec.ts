@@ -54,4 +54,60 @@ test.describe("Blog Public Pages", () => {
     await page.getByText("Clickable Post").click();
     await expect(page).toHaveURL(/\/blog\/clickable-post/);
   });
+
+  test("blog list shows category and tag chips with a category filter", async ({ page }) => {
+    await loginAsAdmin(page);
+    const cat = await (
+      await page.request.post("/api/blog/categories", { data: { name: "Tech", slug: "tech" } })
+    ).json();
+    await page.request.post("/api/blog/tags", { data: { name: "React", slug: "react" } });
+    await page.request.post("/api/blog/posts", {
+      data: {
+        title: "Tagged Post",
+        slug: "tagged-post",
+        content: "Tagged content",
+        status: "published",
+        categoryId: cat.id,
+        tags: ["React"],
+      },
+    });
+    await page.goto("/blog");
+
+    const card = page.locator("a[href='/blog/tagged-post']");
+    await expect(card).toBeVisible();
+    await expect(card.getByText("Tagged Post")).toBeVisible();
+    // Category + tag chips surfaced on the list card
+    await expect(card.getByText("Tech", { exact: true })).toBeVisible();
+    await expect(card.getByText("React", { exact: true })).toBeVisible();
+    // Category filter present (only rendered when categories exist)
+    await expect(page.getByRole("combobox", { name: /category/i })).toBeVisible();
+
+    // Filtering by Tech keeps the tagged post visible
+    await page.getByRole("combobox", { name: /category/i }).click();
+    await page.getByRole("option", { name: "Tech" }).click();
+    await expect(page.getByText("Tagged Post")).toBeVisible();
+    // A post from another category is hidden by the filter
+    await expect(page.getByText("Public Post")).not.toBeVisible();
+  });
+
+  test("blog post detail shows category and tag chips", async ({ page }) => {
+    await loginAsAdmin(page);
+    const cat = await (
+      await page.request.post("/api/blog/categories", { data: { name: "Science", slug: "science" } })
+    ).json();
+    await page.request.post("/api/blog/posts", {
+      data: {
+        title: "Chipped Post",
+        slug: "chipped-post",
+        content: "<p>Chipped content</p>",
+        status: "published",
+        categoryId: cat.id,
+        tags: ["React"],
+      },
+    });
+    await page.goto("/blog/chipped-post");
+    await expect(page.getByText("Chipped Post")).toBeVisible();
+    await expect(page.getByText("Science", { exact: true })).toBeVisible();
+    await expect(page.getByText("React", { exact: true })).toBeVisible();
+  });
 });

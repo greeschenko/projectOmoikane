@@ -154,6 +154,11 @@ test.describe("Admin Pages", () => {
       await expect(page.getByRole("button", { name: /bold|format_bold/i })).toBeVisible();
       await expect(page.getByRole("button", { name: /italic|format_italic/i })).toBeVisible();
       await expect(page.getByRole("button", { name: /insert image|image/i })).toBeVisible();
+      // Text alignment controls from the Phase 26 editor fix (issue 4)
+      await expect(page.getByRole("button", { name: "Align Left" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Align Center" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Align Right" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Justify" })).toBeVisible();
     });
   });
 
@@ -214,6 +219,55 @@ test.describe("Admin Pages", () => {
       const body = reorderRes.postDataJSON();
       expect(reorderRes.method()).toBe("PUT");
       expect(body.pageIds.indexOf(pageB.id)).toBeLessThan(body.pageIds.indexOf(pageA.id));
+    });
+
+    test("drag handle reorders pages via pointer drag", async ({ page }) => {
+      const resA = await page.request.post("/api/pages", {
+        data: { title: "Drag A", slug: "drag-a", content: "A" },
+      });
+      const dragA = await resA.json();
+      // Spacer row so the drop target is two rows below the dragged row —
+      // dropping onto the next row is a no-op under the "insert at slot" rule.
+      const resMid = await page.request.post("/api/pages", {
+        data: { title: "Drag Mid", slug: "drag-mid", content: "M" },
+      });
+      const dragMid = await resMid.json();
+      const resC = await page.request.post("/api/pages", {
+        data: { title: "Drag C", slug: "drag-c", content: "C" },
+      });
+      const dragC = await resC.json();
+
+      await page.goto("/admin/pages");
+      const aRow = page.locator("li", { hasText: "Drag A" });
+      const cRow = page.locator("li", { hasText: "Drag C" });
+      await expect(aRow).toBeVisible();
+      await expect(cRow).toBeVisible();
+
+      const handleBox = await aRow.getByTestId("DragIndicatorIcon").boundingBox();
+      expect(handleBox).toBeTruthy();
+      const cBox = await cRow.boundingBox();
+      expect(cBox).toBeTruthy();
+
+      const reorderRequest = page.waitForRequest((req) => req.url().includes("/api/pages/reorder"));
+
+      const startX = handleBox!.x + handleBox!.width / 2;
+      const startY = handleBox!.y + handleBox!.height / 2;
+      // Aim at the left third of the target row: robust even when the row
+      // overflows a narrow (mobile) viewport.
+      const endX = cBox!.x + Math.min(cBox!.width * 0.3, 120);
+      const endY = cBox!.y + cBox!.height / 2;
+
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(endX, endY, { steps: 6 });
+      await page.mouse.up();
+
+      const reorderRes = await reorderRequest;
+      const body = reorderRes.postDataJSON();
+      expect(reorderRes.method()).toBe("PUT");
+      // Dropping A onto C (two rows further down) moves A past the spacer,
+      // proving the pointer drag actually reordered the siblings.
+      expect(body.pageIds.indexOf(dragA.id)).toBeGreaterThan(body.pageIds.indexOf(dragMid.id));
     });
 
     test("reorder API updates sort order", async ({ page }) => {

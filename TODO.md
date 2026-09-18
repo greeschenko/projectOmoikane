@@ -307,7 +307,49 @@ Email integration, ReCAPTCHA, email templates, rate limiting, and contact form.
 - [x] Content a11y — `alt` on `MediaItem` (model + admin dialog + editor alt UI) done in Phase 22; fallback alt = filename
 - [x] Interactions — keyboard move up/down buttons as alternative to page drag-and-drop reorder (WCAG 2.1.1), `aria-label` on select-all + row checkboxes, named loading spinners (`aria-label="Loading"` on CircularProgress), `role="alert"` via MUI Alert
 - [x] Visual/perception — `prefers-reduced-motion` global CSS, status chips (color badges); 44px touch targets deferred (MUI defaults 40px)
-- [ ] Regression — full `make test` + `make go-test` pending final run
+- [x] Regression — full `make test` + `make go-test` ran clean as pre-Phase-25 baseline (committed `a9a9e40`)
+
+## ✅ Phase 25: Manual System Review
+
+Completed the full regression baseline and manually reviewed the running app (admin + public surfaces), cataloguing 15 issues. The fixes are scheduled in Phase 26.
+
+- [x] Pre-review regression baseline — Go tests **123/123 pass**; desktop Playwright **272/272 pass** (8 skip); mobile Playwright **272/272 pass** (9 skip) — committed `a9a9e40`
+  - e2e flake fixes included: media alt/caption selectors, API-token extraction, `waitForHydration` helper in `frontend/e2e/helpers.ts`
+- [x] Manual review of the running application — 15 issues found (see Phase 26)
+
+**Test status:** Go 123/123 pass; desktop 272/272 pass (8 skip); mobile 272/272 pass (9 skip)
+
+## ✅ Phase 26: Fixes from Manual Review
+
+All 15 issues from the Phase 25 manual review fixed (backend + frontend) and full regression executed.
+
+### Page & blog editors / forms (issues 1–9)
+- [x] **1. Dashboard React key warning** — `GetDashboardStats` now returns zero-filled last-7-days daily counts for `recentRegistrations` + `recentMessages` (`DATE(created_at)` group, zero-filled) → chart renders without duplicate-`key` warnings / NaN; `dashboard_test.go` updated
+- [x] **2. Page create form dialog width** — `/admin/pages` dialog → `maxWidth="lg"` (matches new 2-column layout)
+- [x] **3. Page form 2-column layout** — editor on the left 70% (`Grid md:8.4`), all other fields in the right column (`md:3.6`)
+- [x] **4. RichTextEditor alignment buttons** — `@tiptap/extension-text-align@^3.29.0` installed; Align Left/Center/Right + Justify toolbar buttons (full mode; excluded in `minimal` email-template mode); e2e asserts the four buttons
+- [x] **5. Editor media dialog upload + auto-insert** — upload button in the image dialog (`POST /api/media`, multipart); after upload the grid refreshes and the returned image auto-inserts into the editor with an alt prompt
+- [x] **6. Pages list child indentation** — tree `<ul>` margins zeroed, per-level indent `depth*12`, tighter row padding
+- [x] **7. Drag-and-drop page reorder — no requests fire** — HTML5 DnD replaced with a pointer-event drag from the drag handle: window `pointermove/pointerup` listeners attach synchronously in `pointerdown` (no render race), rows are hit-tested via `data-page-id` with `document.elementFromPoint`, and the string-vs-number id mismatch was fixed (`page.id` is a JSON number; the DOM attribute is a string → parsed with `Number()` — this was why `dropIndex` was always `-1`). Keyboard move up/down kept. e2e: "drag handle reorders pages via pointer drag"
+- [x] **8. Blog create/edit form same as page form** — `/admin/blog` dialog → `maxWidth="lg"` + same 70/30 editor-left layout
+- [x] **9. Frontend edit form similar to backend** — public blog "New Post" dialog and `PostDetailClient` edit dialog upgraded to the admin form layout (RichTextEditor + status/tags/category/slug) — one consistent post editor everywhere
+
+### Blog content & visibility (issues 10–11)
+- [x] **10. Tags/categories not visible in blog** — render category label + tag chips on public list cards and post detail; added category filter dropdown on `/blog`; e2e coverage added (chips + filter + detail)
+- [x] **11. Richer blog posts admin list** — author, created/publish date, like count, category chip, tag chips (all from `/api/admin/blog/posts` payload)
+
+### Admin UI polish (issues 12–15)
+- [x] **12. Distinct admin menu icons** — Messages keeps `MailIcon`; Contacts → `ContactMailIcon` in `AdminLayout.tsx`
+- [x] **13. Audit logs page empty** — `GetAuditLogs` now proxies to the audit microservice (`AuditServiceURL + /logs`, forwarding query filters) with local-DB fallback; `audit_test.go` rewritten with a fake audit service (new `TestGetAuditLogs_ProxiesToAuditService`)
+- [x] **14. API tokens page unclear** — added "What are API tokens?" info panel (headless/programmatic access, `Authorization: Bearer <token>`, token shown only once, roles, expiry, revocation, Swagger UI link)
+- [x] **15. Favicon not applied** — new client `FaviconLoader` in the root layout fetches `/api/settings` and injects `<link rel="icon" data-favicon="true">`
+
+### Verification
+- [x] `make go-test` — full suite green (dashboard 7-day + audit proxy tests included; all packages `ok`)
+- [x] `make test` — full Playwright desktop + mobile regression incl. new coverage (blog tags/category chips + filter, richer admin rows, pointer-drag reorder, editor align buttons, media upload-and-insert, favicon link)
+- [x] Update `AGENTS.md` / `TODO.md` phase status
+
+**Test status:** Go suite green (incl. new audit-proxy test); desktop + mobile Playwright regression passes with new Phase 26 coverage — counts tracked in `AGENTS.md`
 
 ## 📥 Backlog (parked, not scheduled)
 

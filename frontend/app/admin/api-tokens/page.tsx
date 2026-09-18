@@ -104,10 +104,26 @@ export default function AdminApiTokens() {
           New Token
         </Button>
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Tokens allow programmatic (headless CMS) access. Use them with{" "}
-        <code>Authorization: Bearer &lt;token&gt;</code>.
-      </Typography>
+      <Box sx={{ mb: 2 }}>
+        <Paper sx={{ p: 2, bgcolor: "action.hover" }} variant="outlined">
+          <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>What are API tokens?</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            API tokens let external systems read and write content through the same
+            REST API this admin interface uses — a headless CMS setup. Each request
+            authenticates with an <code>Authorization: Bearer &lt;token&gt;</code> header
+            instead of a login session. A token&apos;s role grants the same permissions as
+            that role on a user account.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Tokens are stored as SHA-256 hashes, so the raw value is shown <strong>only once</strong>
+            at creation — copy it somewhere safe. Set a lifetime or pick days = 0 for a token
+            that never expires, and revoke any token here to cut off access immediately.
+          </Typography>
+          <Box component="pre" sx={{ m: 0, p: 1, bgcolor: "background.paper", borderRadius: 1, fontSize: "0.75rem", overflowX: "auto" }}>
+{`curl -H "Authorization: Bearer <token>" https://your-site.com/api/blog/posts`}
+          </Box>
+        </Paper>
+      </Box>
 
       {createdToken && (
         <Alert severity="success" sx={{ mb: 2 }} onClose={() => setCreatedToken(null)}>

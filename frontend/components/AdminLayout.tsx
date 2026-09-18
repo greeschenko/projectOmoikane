@@ -13,6 +13,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import ArticleIcon from "@mui/icons-material/Article";
 import BookIcon from "@mui/icons-material/Book";
 import MailIcon from "@mui/icons-material/Mail";
+import ContactMailIcon from "@mui/icons-material/ContactMail";
 import CollectionsIcon from "@mui/icons-material/Collections";
 import SettingsIcon from "@mui/icons-material/Settings";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
@@ -26,7 +27,7 @@ const navItems = [
   { label: "Pages", href: "/admin/pages", icon: <ArticleIcon /> },
   { label: "Blog", href: "/admin/blog", icon: <BookIcon /> },
   { label: "Messages", href: "/admin/messages", icon: <MailIcon /> },
-  { label: "Contacts", href: "/admin/contacts", icon: <MailIcon /> },
+  { label: "Contacts", href: "/admin/contacts", icon: <ContactMailIcon /> },
   { label: "Media", href: "/admin/media", icon: <CollectionsIcon /> },
   { label: "Trash", href: "/admin/trash", icon: <DeleteSweepIcon /> },
   { label: "Audit Log", href: "/admin/audit-logs", icon: <HistoryIcon /> },

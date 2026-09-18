@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"omoikane-backend/internal/models"
 )
@@ -60,19 +61,6 @@ func (h *Handler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 	h.DB.Model(&models.BlogPost{}).Count(&postCount)
 	h.DB.Model(&models.MediaItem{}).Count(&mediaCount)
 
-	var recentUsers []models.User
-	h.DB.Order("created_at DESC").Limit(5).Find(&recentUsers)
-	registrations := make([]map[string]interface{}, 0, len(recentUsers))
-	for _, u := range recentUsers {
-		registrations = append(registrations, map[string]interface{}{
-			"id":   u.ID,
-			"name": u.Name,
-			"email": u.Email,
-			"role": u.Role,
-			"createdAt": u.CreatedAt,
-		})
-	}
-
 	var recentMessages []models.Message
 	h.DB.Order("created_at DESC").Limit(5).Find(&recentMessages)
 	messages := make([]map[string]interface{}, 0, len(recentMessages))
@@ -85,12 +73,29 @@ func (h *Handler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Registrations per day for the last 7 days (zero-filled so the chart is contiguous).
+	now := time.Now()
+	registrations := make([]map[string]interface{}, 0, 7)
+	for i := 6; i >= 0; i-- {
+		day := now.AddDate(0, 0, -i)
+		start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
+		end := start.AddDate(0, 0, 1)
+		var count int64
+		h.DB.Model(&models.User{}).
+			Where("created_at >= ? AND created_at < ?", start, end).
+			Count(&count)
+		registrations = append(registrations, map[string]interface{}{
+			"date":  day.Format("2006-01-02"),
+			"count": count,
+		})
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"userCount":          userCount,
-		"pageCount":          pageCount,
-		"blogCount":          postCount,
-		"mediaCount":         mediaCount,
-		"recentMessages":     messages,
+		"userCount":           userCount,
+		"pageCount":           pageCount,
+		"blogCount":           postCount,
+		"mediaCount":          mediaCount,
+		"recentMessages":      messages,
 		"recentRegistrations": registrations,
 	})
 }

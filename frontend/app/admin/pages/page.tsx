@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Container, Typography, Button, TextField, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, FormControlLabel, Switch, Select, MenuItem, InputLabel, FormControl, Alert,
+  Box, Grid, FormControlLabel, Switch, Select, MenuItem, InputLabel, FormControl,
   IconButton, CircularProgress, Checkbox, Chip,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
@@ -17,14 +17,14 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import RichTextEditor from "@/components/RichTextEditor";
 
 interface Page {
-  id: string;
+  id: number;
   title: string;
   slug: string;
   content: string;
   metaTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
-  parentId: string | null;
+  parentId: number | null;
   sortOrder: number;
   status: "draft" | "published";
   inMenu: boolean;
@@ -43,8 +43,8 @@ export default function AdminPages() {
     parentId: "", status: "draft" as "draft" | "published", inMenu: false,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkAction, setBulkAction] = useState<string | null>(null);
 
   const fetchPages = useCallback(async () => {
@@ -56,7 +56,7 @@ export default function AdminPages() {
 
   useEffect(() => { fetchPages(); }, [fetchPages]);
 
-  function getChildren(parentId: string | null): Page[] {
+  function getChildren(parentId: number | null): Page[] {
     return pages
       .filter((p) => p.parentId === parentId)
       .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -64,7 +64,7 @@ export default function AdminPages() {
 
   const rootPages = getChildren(null);
 
-  async function handleReorder(parentId: string | null, pageIds: string[]) {
+  async function handleReorder(parentId: number | null, pageIds: number[]) {
     await fetch("/api/pages/reorder", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -73,9 +73,9 @@ export default function AdminPages() {
     fetchPages();
   }
 
-  function openCreate(parentId?: string) {
+  function openCreate(parentId?: number) {
     setEditingPage(null);
-    setFormData({ title: "", slug: "", content: "", metaTitle: "", metaDescription: "", metaKeywords: "", parentId: parentId || "", status: "draft", inMenu: false });
+    setFormData({ title: "", slug: "", content: "", metaTitle: "", metaDescription: "", metaKeywords: "", parentId: parentId != null ? String(parentId) : "", status: "draft", inMenu: false });
     setFormErrors({});
     setFormOpen(true);
   }
@@ -89,7 +89,7 @@ export default function AdminPages() {
       metaTitle: page.metaTitle || "",
       metaDescription: page.metaDescription || "",
       metaKeywords: page.metaKeywords || "",
-      parentId: page.parentId || "",
+      parentId: page.parentId != null ? String(page.parentId) : "",
       status: page.status || "draft",
       inMenu: page.inMenu || false,
     });
@@ -110,7 +110,7 @@ export default function AdminPages() {
     if (!validateForm()) return;
     const url = editingPage ? `/api/pages/${editingPage.id}` : "/api/pages";
     const method = editingPage ? "PUT" : "POST";
-    const body = { ...formData, parentId: formData.parentId || null };
+    const body = { ...formData, parentId: formData.parentId ? Number(formData.parentId) : null };
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (res.ok) {
       setFormOpen(false);
@@ -125,7 +125,7 @@ export default function AdminPages() {
     fetchPages();
   }
 
-  function toggleSelect(id: string) {
+  function toggleSelect(id: number) {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedIds(next);
@@ -184,53 +184,60 @@ export default function AdminPages() {
         )}
       </Paper>
 
-      <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle>{editingPage ? "Edit Page" : "New Page"}</DialogTitle>
         <DialogContent>
-          <TextField label="Title" fullWidth margin="dense" value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            error={!!formErrors.title} helperText={formErrors.title} required />
-          <TextField label="Slug" fullWidth margin="dense" value={formData.slug}
-            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-            error={!!formErrors.slug} helperText={formErrors.slug} required />
-          <RichTextEditor
-            value={formData.content}
-            onChange={(html) => setFormData({ ...formData, content: html })}
-            error={!!formErrors.content}
-            helperText={formErrors.content}
-          />
-          <TextField label="Meta Title" fullWidth margin="dense" value={formData.metaTitle}
-            onChange={(e) => setFormData({ ...formData, metaTitle: e.target.value })} />
-          <TextField label="Meta Description" fullWidth margin="dense" value={formData.metaDescription}
-            onChange={(e) => setFormData({ ...formData, metaDescription: e.target.value })} />
-          <TextField label="Meta Keywords" fullWidth margin="dense" value={formData.metaKeywords}
-            onChange={(e) => setFormData({ ...formData, metaKeywords: e.target.value })} />
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Parent Page</InputLabel>
-            <Select label="Parent Page" value={formData.parentId}
-              onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}>
-              <MenuItem value="">None (root page)</MenuItem>
-              {pages
-                .filter((p) => p.id !== editingPage?.id)
-                .map((p) => (
-                  <MenuItem key={p.id} value={p.id}>{p.title}</MenuItem>
-                ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Status</InputLabel>
-            <Select label="Status" value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as "draft" | "published" })}>
-              <MenuItem value="draft">Draft</MenuItem>
-              <MenuItem value="published">Published</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControlLabel
-            control={<Switch checked={formData.inMenu}
-              onChange={(e) => setFormData({ ...formData, inMenu: e.target.checked })} />}
-            label="Show in menu"
-            sx={{ mt: 1 }}
-          />
+          <Grid container spacing={2} sx={{ mt: 0 }}>
+            <Grid size={{ xs: 12, md: 8.4 }}>
+              <RichTextEditor
+                value={formData.content}
+                onChange={(html) => setFormData({ ...formData, content: html })}
+                error={!!formErrors.content}
+                helperText={formErrors.content}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 3.6 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <TextField label="Title" fullWidth margin="dense" value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  error={!!formErrors.title} helperText={formErrors.title} required />
+                <TextField label="Slug" fullWidth margin="dense" value={formData.slug}
+                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                  error={!!formErrors.slug} helperText={formErrors.slug} required />
+                <TextField label="Meta Title" fullWidth margin="dense" value={formData.metaTitle}
+                  onChange={(e) => setFormData({ ...formData, metaTitle: e.target.value })} />
+                <TextField label="Meta Description" fullWidth margin="dense" value={formData.metaDescription}
+                  onChange={(e) => setFormData({ ...formData, metaDescription: e.target.value })} />
+                <TextField label="Meta Keywords" fullWidth margin="dense" value={formData.metaKeywords}
+                  onChange={(e) => setFormData({ ...formData, metaKeywords: e.target.value })} />
+                <FormControl fullWidth margin="dense">
+                  <InputLabel>Parent Page</InputLabel>
+                  <Select label="Parent Page" value={formData.parentId}
+                    onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}>
+                    <MenuItem value="">None (root page)</MenuItem>
+                    {pages
+                      .filter((p) => p.id !== editingPage?.id)
+                      .map((p) => (
+                        <MenuItem key={p.id} value={String(p.id)}>{p.title}</MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth margin="dense">
+                  <InputLabel>Status</InputLabel>
+                  <Select label="Status" value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as "draft" | "published" })}>
+                    <MenuItem value="draft">Draft</MenuItem>
+                    <MenuItem value="published">Published</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControlLabel
+                  control={<Switch checked={formData.inMenu}
+                    onChange={(e) => setFormData({ ...formData, inMenu: e.target.checked })} />}
+                  label="Show in menu"
+                />
+              </Box>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setFormOpen(false)}>Cancel</Button>
@@ -280,23 +287,23 @@ export default function AdminPages() {
 function PageTreeList({
   parentId, pages, getChildren, onEdit, onDelete, onReorder, dragOverId, setDragOverId, depth, selectedIds, onToggleSelect,
 }: {
-  parentId: string | null;
+  parentId: number | null;
   pages: Page[];
-  getChildren: (pid: string | null) => Page[];
+  getChildren: (pid: number | null) => Page[];
   onEdit: (p: Page) => void;
   onDelete: (p: Page) => void;
-  onReorder: (pid: string | null, ids: string[]) => void;
-  dragOverId: string | null;
-  setDragOverId: (id: string | null) => void;
+  onReorder: (pid: number | null, ids: number[]) => void;
+  dragOverId: number | null;
+  setDragOverId: (id: number | null) => void;
   depth: number;
-  selectedIds: Set<string>;
-  onToggleSelect: (id: string) => void;
+  selectedIds: Set<number>;
+  onToggleSelect: (id: number) => void;
 }) {
   const children = getChildren(parentId);
   if (children.length === 0) return null;
 
   return (
-    <ul style={{ listStyle: "none", padding: 0 }}>
+    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
       {children.map((page) => (
         <PageTreeItem
           key={page.id}
@@ -334,51 +341,85 @@ function PageTreeItem({
 }: {
   page: Page;
   pages: Page[];
-  getChildren: (pid: string | null) => Page[];
+  getChildren: (pid: number | null) => Page[];
   depth: number;
   onEdit: (p: Page) => void;
   onDelete: (p: Page) => void;
-  onReorder: (pid: string | null, ids: string[]) => void;
-  dragOverId: string | null;
-  setDragOverId: (id: string | null) => void;
-  selectedIds: Set<string>;
-  onToggleSelect: (id: string) => void;
+  onReorder: (pid: number | null, ids: number[]) => void;
+  dragOverId: number | null;
+  setDragOverId: (id: number | null) => void;
+  selectedIds: Set<number>;
+  onToggleSelect: (id: number) => void;
 }) {
-  const siblings = getChildren(page.parentId);
+  const [dragging, setDragging] = useState(false);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
 
-  function handleDragStart(e: React.DragEvent) {
-    e.dataTransfer.setData("text/plain", page.id);
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragOver(e: React.DragEvent) {
+  // Pointer-based drag: listeners attach synchronously in pointerdown (not via
+  // an effect) so fast drags never race React's render. The dragged row is
+  // highlighted via dragOverId; on release the siblings are reordered.
+  function handlePointerDown(e: React.PointerEvent<HTMLSpanElement>) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    setDragging(true);
     setDragOverId(page.id);
+
+    const rowAt = (clientX: number, clientY: number): number | null => {
+      const el = document.elementFromPoint(clientX, clientY);
+      const row = el?.closest?.("[data-page-id]") as HTMLElement | null;
+      const raw = row ? row.getAttribute("data-page-id") : null;
+      const parsed = raw !== null ? Number(raw) : NaN;
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      const id = rowAt(ev.clientX, ev.clientY);
+      if (id !== null) setDragOverId(id);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      const targetId = rowAt(ev.clientX, ev.clientY);
+      const finalTarget = targetId !== null && targetId !== page.id ? targetId : null;
+      cleanup();
+      if (finalTarget === null) return;
+
+      const siblings = getChildren(page.parentId);
+      const draggedPage = pages.find((p) => p.id === page.id);
+      if (!draggedPage) return;
+      const reordered = siblings.filter((p) => p.id !== page.id);
+      const dropIndex = reordered.findIndex((p) => p.id === finalTarget);
+      if (dropIndex < 0) return;
+      reordered.splice(dropIndex, 0, draggedPage);
+      onReorder(page.parentId, reordered.map((p) => p.id));
+    };
+
+    const onCancel = () => cleanup();
+
+    function cleanup() {
+      setDragging(false);
+      setDragOverId(null);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      dragCleanupRef.current = null;
+    }
+
+    dragCleanupRef.current = cleanup;
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
   }
 
-  function handleDragLeave() {
-    setDragOverId(null);
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDragOverId(null);
-    const draggedId = e.dataTransfer.getData("text/plain");
-    if (draggedId === page.id) return;
-    const draggedPage = pages.find((p) => p.id === draggedId);
-    if (!draggedPage) return;
-
-    const reordered = siblings.filter((p) => p.id !== draggedId);
-    const dropIndex = reordered.findIndex((p) => p.id === page.id);
-    reordered.splice(dropIndex, 0, draggedPage);
-
-    onReorder(page.parentId, reordered.map((p) => p.id));
-  }
+  // Ensure listeners are removed if the row unmounts mid-drag.
+  useEffect(() => {
+    return () => {
+      dragCleanupRef.current?.();
+    };
+  }, [setDragOverId]);
 
   const isDragOver = dragOverId === page.id;
 
   function handleMove(direction: "up" | "down") {
+    const siblings = getChildren(page.parentId);
     const reordered = [...siblings];
     const index = reordered.findIndex((p) => p.id === page.id);
     const swap = direction === "up" ? index - 1 : index + 1;
@@ -390,18 +431,12 @@ function PageTreeItem({
   return (
     <li>
       <Box
-        draggable
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        data-page-id={page.id}
         sx={{
-          display: "flex", alignItems: "center", gap: 1, py: 0.5, pl: depth * 16,
-          bgcolor: selectedIds.has(page.id) ? "action.selected" : isDragOver ? "action.hover" : "transparent",
+          display: "flex", alignItems: "center", gap: 1, py: 0.25, pl: depth * 12,
+          bgcolor: selectedIds.has(page.id) ? "action.selected" : dragging ? "action.hover" : isDragOver ? "action.selected" : "transparent",
           borderTop: isDragOver ? 2 : 0,
           borderColor: "primary.main",
-          cursor: "grab",
-          "&:active": { cursor: "grabbing" },
         }}
       >
         <Checkbox
@@ -409,7 +444,20 @@ function PageTreeItem({
           onChange={() => onToggleSelect(page.id)}
           size="small"
         />
-        <DragIndicatorIcon fontSize="small" color="disabled" sx={{ cursor: "grab" }} />
+        <Box
+          component="span"
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            cursor: "grab",
+            touchAction: "none",
+            "&:active": { cursor: "grabbing" },
+            opacity: dragging ? 0.6 : 1,
+          }}
+          onPointerDown={handlePointerDown}
+        >
+          <DragIndicatorIcon fontSize="small" color="disabled" />
+        </Box>
         <IconButton size="small" onClick={() => handleMove("up")} aria-label={`Move ${page.title} up`}>
           <ArrowUpwardIcon fontSize="small" />
         </IconButton>

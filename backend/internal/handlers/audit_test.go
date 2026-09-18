@@ -2,8 +2,10 @@ package handlers_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"omoikane-backend/internal/handlers"
@@ -99,6 +101,42 @@ func TestGetAuditLogs_FilterByEntity(t *testing.T) {
 	logs := result["logs"].([]interface{})
 	if len(logs) != 2 {
 		t.Fatalf("Expected 2 user logs, got %d", len(logs))
+	}
+}
+
+func TestGetAuditLogs_ProxiesToAuditService(t *testing.T) {
+	db := setupTestDB(t)
+	createTestUser(db, "Admin", "admin@test.com", "pass", "admin")
+
+	// Fake audit microservice that records the forwarded query string and
+	// returns canned logs (the real service owns the omoikane_audit DB).
+	var gotQuery string
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"logs":[{"id":7,"action":"create","entityType":"user"}],"total":1}`)
+	}))
+	defer fake.Close()
+
+	h := &handlers.Handler{DB: db, JWTSecret: testJWTSecret, AuditServiceURL: fake.URL}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /auth/login", h.Login)
+	mux.HandleFunc("GET /audit-logs", h.Admin(h.GetAuditLogs))
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	cookie := loginAs(t, server, "admin@test.com", "pass")
+	resp := authenticatedRequest(t, "GET", server.URL+"/audit-logs?entity=user&search=Admin&limit=50", "", cookie)
+	if resp.StatusCode != 200 {
+		t.Fatalf("Expected 200, got %d", resp.StatusCode)
+	}
+
+	body := readBody(t, resp)
+	if !strings.Contains(body, `"action":"create"`) {
+		t.Fatalf("Expected proxied audit payload, got: %s", body)
+	}
+	if gotQuery != "entity=user&search=Admin&limit=50" {
+		t.Fatalf("Expected query forwarded as-is, got %q", gotQuery)
 	}
 }
 

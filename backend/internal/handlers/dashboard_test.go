@@ -131,13 +131,31 @@ func TestDashboardStats_ReturnsRecentData(t *testing.T) {
 
 	data := decodeJSON(t, readBody(t, resp))
 
-	// recentRegistrations should have entries (not empty array)
+	// recentRegistrations should be the 7-day chart shape [{date, count}]
 	registrations, ok := data["recentRegistrations"].([]interface{})
 	if !ok {
 		t.Fatalf("Expected recentRegistrations to be array, got %T", data["recentRegistrations"])
 	}
-	if len(registrations) == 0 {
-		t.Error("Expected recentRegistrations to be non-empty")
+	if len(registrations) != 7 {
+		t.Fatalf("Expected 7 registration days, got %d", len(registrations))
+	}
+	for _, entry := range registrations {
+		day, ok := entry.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected each registration entry to be an object, got %T", entry)
+		}
+		if day["date"] == nil || day["date"] == "" {
+			t.Errorf("Expected a non-empty date in registration entry, got %v", day["date"])
+		}
+		if _, hasCount := day["count"]; !hasCount {
+			t.Errorf("Expected a count in registration entry, got %v", day)
+		}
+	}
+
+	// All 3 test users were created today, so today's tally must be 3.
+	lastDay := registrations[len(registrations)-1].(map[string]interface{})
+	if lastDay["count"] != float64(3) {
+		t.Errorf("Expected today's registration count 3, got %v", lastDay["count"])
 	}
 
 	// recentMessages should have entries

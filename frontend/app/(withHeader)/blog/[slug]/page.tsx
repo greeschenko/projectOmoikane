@@ -43,6 +43,8 @@ export default async function BlogPostPage({
           likeCount: post.likeCount as number,
           createdAt: post.createdAt as string,
           authorName: post.authorName as string | undefined,
+          tags: (post.tags as string[] | undefined) || [],
+          categoryId: (post.categoryId as string | null | undefined) || null,
         }}
         canEdit={canEdit}
       />
