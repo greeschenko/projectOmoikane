@@ -81,7 +81,11 @@ func (h *Handler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 			item.ThumbPath = thumb
 		}
 	}
-	h.DB.Create(&item)
+	if err := h.createMediaAndEmit(r.Context(), &item); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save media"})
+		return
+	}
 
 	encoded := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data)
 

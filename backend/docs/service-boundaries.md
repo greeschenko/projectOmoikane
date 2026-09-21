@@ -116,8 +116,8 @@ decision deferred to Phase 31; contract unchanged meanwhile.
 |---|---|---|
 | `/api/audit/` | audit-service:8081 | quit (audit moves to `/api/audit-logs` route + events) |
 | `/api/auth/...`, `/api/users*`, `/api/api-tokens*`, `/api/setup*`, `/api/settings/profile`, `/api/settings/password` | **auth-service:8082** (Phase 29) | auth-service |
-| `/api/pages*`, `/api/blog*` | backend:8080 | content-service |
-| `/api/media*` | backend:8080 | media-service |
+| `/api/pages*`, `/api/admin/blog/`, `/api/blog*` | **content-service:8083** (Phase 30) | content-service |
+| `/api/media*`, `/media/` (file serving) | **media-service:8084** (Phase 30) | media-service |
 | `/api/contact*`, `/api/contacts*`, `/api/messages*` | backend:8080 | messages-service |
 | `/api/settings`, `/api/settings/*` (site) | backend:8080 | settings-service |
 | `/api/audit-logs` | backend:8080 (proxy) | audit-service |
@@ -127,8 +127,27 @@ decision deferred to Phase 31; contract unchanged meanwhile.
 
 **Phase 29 status (Wave 1):** the `auth_service` upstream now points at the
 `auth-service` process (`:8082`). Everything else is still `backend:8080`.
-Phases 30–31 flip the remaining targets per service, gated by the full
-Playwright suite.
+
+**Phase 30 status (Wave 2):** `content_service` → `content-service:8083`
+(pages + blog), `media_service` → `media-service:8084` (media CRUD + file
+serving). The `/media/` rich-text location flips to media-service too (full path,
+no URI rewrite). Remaining targets still `backend:8080` flip in Phase 31.
+
+**Gateway note — `/api/admin/blog/` needs its own location:** `/api/admin/blog/posts`
+does NOT match the trailing-slash `location /api/blog/` prefix (it fell to
+`location /api/` → monolith). Phase 30 adds `location /api/admin/blog/` mapping to
+`content_service/admin/blog/`.
+
+**Wave 2 store split — process split, shared store:** like auth-service, both
+content-service and media-service are separate processes over the same Postgres
+`omoikane` store and the shared uploads disk (`../backend:/app` bind in every
+container → `backend/uploads`). The monolith still reads content/media data (SSR,
+trash, dashboard) and serves the `/media/*` records list for trash, so physical
+partition stays deferred to Phase 31. Events stay single-writer: `content-service`
+emits `page.published`/`post.published`, `media-service` emits `media.uploaded`,
+monolith `Handler.Outbox` remains nil. Content-service also wires the shared
+Redis (`REDIS_URL=redis://redis:6379/0`) so its `flushCache()` (FlushDB)
+invalidates the monolith SSR cache and vice versa.
 
 **Wave 1 store split — process split, shared store:** `auth-service` is its own
 process but connects to the same Postgres `omoikane` store as the monolith. The

@@ -274,14 +274,10 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		CategoryID:    req.CategoryID,
 	}
 
-	h.DB.Create(&post)
-
-	// Associate tags
-	for _, tagName := range req.Tags {
-		var tag models.Tag
-		if err := h.DB.Where("name = ?", tagName).First(&tag).Error; err == nil {
-			h.DB.Model(&post).Association("Tags").Append(&tag)
-		}
+	if err := h.createPostAndEmit(r.Context(), &post, req.Tags); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create post"})
+		return
 	}
 
 	var actorName string
@@ -376,22 +372,13 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 		updates["category_id"] = *req.CategoryID
 	}
 
-	if len(updates) > 0 {
-		h.DB.Model(&post).Updates(updates)
+	updated, err2 := h.updatePostAndEmit(r.Context(), post, updates, req.Tags)
+	if err2 != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to update post"})
+		return
 	}
-
-	if req.Tags != nil {
-		h.DB.First(&post, id)
-		h.DB.Model(&post).Association("Tags").Clear()
-		for _, tagName := range req.Tags {
-			var tag models.Tag
-			if err := h.DB.Where("name = ?", tagName).First(&tag).Error; err == nil {
-				h.DB.Model(&post).Association("Tags").Append(&tag)
-			}
-		}
-	}
-
-	h.DB.First(&post, id)
+	post = updated
 
 	actorID := middleware.GetUserID(r)
 	var actorName string
@@ -501,7 +488,11 @@ func (h *Handler) BatchPosts(w http.ResponseWriter, r *http.Request) {
 	case "delete":
 		h.DB.Delete(&models.BlogPost{}, req.IDs)
 	case "publish":
-		h.DB.Model(&models.BlogPost{}).Where("id IN ?", req.IDs).Update("status", "published")
+		if err := h.publishPostsAndEmit(r.Context(), req.IDs); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to publish posts"})
+			return
+		}
 	case "draft":
 		h.DB.Model(&models.BlogPost{}).Where("id IN ?", req.IDs).Update("status", "draft")
 	default:

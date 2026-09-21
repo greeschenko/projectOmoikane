@@ -1,0 +1,196 @@
+// Command content is the Omoikane content service (Phase 30, Wave 2).
+//
+// It owns the pages + blog surface that was previously served by the monolith
+// (cmd/api): pages (list/slug/detail/create/update/delete/reorder/batch), blog
+// posts, tags and categories. The nginx gateway routes /api/pages* and
+// /api/blog* here.
+//
+// Store split (Wave 2): "process split, shared store". The content service is
+// its own process (CONTENT_PORT, default 8083) but connects to the same
+// Postgres `omoikane` store as the monolith and auth service, because the
+// monolith still reads content data (public SSR fetches, dashboard, trash)
+// until the Phase 31 aggregator work. A physical schema partition is deferred.
+//
+// Events: content is the single writer of content events. It wires the Phase 28
+// outbox (page/post writes enqueue inside the business transaction) and runs a
+// Relay that publishes page.published / post.published CloudEvents to Kafka.
+// The monolith deliberately leaves its own outbox nil, so there is never double
+// emission. Kafka being unreachable must not fatal the service: topic
+// provisioning is best-effort and the relay keeps retrying pending rows.
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"omoikane-backend/internal/cache"
+	"omoikane-backend/internal/events"
+	"omoikane-backend/internal/handlers"
+	"omoikane-backend/internal/middleware"
+	"omoikane-backend/internal/models"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+func main() {
+	dsn := os.Getenv("CONTENT_DATABASE_URL")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable"
+	}
+	port := os.Getenv("CONTENT_PORT")
+	if port == "" {
+		port = "8083"
+	}
+
+	var err error
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn),
+	})
+	if err != nil {
+		log.Fatalf("content-service: failed to connect to database: %v", err)
+	}
+
+	// Migrate only the content tables owned (Wave 2: shared store) by content:
+	// pages, blog posts, tags, categories, likes and the tag join model. The
+	// outbox table ships with it.
+	if err := db.AutoMigrate(
+		&models.Page{},
+		&models.BlogPost{},
+		&models.Tag{},
+		&models.BlogPostTag{},
+		&models.Category{},
+		&models.Like{},
+	); err != nil {
+		log.Fatalf("content-service: failed to migrate content tables: %v", err)
+	}
+	outbox := events.NewGormOutboxStore(db)
+	if err := events.MigrateOutbox(db); err != nil {
+		log.Fatalf("content-service: failed to migrate outbox: %v", err)
+	}
+	log.Println("content-service connected and migrated (shared omoikane store + outbox)")
+
+	// Events wiring. EnsureTopics is best-effort: if Kafka is down the relay
+	// simply keeps retrying pending outbox rows; the service stays up.
+	eventsCfg := events.ConfigFromEnv()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := events.EnsureTopics(ctx, eventsCfg.Brokers, []string{eventsCfg.Topic, eventsCfg.DLQTopic}); err != nil {
+		log.Printf("WARNING: content-service: ensure kafka topics: %v (relay will retry)", err)
+	}
+	producer, err := events.NewProducer(eventsCfg)
+	if err != nil {
+		log.Printf("WARNING: content-service: kafka producer disabled (%v); outbox rows stay pending", err)
+		producer = nil
+	}
+	if producer != nil {
+		defer producer.Close()
+	}
+
+	h := &handlers.Handler{
+		DB:              db,
+		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-production"),
+		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
+		// Content is the single writer of content events (page.published,
+		// post.published). The outbox store is transactional (handler enqueues
+		// inside the business DB tx); the relay below flushes it to Kafka.
+		Outbox: outbox,
+	}
+
+	// Public GET caches share the monolith's Redis instance, so cache flushes
+	// from either process keep SSR reads (backend:8080) and gateway reads
+	// (content-service) mutually consistent.
+	var c cache.Cache = cache.NoopCache{}
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		if rc, rerr := cache.NewRedis(redisURL, 30*time.Second); rerr != nil {
+			log.Printf("WARNING: content-service: cache disabled (%v)", rerr)
+		} else {
+			c = rc
+		}
+	}
+	h.Cache = c
+
+	// Outbox relay: publishes page.published/post.published to Kafka on an
+	// interval until the process shuts down.
+	if producer != nil {
+		relay := events.NewRelay(outbox, producer, eventsCfg)
+		go relay.Run(ctx)
+	} else {
+		log.Println("WARNING: content-service: outbox relay not started (no producer)")
+	}
+
+	mux := newContentMux(h)
+
+	addr := ":" + port
+	log.Printf("content-service starting on %s", addr)
+	srv := &http.Server{Addr: addr, Handler: mux}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("content-service failed: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("content-service shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("content-service: shutdown error: %v", err)
+	}
+}
+
+// newContentMux registers every content-service route. Mux paths carry NO /api
+// prefix — nginx prefix locations strip the prefix, so /api/pages -> /pages.
+// Exposed as a function so cmd/content tests can exercise the full wiring.
+func newContentMux(h *handlers.Handler) *http.ServeMux {
+	mux := http.NewServeMux()
+	cacheTTL := 30 * time.Second
+
+	// Health (readiness check from Makefile / compose healthcheck)
+	mux.HandleFunc("GET /health", handlers.HealthHandler)
+
+	// Pages
+	mux.HandleFunc("GET /pages", middleware.CacheRead(h.Cache, cacheTTL, h.GetPages))
+	mux.HandleFunc("GET /pages/slug/{slug}", middleware.CacheRead(h.Cache, cacheTTL, h.GetPageBySlug))
+	mux.HandleFunc("GET /pages/{id}", h.GetPage)
+	mux.HandleFunc("POST /pages", h.Auth(h.CreatePage))
+	mux.HandleFunc("PUT /pages/{id}", h.Auth(h.UpdatePage))
+	mux.HandleFunc("DELETE /pages/{id}", h.Auth(h.DeletePage))
+	mux.HandleFunc("POST /pages/batch", h.Auth(h.BatchPages))
+	mux.HandleFunc("PUT /pages/reorder", h.Auth(h.ReorderPages))
+
+	// Blog posts
+	mux.HandleFunc("GET /blog/posts", middleware.CacheRead(h.Cache, cacheTTL, h.GetPosts))
+	mux.HandleFunc("GET /admin/blog/posts", h.Admin(h.GetAdminPosts))
+	mux.HandleFunc("GET /blog/posts/slug/{slug}", middleware.CacheRead(h.Cache, cacheTTL, h.GetPostBySlug))
+	mux.HandleFunc("GET /blog/posts/{id}", h.GetPost)
+	mux.HandleFunc("POST /blog/posts", h.Auth(h.CreatePost))
+	mux.HandleFunc("PUT /blog/posts/{id}", h.Auth(h.UpdatePost))
+	mux.HandleFunc("DELETE /blog/posts/{id}", h.Auth(h.DeletePost))
+	mux.HandleFunc("POST /blog/posts/batch", h.Auth(h.BatchPosts))
+	mux.HandleFunc("POST /blog/posts/{id}/like", h.Auth(h.ToggleLike))
+
+	// Tags + categories
+	mux.HandleFunc("GET /blog/tags", h.GetTags)
+	mux.HandleFunc("POST /blog/tags", h.Admin(h.CreateTag))
+	mux.HandleFunc("DELETE /blog/tags/{id}", h.Admin(h.DeleteTag))
+	mux.HandleFunc("GET /blog/categories", h.GetCategories)
+	mux.HandleFunc("POST /blog/categories", h.Admin(h.CreateCategory))
+	mux.HandleFunc("DELETE /blog/categories/{id}", h.Admin(h.DeleteCategory))
+
+	return mux
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

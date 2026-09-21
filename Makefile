@@ -27,6 +27,24 @@ up:
 		if [ $$i -eq 30 ]; then echo "Auth service not ready after 30s"; exit 1; fi; \
 		sleep 2; \
 	done
+	@echo "Waiting for content service to be ready..."
+	@for i in $$(seq 1 30); do \
+		if curl -s http://localhost:8083/health 2>/dev/null | grep -q '"status":"ok"'; then \
+			echo "Content service ready after $$i seconds"; \
+			break; \
+		fi; \
+		if [ $$i -eq 30 ]; then echo "Content service not ready after 30s"; exit 1; fi; \
+		sleep 2; \
+	done
+	@echo "Waiting for media service to be ready..."
+	@for i in $$(seq 1 30); do \
+		if curl -s http://localhost:8084/health 2>/dev/null | grep -q '"status":"ok"'; then \
+			echo "Media service ready after $$i seconds"; \
+			break; \
+		fi; \
+		if [ $$i -eq 30 ]; then echo "Media service not ready after 30s"; exit 1; fi; \
+		sleep 2; \
+	done
 	@echo "Waiting for frontend to be ready..."
 	@for i in $$(seq 1 60); do \
 		if curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null | grep -q "307\|200"; then \
@@ -48,6 +66,8 @@ reset:
 db-reset: up
 	docker compose -f docker/docker-compose.yml stop audit-service
 	docker compose -f docker/docker-compose.yml stop auth-service
+	docker compose -f docker/docker-compose.yml stop content-service
+	docker compose -f docker/docker-compose.yml stop media-service
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='omoikane' AND pid<>pg_backend_pid();"
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane;"
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "CREATE DATABASE omoikane;"
@@ -56,6 +76,8 @@ db-reset: up
 	docker compose -f docker/docker-compose.yml start audit-service
 	docker compose -f docker/docker-compose.yml restart backend
 	docker compose -f docker/docker-compose.yml restart auth-service
+	docker compose -f docker/docker-compose.yml restart content-service
+	docker compose -f docker/docker-compose.yml restart media-service
 	@echo "Waiting for backend to be ready..."
 	@for i in $$(seq 1 30); do \
 		if curl -s http://localhost:8080/health 2>/dev/null | grep -q '"status":"ok"'; then \
@@ -72,6 +94,24 @@ db-reset: up
 			break; \
 		fi; \
 		if [ $$i -eq 15 ]; then echo "Auth service not ready after 15s"; exit 1; fi; \
+		sleep 2; \
+	done
+	@echo "Waiting for content service to be ready..."
+	@for i in $$(seq 1 15); do \
+		if curl -s http://localhost:8083/health 2>/dev/null | grep -q '"status":"ok"'; then \
+			echo "Content service ready after $$i seconds"; \
+			break; \
+		fi; \
+		if [ $$i -eq 15 ]; then echo "Content service not ready after 15s"; exit 1; fi; \
+		sleep 2; \
+	done
+	@echo "Waiting for media service to be ready..."
+	@for i in $$(seq 1 15); do \
+		if curl -s http://localhost:8084/health 2>/dev/null | grep -q '"status":"ok"'; then \
+			echo "Media service ready after $$i seconds"; \
+			break; \
+		fi; \
+		if [ $$i -eq 15 ]; then echo "Media service not ready after 15s"; exit 1; fi; \
 		sleep 2; \
 	done
 	@echo "Waiting for audit service to be ready..."
@@ -96,18 +136,20 @@ db-reset: up
 	done
 
 go-test:
-	cd backend && go test -v -p 1 ./internal/... ./cmd/auth/...
+	cd backend && go test -v -p 1 ./internal/... ./cmd/auth/... ./cmd/content/... ./cmd/media/...
 
 go-build:
 	cd backend && go build -o bin/api ./cmd/api
 	cd backend && go build -o bin/auth ./cmd/auth
+	cd backend && go build -o bin/content ./cmd/content
+	cd backend && go build -o bin/media ./cmd/media
 
 test: up
 	@echo "Creating test database..."
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -c "DROP DATABASE IF EXISTS omoikane_test;" 2>/dev/null || true
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -c "CREATE DATABASE omoikane_test;" 2>/dev/null || true
 	@echo "Running Go backend tests..."
-	cd backend && TEST_DATABASE_URL="host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane_test sslmode=disable" go test -v -p 1 ./internal/... ./cmd/auth/...
+	cd backend && TEST_DATABASE_URL="host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane_test sslmode=disable" go test -v -p 1 ./internal/... ./cmd/auth/... ./cmd/content/... ./cmd/media/...
 	@echo "Resetting main database for desktop Playwright run..."
 	$(MAKE) db-reset
 	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test --config=e2e/playwright.config.ts --project=desktop

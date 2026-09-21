@@ -220,7 +220,11 @@ func (h *Handler) CreatePage(w http.ResponseWriter, r *http.Request) {
 		PreviewToken:    generatePreviewToken(),
 	}
 
-	h.DB.Create(&page)
+	if err := h.createPageAndEmit(r.Context(), &page); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create page"})
+		return
+	}
 
 	actorID := middleware.GetUserID(r)
 	var actorName string
@@ -322,11 +326,15 @@ func (h *Handler) UpdatePage(w http.ResponseWriter, r *http.Request) {
 		updates["in_menu"] = *req.InMenu
 	}
 
-	if len(updates) > 0 {
-		h.DB.Model(&page).Updates(updates)
+	if len(updates) > 0 || h.Outbox != nil {
+		updated, err := h.updatePageAndEmit(r.Context(), page, updates)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to update page"})
+			return
+		}
+		page = updated
 	}
-
-	h.DB.First(&page, id)
 
 	actorID := middleware.GetUserID(r)
 	var actorName string
@@ -467,7 +475,11 @@ func (h *Handler) BatchPages(w http.ResponseWriter, r *http.Request) {
 	case "delete":
 		h.DB.Delete(&models.Page{}, req.IDs)
 	case "publish":
-		h.DB.Model(&models.Page{}).Where("id IN ?", req.IDs).Update("status", "published")
+		if err := h.publishPagesAndEmit(r.Context(), req.IDs); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to publish pages"})
+			return
+		}
 	case "draft":
 		h.DB.Model(&models.Page{}).Where("id IN ?", req.IDs).Update("status", "draft")
 	default:

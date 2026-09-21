@@ -22,7 +22,7 @@ and Kubernetes.
 - **Frontend:** Next.js 16 (App Router), MUI 9, TipTap (rich text)
 - **Backend:** Go 1.24, GORM, PostgreSQL, JWT (httpOnly cookie auth), Redis cache
 - **Events:** Kafka (single-node KRaft dev default; managed MSK/Confluent for production), CloudEvents 1.0, outbox pattern
-- **Infrastructure (dev):** Docker Compose (nginx gateway, Next.js, Go + Air hot-reload, PostgreSQL, Redis, Kafka, audit + auth services)
+- **Infrastructure (dev):** Docker Compose (nginx gateway, Next.js, Go + Air hot-reload, PostgreSQL, Redis, Kafka, audit + auth + content + media services)
 - **Infrastructure (platform):** minikube/kind locally → Helm chart → any cloud K8s
 - **Testing:** Go tests (`make go-test`) + Playwright desktop & mobile (`make test`) + K8s smoke tests (`make k8s-test`)
 
@@ -60,7 +60,7 @@ and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN
 | 27 — Blueprint & Contract Freeze | ✅ | Go 126 pass; desktop/mobile green; gateway split, Kafka KRaft, CloudEvents catalog |
 | 28 — Event SDK & Outbox | ✅ | Go 129 pass; Kafka round-trip integration tests (producer→consumer, outbox→relay→consumer, DLQ) |
 | 29 — Auth Service (Wave 1) | ✅ | Go 138 pass; gateway routes auth→auth-service; user.registered via outbox→Kafka |
-| 30 — Content + Media Services | 🔲 | — |
+| 30 — Content + Media Services (Wave 2) | ✅ | Go 158 pass; gateway routes content/media→services; page.published/post.published/media.uploaded via outbox→Kafka |
 | 31 — Messages + Settings; Monolith Retired | 🔲 | — |
 | 32 — Real Events Live (audit via Kafka) | 🔲 | — |
 | 33 — Helm Chart + Local K8s | 🔲 | — |
@@ -74,7 +74,7 @@ and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN
 ### Docker (current dev setup)
 
 ```bash
-make dev      # Start Docker services (nginx + frontend + Go + PostgreSQL + Redis + Kafka + audit)
+make up       # Start Docker services (nginx + frontend + Go monolith + PostgreSQL + Redis + Kafka + audit + auth + content + media)
 make go-test  # Run Go backend tests (requires running PostgreSQL)
 make test     # Run full Playwright suite
 ```

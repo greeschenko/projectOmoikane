@@ -1,0 +1,158 @@
+// Command media is the Omoikane media service (Phase 30, Wave 2).
+//
+// It owns the media surface that was previously served by the monolith
+// (cmd/api): upload, list, update (alt), delete, batch and — critically — the
+// CDN-ready public file delivery (GET /media/file/{filename}). The nginx
+// gateway routes /api/media* here and the /media/ location (rich-text <img>
+// URLs) flips to this service too.
+//
+// Store split (Wave 2): "process split, shared store". The media service is its
+// own process (MEDIA_PORT, default 8084) but connects to the same Postgres
+// `omoikane` store as the monolith and auth service, because the monolith still
+// reads media data (SSR media JSON, trash) until the Phase 31 aggregator work.
+// Uploaded files stay on the shared bind-mounted disk (../backend:/app), so
+// ./uploads resolves to the same backend/uploads directory every container sees.
+//
+// Events: media is the single writer of media events. It wires the Phase 28
+// outbox (media upload enqueues inside the business transaction) and runs a
+// Relay that publishes media.uploaded CloudEvents to Kafka. The monolith
+// deliberately leaves its own outbox nil, so there is never double emission.
+// Kafka being unreachable must not fatal the service: topic provisioning is
+// best-effort and the relay keeps retrying pending rows.
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"omoikane-backend/internal/events"
+	"omoikane-backend/internal/handlers"
+	"omoikane-backend/internal/models"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+func main() {
+	dsn := os.Getenv("MEDIA_DATABASE_URL")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable"
+	}
+	port := os.Getenv("MEDIA_PORT")
+	if port == "" {
+		port = "8084"
+	}
+
+	var err error
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn),
+	})
+	if err != nil {
+		log.Fatalf("media-service: failed to connect to database: %v", err)
+	}
+
+	// Migrate only the media tables owned (Wave 2: shared store) by media. The
+	// outbox table ships with it.
+	if err := db.AutoMigrate(&models.MediaItem{}); err != nil {
+		log.Fatalf("media-service: failed to migrate media tables: %v", err)
+	}
+	outbox := events.NewGormOutboxStore(db)
+	if err := events.MigrateOutbox(db); err != nil {
+		log.Fatalf("media-service: failed to migrate outbox: %v", err)
+	}
+	log.Println("media-service connected and migrated (shared omoikane store + outbox)")
+
+	// Events wiring. EnsureTopics is best-effort: if Kafka is down the relay
+	// simply keeps retrying pending outbox rows; the service stays up.
+	eventsCfg := events.ConfigFromEnv()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := events.EnsureTopics(ctx, eventsCfg.Brokers, []string{eventsCfg.Topic, eventsCfg.DLQTopic}); err != nil {
+		log.Printf("WARNING: media-service: ensure kafka topics: %v (relay will retry)", err)
+	}
+	producer, err := events.NewProducer(eventsCfg)
+	if err != nil {
+		log.Printf("WARNING: media-service: kafka producer disabled (%v); outbox rows stay pending", err)
+		producer = nil
+	}
+	if producer != nil {
+		defer producer.Close()
+	}
+
+	h := &handlers.Handler{
+		DB:              db,
+		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-production"),
+		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
+		UploadDir:       getEnv("UPLOAD_DIR", "./uploads"),
+		MediaBaseURL:    getEnv("MEDIA_BASE_URL", ""),
+		// Media is the single writer of media events (media.uploaded). The
+		// outbox store is transactional (handler enqueues inside the business
+		// DB tx); the relay below flushes it to Kafka.
+		Outbox: outbox,
+	}
+
+	// Outbox relay: publishes media.uploaded to Kafka on an interval until the
+	// process shuts down.
+	if producer != nil {
+		relay := events.NewRelay(outbox, producer, eventsCfg)
+		go relay.Run(ctx)
+	} else {
+		log.Println("WARNING: media-service: outbox relay not started (no producer)")
+	}
+
+	mux := newMediaMux(h)
+
+	addr := ":" + port
+	log.Printf("media-service starting on %s", addr)
+	srv := &http.Server{Addr: addr, Handler: mux}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("media-service failed: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("media-service shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("media-service: shutdown error: %v", err)
+	}
+}
+
+// newMediaMux registers every media-service route. Mux paths carry NO /api
+// prefix — nginx prefix locations strip the prefix, so /api/media -> /media.
+// Exposed as a function so cmd/media tests can exercise the full wiring.
+func newMediaMux(h *handlers.Handler) *http.ServeMux {
+	mux := http.NewServeMux()
+
+	// Health (readiness check from Makefile / compose healthcheck)
+	mux.HandleFunc("GET /health", handlers.HealthHandler)
+
+	// Public CDN-ready file delivery (rich-text <img src="/media/file/...">).
+	mux.HandleFunc("GET /media/file/{filename}", h.ServeMediaFile)
+
+	// Media CRUD (all auth-protected; no public cache on these).
+	mux.HandleFunc("GET /media", h.Auth(h.GetMedia))
+	mux.HandleFunc("POST /media", h.Auth(h.UploadMedia))
+	mux.HandleFunc("GET /media/{id}", h.Auth(h.GetMediaItem))
+	mux.HandleFunc("PUT /media/{id}", h.Auth(h.UpdateMedia))
+	mux.HandleFunc("DELETE /media/{id}", h.Auth(h.DeleteMedia))
+	mux.HandleFunc("POST /media/batch", h.Auth(h.BatchMedia))
+
+	return mux
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

@@ -384,11 +384,12 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] Emits `user.registered` (behind outbox; single-writer — monolith outbox stays nil) from Setup/Register/CreateUser
 - [x] **Gate:** auth/users Go + Playwright specs pass against the gateway (full `make go-test` + `make test`)
 
-## 🔲 Phase 30: Wave 2 Services — Content + Media
-- [ ] `cmd/content`: pages, blog, tags/categories, sitemap, RSS — own schema
-- [ ] `cmd/media`: upload, thumbnails, alt edit, file serving — own schema
-- [ ] Emits `page.published`, `post.published`, `media.uploaded`
-- [ ] **First result #1:** pages/blog/media Playwright specs green against the gateway
+## ✅ Phase 30: Wave 2 Services — Content + Media
+- [x] `cmd/content`: pages, blog, posts, tags, categories — **process split, shared store**
+- [x] `cmd/media`: upload, thumbnails, alt edit, file serving — **process split, shared store**
+- [x] Emits `page.published`, `post.published`, `media.uploaded` (behind outbox; single-writer — monolith outbox stays nil)
+- [x] Gateway: `/api/pages*`, `/api/blog*`, `/api/admin/blog/` → content-service:8083; `/api/media*`, `/media/` → media-service:8084
+- [x] **First result #1:** pages/blog/media Playwright specs green against the gateway (full `make go-test` + `make test`)
 
 ## 🔲 Phase 31: Wave 3 Services — Messages + Settings; Monolith Retired
 - [ ] `cmd/messages`: broadcasts, contact form, notifications — own schema

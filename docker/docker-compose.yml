@@ -9,6 +9,8 @@ services:
       - frontend
       - audit-service
       - auth-service
+      - content-service
+      - media-service
 
   kafka:
     image: apache/kafka:3.9.0
@@ -124,6 +126,78 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8082/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Wave 2 content service (Phase 30): separate process, shared Postgres store
+  # with the monolith until the Phase 31 aggregator work. Owns pages + blog
+  # (posts/tags/categories); gateway flips /api/pages*, /api/blog/* and
+  # /api/admin/blog/* here. Emits page.published / post.published via the
+  # outbox -> Kafka relay. Shares the monolith's Redis so cache flushes stay
+  # consistent across SSR (backend:8080) and gateway reads.
+  content-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/content
+    ports:
+      - "8083:8083"
+    environment:
+      - CONTENT_PORT=8083
+      - CONTENT_DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable
+      - JWT_SECRET=dev-secret-change-in-production
+      - AUDIT_SERVICE_URL=http://audit-service:8081
+      - REDIS_URL=redis://redis:6379/0
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_EVENTS_TOPIC=omoikane.events
+      - KAFKA_DLQ_TOPIC=omoikane.events.dlq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8083/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Wave 2 media service (Phase 30): separate process, shared Postgres store +
+  # shared uploads disk (../backend:/app bind mounts both containers at the same
+  # backend/uploads directory). Owns media CRUD + CDN-ready file delivery;
+  # gateway flips /api/media* and /media/ here. Emits media.uploaded via the
+  # outbox -> Kafka relay.
+  media-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/media
+    ports:
+      - "8084:8084"
+    environment:
+      - MEDIA_PORT=8084
+      - MEDIA_DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable
+      - JWT_SECRET=dev-secret-change-in-production
+      - AUDIT_SERVICE_URL=http://audit-service:8081
+      - UPLOAD_DIR=/app/uploads
+      - MEDIA_BASE_URL=
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_EVENTS_TOPIC=omoikane.events
+      - KAFKA_DLQ_TOPIC=omoikane.events.dlq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8084/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10
