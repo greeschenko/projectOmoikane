@@ -76,8 +76,9 @@
   - Verification: `make go-test` green; full `make test` (desktop + mobile) passes with new e2e coverage (blog chips/filter, editor align buttons, pointer-drag reorder, media upload/insert, favicon)
 
 ## Next Steps
-1. (Optional, from Phase 15) Wire UndoSnackbar into delete flows for undo-toast UX
-2. (Backlog) i18n — see TODO.md Backlog
+1. **Platform roadmap** — Phase 27+: decompose the CMS into event-driven microservices, Kafka backbone, deploy via Helm to K8s (see [PLAN.md](./PLAN.md) for full design; `TODO.md` for phase checklist)
+2. (Optional, from Phase 15) Wire UndoSnackbar into delete flows for undo-toast UX
+3. (Backlog) i18n — see TODO.md Backlog
 
 ## Critical Context
 - **Go tests**: green via `make go-test` (all packages `ok`; Phase 26 adds `TestGetAuditLogs_ProxiesToAuditService`; need running PostgreSQL)

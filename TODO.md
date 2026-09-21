@@ -351,6 +351,87 @@ All 15 issues from the Phase 25 manual review fixed (backend + frontend) and ful
 
 **Test status:** Go suite green (incl. new audit-proxy test); desktop + mobile Playwright regression passes with new Phase 26 coverage — counts tracked in `AGENTS.md`
 
+---
+
+# 🚀 Platform Roadmap — Modular Event-Driven Platform on Kubernetes
+
+The CMS (Phases 1–26) is complete. The project now evolves into a **modular, event-driven platform** that fast-deploys to any cloud Kubernetes with a single `helm install`. Full design, decisions (D1–D10), target architecture, and gate criteria: see [PLAN.md](./PLAN.md).
+
+**Direction (locked):** decompose the monolith into microservices · Kafka event backbone (KRaft default, managed overridable) · CloudEvents 1.0 · outbox pattern · cloud-agnostic Helm chart · GitHub Actions CI · minikube (local) + kind (CI) · flagship demo = webhook module.
+
+**Waves:** Wave 1 — everything in Docker (prove the architecture). Wave 2 — Kubernetes (pure deployment move). Wave 3 — cloud + CI (fast-deploy story).
+
+## ⬜ Wave 1 — Docker: Decomposition & Event-Driven Core
+
+## 🔲 Phase 27: Blueprint & Contract Freeze
+- [ ] Service boundary map — route→service table (auth / content / media / messages / settings / audit)
+- [ ] Monorepo layout: `backend/cmd/<service>`; new `backend/internal/events`
+- [ ] CloudEvents schema catalog (`internal/events/schemas/*.json`)
+- [ ] docker-compose: add Kafka (single-node KRaft); nginx route-split gateway config
+- [ ] **Gate:** all Go + Playwright tests still green (contract unchanged)
+
+## 🔲 Phase 28: Event SDK & Outbox Infrastructure
+- [ ] `internal/events`: CloudEvents producer/consumer, consumer groups, DLQ, outbox table + relay worker
+- [ ] **Gate:** integration test — event round-trips Kafka in compose
+
+## 🔲 Phase 29: Wave 1 Services — Auth
+- [ ] `cmd/auth`: setup, auth, users CRUD, roles, API tokens, profile — own DB schema
+- [ ] Gateway routes `/api/auth*`, `/api/users*`, `/api-tokens*` → auth
+- [ ] Emits `user.registered` (behind outbox)
+- [ ] **Gate:** auth/users Go + Playwright specs pass against the gateway
+
+## 🔲 Phase 30: Wave 2 Services — Content + Media
+- [ ] `cmd/content`: pages, blog, tags/categories, trash, sitemap, RSS — own schema
+- [ ] `cmd/media`: upload, thumbnails, alt edit, file serving — own schema
+- [ ] Emits `page.published`, `post.published`, `media.uploaded`
+- [ ] **First result #1:** pages/blog/media Playwright specs green against the gateway
+
+## 🔲 Phase 31: Wave 3 Services — Messages + Settings; Monolith Retired
+- [ ] `cmd/messages`: broadcasts, contact form, notifications — own schema
+- [ ] `cmd/settings`: site settings, email templates — own schema
+- [ ] Dashboard becomes an aggregator (internal fetches)
+- [ ] Delete `cmd/api` monolith; migrate Redis public cache per service
+- [ ] **First result #2:** full Go + Playwright green; zero monolith; every request through gateway → microservice
+
+## 🔲 Phase 32: Real Events Live
+- [ ] Outbox relays publish real domain events on writes
+- [ ] `cmd/audit` switches from HTTP proxy to Kafka consumer
+- [ ] Event catalog in Swagger + `docs/events.md`
+- [ ] **Gate:** e2e — publish post → audit entry arrives via event (not HTTP)
+
+## ⬜ Wave 2 — Kubernetes: Pure Deployment Move
+
+## 🔲 Phase 33: Helm Chart v1 + Local Cluster
+- [ ] Umbrella chart `charts/omoikane` (all services + kafka + postgres + redis + gateway/ingress)
+- [ ] `make k8s-up` (minikube) + `make k8s-test` (Playwright against cluster)
+- [ ] Values files: `values.yaml`, `values-minikube.yaml`, `values-kind.yaml`
+- [ ] **First result #3:** `helm install omoikane` on minikube → CMS fully functional
+
+## 🔲 Phase 34: Observability & Ops Hardening
+- [ ] Liveness/readiness probes everywhere
+- [ ] Prometheus metrics, OTel tracing (optional), JSON structured logs
+- [ ] Migration `Jobs`, secrets via values, HPA manifests, resource requests
+- [ ] **Gate:** zero-manual-step deploy; failures visible in metrics/logs; restart-safe
+
+## 🔲 Phase 35: Webhook Module (Flagship Demo)
+- [ ] `cmd/webhooks`: subscription CRUD, admin UI, delivery worker (Kafka consumer)
+- [ ] Retries with exponential backoff, DLQ, delivery-log UI
+- [ ] **Gate:** e2e — publish post → webhook fires with CloudEvents payload; failing endpoint retries with backoff
+
+## ⬜ Wave 3 — Cloud & Scale: Fast-Deploy Story
+
+## 🔲 Phase 36: FIRST RESULT — CI/CD + Cloud Runbooks + Demo
+- [ ] GitHub Actions `deploy.yml`: go-test → Playwright → build/push (GHCR) → helm upgrade
+- [ ] EKS / GKE / AKS runbooks (`docs/cloud/`)
+- [ ] Values for managed Kafka (MSK/Confluent) + managed Postgres (RDS/CloudSQL/Azure DB)
+- [ ] **FIRST RESULT:** fresh cloud cluster → `helm install omoikane` → publish post → webhook delivers to demo sink; all gates green
+
+## 🔲 Phase 37: (optional) Workflow/Automation Module
+- [ ] Event → condition → action rules engine; admin UI; e2e workflow tests
+
+## 🔲 Phase 38: (optional) Multi-Tenancy & Scale Validation
+- [ ] Per-tenant schema separation, tenant-scoped events, HPA stress test
+
 ## 📥 Backlog (parked, not scheduled)
 
 - [ ] i18n / multi-language support — currently deferred; UI-only localization (next-intl + language switcher) is the likely scope if picked up
