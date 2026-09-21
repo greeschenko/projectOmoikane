@@ -1,6 +1,7 @@
 # Omoikane — Project Context for AI Agents
 
 ## Goal
+- Phase 28 (event SDK & outbox infrastructure) — DONE
 - Phase 27 (platform blueprint & contract freeze) — DONE
 - Phase 26 (fixes from manual review — 15 issues) — DONE
 - Phase 25 (manual system review) — DONE
@@ -12,7 +13,7 @@
 - Phase 19 (OpenAPI docs + public Swagger UI) — DONE
 
 ## Constraints & Preferences
-- `make go-test` to verify all Go tests pass (126 tests: 109 handler + 9 middleware + 2 mailer + 3 database + 3 events; need running PostgreSQL)
+- `make go-test` to verify all Go tests pass (129 tests: 106 handler + 9 middleware + 2 mailer + 3 database + 9 events; need running PostgreSQL; Kafka integration tests skip cleanly when the broker is not reachable)
 - `make swagger` regenerates both OpenAPI doc sets via swag (main + audit; run before committing if handler annotations changed)
 - Public Swagger UI: `/api/swagger/` (main API) and `/api/audit/swagger/` (audit microservice); nginx `proxy_redirect /swagger/` rewrites the trailing-slash redirect so prefixed URLs resolve
 - `make test` for full Playwright suite (desktop + mobile); DB reset twice: before desktop, between desktop and mobile
@@ -81,17 +82,23 @@
   - docker-compose: `kafka` service (apache/kafka:3.9.0, single-node KRaft, `kafka-data` volume, healthcheck)
   - nginx gateway: route-split blueprint — per-service `upstream` blocks + `location` blocks, ALL still → monolith (contract unchanged); Phases 29–31 flip `proxy_pass` hosts. Nginx prefix→URI semantics preserve `/api`-stripping (`/api/trash/page/5/restore` → `/trash/page/5/restore`)
   - Verification: `make go-test` green (126); spot-checked every route group through the gateway (401 on protected, 200 on public, swagger UI + audit swagger reachable); full `make test` gate green
+- **Phase 28**: Event SDK & outbox infrastructure — 129/129 Go tests pass (committed `7d8ba20`)
+  - `backend/internal/events/`: Kafka-backed `Producer` (CloudEvents → topic, key=subject, `RequiredAcks=RequireAll`), `Consumer` (consumer groups, retry + backoff, DLQ routing with `ce-type` header preservation), `Handler`/`HandlerFunc`, `OutboxEvent` model + `GormOutboxStore` (enqueue inside business tx, `Pending`/`MarkSent`/`MarkAttempt`), `Relay` worker (interval + batch), `EnsureTopics`/`EnsureTopic` idempotent topic provisioning, `Config`/`ConfigFromEnv` (`KAFKA_BROKERS`/`KAFKA_EVENTS_TOPIC`/`KAFKA_DLQ_TOPIC`), `MarshalCloudEvent`/`UnmarshalCloudEvent`
+  - Outbox DB ops use the main test DB (`omoikane_test`); outbox migrations not yet wired into the monolith (Phase 29+ services provision their own schema + call `EnsureTopics` at startup)
+  - Kafka integration tests (`kafka_integration_test.go`): producer→consumer-group ack, outbox→relay→consumer end-to-end, DLQ on handler failure — skip cleanly when broker unreachable (host `localhost:9092`); `go.mod` adds `github.com/segmentio/kafka-go v0.4.51`
+  - Verification: `make go-test` green (129: 106 handler + 9 events + 9 middleware + 3 database + 2 mailer)
 
 ## Next Steps
-1. **Phase 28** — Event SDK & outbox infrastructure: `internal/events` producer/consumer (consumer groups, DLQ), outbox table + relay worker; gate = integration test round-tripping Kafka in compose (see [PLAN.md](./PLAN.md); `TODO.md` for phase checklist)
+1. **Phase 29** — Wave 1 auth service: `cmd/auth` own DB schema, gateway routes `/api/auth*`, `/api/users*`, `/api-tokens*` → auth; emits `user.registered` behind the outbox (see [PLAN.md](./PLAN.md); `TODO.md` for phase checklist)
 2. (After Phase 31) Monolith `cmd/api` retired — every request flows gateway → microservice
 3. (Optional, from Phase 15) Wire UndoSnackbar into delete flows for undo-toast UX
 4. (Backlog) i18n — see TODO.md Backlog
 
 ## Critical Context
 - **Gateway route-split** (Phase 27): nginx uses per-service `upstream` blocks + prefix `location`s, ALL still → monolith today. Nginx prefix-location semantics REPLACE the matched prefix with the `proxy_pass` URI — keep the trailing-slash/`$is_args$args` shapes from `service-boundaries.md` §5 when flipping hosts in Phases 29–31. `location = /api/audit-logs` is an exact match (no trailing slash greediness).
-- **Kafka**: `kafka` service in compose — `apache/kafka:3.9.0`, single-node KRaft (`KAFKA_PROCESS_ROLES: broker,controller`, `CLUSTER_ID`), auto-creates topics, exposed on `localhost:9092`. Inside compose, other services reach it at `kafka:9092`.
-- **Go tests**: green via `make go-test` (all packages `ok`; Phase 26 adds `TestGetAuditLogs_ProxiesToAuditService`; Phase 27 adds `internal/events` tests — envelope round-trip + schema catalog; need running PostgreSQL)
+- **Kafka**: `kafka` service in compose — `apache/kafka:3.9.0`, single-node KRaft (`KAFKA_PROCESS_ROLES: broker,controller`, `CLUSTER_ID`), auto-creates topics, exposed on `localhost:9092`. Inside compose, other services reach it at `kafka:9092`. The events SDK does NOT rely on broker auto-create for correctness: services call `EnsureTopics` at startup (idempotent) so the first publish can never race topic creation.
+- **Events SDK (`github.com/segmentio/kafka-go`)**: producer writes sync (`RequireAll`), `BatchTimeout 50ms`; consumer uses `MaxWait 500ms`, manual commits, at-least-once + DLQ (raw message + `ce-type` header preserved) after `ConsumerMaxRetries`. Outbox = transactional append (enqueue inside the business GORM tx); `Relay` polls `RelayBatchSize`/`RelayInterval` and marks rows sent/failed (`OutboxMaxAttempts`). At-least-once everywhere → **handlers must be idempotent**.
+- **Go tests**: green via `make go-test` — 129 tests (106 handler + 9 events + 9 middleware + 2 mailer + 3 database). Phase 26 adds `TestGetAuditLogs_ProxiesToAuditService`; Phase 27 adds envelope round-trip + schema catalog; Phase 28 adds outbox store (3) + Kafka integration tests (3: round-trip ack, outbox→relay→consumer, DLQ) that `t.Skip` if the broker is unreachable. Need running PostgreSQL (`omoikane_test`).
 - **Desktop Playwright**: 276/276 pass, 8 skipped — 0 failures (Phase 26 adds 4 tests: drag reorder, blog chips/filter, blog detail chips, api-tokens hydration-race guard; Phase 24 added a11y spec)
 - **Mobile Playwright**: 275/275 pass, 9 skipped — 0 failures (Phase 26 adds drag reorder, blog chips/filter, blog detail chips; Phase 24 added a11y spec)
 - **Test DB connections**: `setupTestDB` caps pool (MaxOpenConns 3) + closes via `t.Cleanup` — prevents "too many clients" with Postgres' default 100-connection limit
@@ -186,6 +193,17 @@
 - `docker/docker-compose.yml`: `kafka` service (apache/kafka:3.9.0 KRaft single-node, advertised `localhost:9092`, `kafka-data` volume, topics healthcheck)
 - `docker/nginx/nginx.conf`: route-split gateway blueprint — per-service `upstream` blocks (`auth_service`…`trash_service`) + `location` blocks, all targets still `backend:8080` except `/api/audit/` → `audit-service:8081`
 
+### Phase 28 files
+- `backend/internal/events/config.go` (new): `Config` + `ConfigFromEnv` (KAFKA_*), `DefaultTopic`/`DefaultDLQTopic`
+- `backend/internal/events/producer.go` (new): `Producer` interface + `KafkaProducer` (`MarshalCloudEvent`/`UnmarshalCloudEvent` shared helpers)
+- `backend/internal/events/consumer.go` (new): `Consumer` (consumer groups, retry+backoff, DLQ), `Handler`/`HandlerFunc`
+- `backend/internal/events/outbox.go` (new): `OutboxEvent` model + `OutboxStore` interface + `GormOutboxStore` + `MigrateOutbox`
+- `backend/internal/events/relay.go` (new): `Relay` worker (`Run`/`RunOnce`, interval + batch)
+- `backend/internal/events/admin.go` (new): `EnsureTopic`/`EnsureTopics` idempotent provisioning
+- `backend/internal/events/outbox_test.go` (new): 3 outbox store tests (enqueue/pending/mark-sent, attempt exhaustion, marshal round-trip)
+- `backend/internal/events/kafka_integration_test.go` (new): 3 Kafka integration tests (round-trip ack, outbox→relay→consumer, DLQ)
+- `backend/go.mod`/`go.sum`: added `github.com/segmentio/kafka-go v0.4.51`
+
 ### Documentation
 - `AGENTS.md`: This file
-- `TODO.md`: Phase 27 completed; Phase 28 next; i18n in Backlog
+- `TODO.md`: Phase 28 completed; Phase 29 next; i18n in Backlog

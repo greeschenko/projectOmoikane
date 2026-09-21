@@ -3,7 +3,20 @@
 // by producers (outbox relays) and consumers (audit, webhooks, workflows).
 //
 // Phase 27 scope: contract freeze only (types + schema catalog).
-// Phase 28 adds the outbox relay, producer and consumer implementations.
+// Phase 28 adds the SDK around it:
+//
+//   - Producer / KafkaProducer — publish an envelope to the events topic.
+//   - Consumer — consumer-group member with retries + DLQ routing.
+//   - OutboxEvent + GormOutboxStore — transactional outbox (append inside the
+//     business DB transaction).
+//   - Relay — interval/batch worker that moves outbox rows to Kafka.
+//   - EnsureTopics — idempotent startup provisioning for a service's topic
+//     and DLQ topic. Services MUST call this before starting their producer /
+//     consumer so the first publish cannot race broker topic creation.
+//
+// Delivery is at-least-once end to end: the relay may republish an event after
+// a crash between Kafka ack and MarkSent, and consumers commit only after a
+// handler succeeds or the event is dead-lettered. Handlers must be idempotent.
 package events
 
 import (

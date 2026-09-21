@@ -58,7 +58,7 @@ and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN
 | 16 — Manual Testing Session | 🔲 | — |
 | 17–26 — Bug fixes, audit microservice, OpenAPI, API tokens, Redis cache, CDN-ready media, a11y, manual review fix pass | ✅ | Go green; desktop 276/276; mobile 275/275 |
 | 27 — Blueprint & Contract Freeze | ✅ | Go 126 pass; desktop/mobile green; gateway split, Kafka KRaft, CloudEvents catalog |
-| 28 — Event SDK & Outbox | 🔲 | — |
+| 28 — Event SDK & Outbox | ✅ | Go 129 pass; Kafka round-trip integration tests (producer→consumer, outbox→relay→consumer, DLQ) |
 | 29 — Auth Service | 🔲 | — |
 | 30 — Content + Media Services | 🔲 | — |
 | 31 — Messages + Settings; Monolith Retired | 🔲 | — |

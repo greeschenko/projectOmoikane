@@ -68,10 +68,11 @@ Flagship demo = webhook module. First result = working platform on a fresh clust
 - docker-compose: add Kafka (single-node KRaft); add route-split gateway config in nginx
 - **Gate:** all Go + Playwright tests still green (contract unchanged)
 
-#### Phase 28 — Event SDK & outbox infrastructure
+#### Phase 28 — Event SDK & outbox infrastructure ✅ (DONE)
 - `internal/events`: CloudEvents envelope, producer, consumer (consumer groups),
   DLQ handling, outbox table + relay worker (interval, batch), config
-- **Gate:** integration test — event round-trips Kafka in compose; relay publishes, consumer acks
+- idempotent topic provisioning (`EnsureTopics`) so first publish never races broker auto-create
+- **Gate:** integration test — event round-trips Kafka in compose; relay publishes, consumer acks (3 integration tests: producer→consumer ack, outbox→relay→consumer, DLQ on handler failure; skip cleanly when broker unreachable)
 
 #### Phase 29 — Wave 1 services: auth
 - `cmd/auth`: setup, login/register/logout, forgot/reset password, users CRUD,

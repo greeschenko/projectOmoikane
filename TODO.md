@@ -370,9 +370,13 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] docker-compose: add Kafka (single-node KRaft, apache/kafka:3.9.0); nginx route-split gateway config (per-service upstreams, all → monolith today)
 - [x] **Gate:** all Go + Playwright tests still green (126 Go; desktop 276/276; mobile 275/275)
 
-## 🔲 Phase 28: Event SDK & Outbox Infrastructure
-- [ ] `internal/events`: CloudEvents producer/consumer, consumer groups, DLQ, outbox table + relay worker
-- [ ] **Gate:** integration test — event round-trips Kafka in compose
+## ✅ Phase 28: Event SDK & Outbox Infrastructure
+- [x] `internal/events` SDK: `Config`/`ConfigFromEnv` (KAFKA_* env), `Producer`/`KafkaProducer` (CloudEvents → Kafka, key=subject, `RequireAll`), `Consumer` (consumer groups, retry+backoff, DLQ routing), `Handler`/`HandlerFunc`
+- [x] Transactional outbox: `OutboxEvent` model + `GormOutboxStore` (`Enqueue`/`Pending`/`MarkSent`/`MarkAttempt`) + `MigrateOutbox`
+- [x] `Relay` worker — interval + batch (`RelayBatchSize`/`RelayInterval`), marks rows sent/failed; `RunOnce` for tests
+- [x] `EnsureTopics`/`EnsureTopic` admin provisioning (idempotent) — services call at startup so first publish never races broker topic creation
+- [x] **Gate:** integration tests round-trip Kafka in compose — producer→consumer-group ack, outbox→relay→consumer, DLQ on handler failure (skip cleanly when Kafka is down)
+- [x] Docs/AGENTS/README updated; Go suite 129 tests green (106 handler + 9 events + 9 middleware + 3 database + 2 mailer)
 
 ## 🔲 Phase 29: Wave 1 Services — Auth
 - [ ] `cmd/auth`: setup, auth, users CRUD, roles, API tokens, profile — own DB schema
