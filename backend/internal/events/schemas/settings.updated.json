@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "org.omoikane.settings.updated.v1",
+  "title": "Site Settings Updated",
+  "type": "object",
+  "description": "Emitted by settings-service when site settings are changed.",
+  "properties": {
+    "siteName": { "type": "string" },
+    "tagline": { "type": ["string", "null"] },
+    "blogEnabled": { "type": "boolean" }
+  },
+  "required": ["siteName", "blogEnabled"]
+}

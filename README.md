@@ -57,7 +57,7 @@ and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN
 | 15 — Trash System & Bulk Actions | ✅ | 249/249 pass, 82 Go pass |
 | 16 — Manual Testing Session | 🔲 | — |
 | 17–26 — Bug fixes, audit microservice, OpenAPI, API tokens, Redis cache, CDN-ready media, a11y, manual review fix pass | ✅ | Go green; desktop 276/276; mobile 275/275 |
-| 27 — Blueprint & Contract Freeze | 🔲 | — |
+| 27 — Blueprint & Contract Freeze | ✅ | Go 126 pass; desktop/mobile green; gateway split, Kafka KRaft, CloudEvents catalog |
 | 28 — Event SDK & Outbox | 🔲 | — |
 | 29 — Auth Service | 🔲 | — |
 | 30 — Content + Media Services | 🔲 | — |
@@ -74,7 +74,7 @@ and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN
 ### Docker (current dev setup)
 
 ```bash
-make dev      # Start Docker services (nginx + frontend + Go + PostgreSQL)
+make dev      # Start Docker services (nginx + frontend + Go + PostgreSQL + Redis + Kafka + audit)
 make go-test  # Run Go backend tests (requires running PostgreSQL)
 make test     # Run full Playwright suite
 ```

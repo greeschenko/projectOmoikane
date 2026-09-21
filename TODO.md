@@ -363,12 +363,12 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 
 ## ⬜ Wave 1 — Docker: Decomposition & Event-Driven Core
 
-## 🔲 Phase 27: Blueprint & Contract Freeze
-- [ ] Service boundary map — route→service table (auth / content / media / messages / settings / audit)
-- [ ] Monorepo layout: `backend/cmd/<service>`; new `backend/internal/events`
-- [ ] CloudEvents schema catalog (`internal/events/schemas/*.json`)
-- [ ] docker-compose: add Kafka (single-node KRaft); nginx route-split gateway config
-- [ ] **Gate:** all Go + Playwright tests still green (contract unchanged)
+## ✅ Phase 27: Blueprint & Contract Freeze
+- [x] Service boundary map — route→service table (auth / content / media / messages / settings / audit / trash / dashboard) → `backend/docs/service-boundaries.md`
+- [x] Monorepo layout: `backend/cmd/<service>` convention documented in boundary map; new `backend/internal/events`
+- [x] CloudEvents schema catalog (`internal/events/schemas/*.json`, 10 event types) + envelope Go types + 3 tests
+- [x] docker-compose: add Kafka (single-node KRaft, apache/kafka:3.9.0); nginx route-split gateway config (per-service upstreams, all → monolith today)
+- [x] **Gate:** all Go + Playwright tests still green (126 Go; desktop 276/276; mobile 275/275)
 
 ## 🔲 Phase 28: Event SDK & Outbox Infrastructure
 - [ ] `internal/events`: CloudEvents producer/consumer, consumer groups, DLQ, outbox table + relay worker
@@ -381,7 +381,7 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [ ] **Gate:** auth/users Go + Playwright specs pass against the gateway
 
 ## 🔲 Phase 30: Wave 2 Services — Content + Media
-- [ ] `cmd/content`: pages, blog, tags/categories, trash, sitemap, RSS — own schema
+- [ ] `cmd/content`: pages, blog, tags/categories, sitemap, RSS — own schema
 - [ ] `cmd/media`: upload, thumbnails, alt edit, file serving — own schema
 - [ ] Emits `page.published`, `post.published`, `media.uploaded`
 - [ ] **First result #1:** pages/blog/media Playwright specs green against the gateway
@@ -389,6 +389,7 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 ## 🔲 Phase 31: Wave 3 Services — Messages + Settings; Monolith Retired
 - [ ] `cmd/messages`: broadcasts, contact form, notifications — own schema
 - [ ] `cmd/settings`: site settings, email templates — own schema
+- [ ] `cmd/trash`: cross-cutting soft-delete aggregator over all entities (Phase 27 §2)
 - [ ] Dashboard becomes an aggregator (internal fetches)
 - [ ] Delete `cmd/api` monolith; migrate Redis public cache per service
 - [ ] **First result #2:** full Go + Playwright green; zero monolith; every request through gateway → microservice

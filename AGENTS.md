@@ -1,6 +1,7 @@
 # Omoikane — Project Context for AI Agents
 
 ## Goal
+- Phase 27 (platform blueprint & contract freeze) — DONE
 - Phase 26 (fixes from manual review — 15 issues) — DONE
 - Phase 25 (manual system review) — DONE
 - Phase 24 (accessibility) — DONE
@@ -11,7 +12,7 @@
 - Phase 19 (OpenAPI docs + public Swagger UI) — DONE
 
 ## Constraints & Preferences
-- `make go-test` to verify all Go tests pass (123 tests: 109 handler + 9 middleware + 2 mailer + 3 database; need running PostgreSQL)
+- `make go-test` to verify all Go tests pass (126 tests: 109 handler + 9 middleware + 2 mailer + 3 database + 3 events; need running PostgreSQL)
 - `make swagger` regenerates both OpenAPI doc sets via swag (main + audit; run before committing if handler annotations changed)
 - Public Swagger UI: `/api/swagger/` (main API) and `/api/audit/swagger/` (audit microservice); nginx `proxy_redirect /swagger/` rewrites the trailing-slash redirect so prefixed URLs resolve
 - `make test` for full Playwright suite (desktop + mobile); DB reset twice: before desktop, between desktop and mobile
@@ -74,14 +75,23 @@
   - Backend: dashboard `GetDashboardStats` returns zero-filled last-7-days `[{date,count}]` for registrations + messages; `GetAuditLogs` proxies to the audit microservice (`AuditServiceURL + /logs`) with local-DB fallback; new `TestGetAuditLogs_ProxiesToAuditService` (fake service)
   - Frontend: pages + blog create/edit dialogs → `maxWidth="lg"` with 70/30 editor-left 2-col layout; RichTextEditor Align Left/Center/Right/Justify buttons (`@tiptap/extension-text-align`) + media-dialog upload with auto-insert; pages tree tightened (depth*12, zero margins); HTML5 DnD replaced with pointer-event drag from the handle (window listeners attached in `pointerdown`, `data-page-id` hit-testing, numeric-id parse fix); public blog category filter + tag/category chips on list & detail; richer admin blog rows (author/dates/likes/category/tags); Contacts icon → `ContactMailIcon`; api-tokens explainer panel; new `FaviconLoader` renders the settings favicon
   - Verification: `make go-test` green; full `make test` (desktop + mobile) passes with new e2e coverage (blog chips/filter, editor align buttons, pointer-drag reorder, media upload/insert, favicon)
+- **Phase 27**: Platform blueprint & contract freeze — DONE (committed)
+  - `backend/docs/service-boundaries.md`: authoritative route→service table (auth/content/media/messages/settings/audit/trash/dashboard) + cross-cutting decisions (trash = thin aggregator service since the entity lives in the path; dashboard = aggregator facade)
+  - `backend/internal/events/`: CloudEvents 1.0 envelope Go types + Type/Source constants + JSON Schema catalog (`schemas/*.json`, 10 event types incl. user.registered, post.published, media.uploaded, contact.received) + 3 new Go tests (envelope round-trip, catalog JSON validity, catalog completeness vs type constants) — 126 Go tests total
+  - docker-compose: `kafka` service (apache/kafka:3.9.0, single-node KRaft, `kafka-data` volume, healthcheck)
+  - nginx gateway: route-split blueprint — per-service `upstream` blocks + `location` blocks, ALL still → monolith (contract unchanged); Phases 29–31 flip `proxy_pass` hosts. Nginx prefix→URI semantics preserve `/api`-stripping (`/api/trash/page/5/restore` → `/trash/page/5/restore`)
+  - Verification: `make go-test` green (126); spot-checked every route group through the gateway (401 on protected, 200 on public, swagger UI + audit swagger reachable); full `make test` gate green
 
 ## Next Steps
-1. **Platform roadmap** — Phase 27+: decompose the CMS into event-driven microservices, Kafka backbone, deploy via Helm to K8s (see [PLAN.md](./PLAN.md) for full design; `TODO.md` for phase checklist)
-2. (Optional, from Phase 15) Wire UndoSnackbar into delete flows for undo-toast UX
-3. (Backlog) i18n — see TODO.md Backlog
+1. **Phase 28** — Event SDK & outbox infrastructure: `internal/events` producer/consumer (consumer groups, DLQ), outbox table + relay worker; gate = integration test round-tripping Kafka in compose (see [PLAN.md](./PLAN.md); `TODO.md` for phase checklist)
+2. (After Phase 31) Monolith `cmd/api` retired — every request flows gateway → microservice
+3. (Optional, from Phase 15) Wire UndoSnackbar into delete flows for undo-toast UX
+4. (Backlog) i18n — see TODO.md Backlog
 
 ## Critical Context
-- **Go tests**: green via `make go-test` (all packages `ok`; Phase 26 adds `TestGetAuditLogs_ProxiesToAuditService`; need running PostgreSQL)
+- **Gateway route-split** (Phase 27): nginx uses per-service `upstream` blocks + prefix `location`s, ALL still → monolith today. Nginx prefix-location semantics REPLACE the matched prefix with the `proxy_pass` URI — keep the trailing-slash/`$is_args$args` shapes from `service-boundaries.md` §5 when flipping hosts in Phases 29–31. `location = /api/audit-logs` is an exact match (no trailing slash greediness).
+- **Kafka**: `kafka` service in compose — `apache/kafka:3.9.0`, single-node KRaft (`KAFKA_PROCESS_ROLES: broker,controller`, `CLUSTER_ID`), auto-creates topics, exposed on `localhost:9092`. Inside compose, other services reach it at `kafka:9092`.
+- **Go tests**: green via `make go-test` (all packages `ok`; Phase 26 adds `TestGetAuditLogs_ProxiesToAuditService`; Phase 27 adds `internal/events` tests — envelope round-trip + schema catalog; need running PostgreSQL)
 - **Desktop Playwright**: 276/276 pass, 8 skipped — 0 failures (Phase 26 adds 4 tests: drag reorder, blog chips/filter, blog detail chips, api-tokens hydration-race guard; Phase 24 added a11y spec)
 - **Mobile Playwright**: 275/275 pass, 9 skipped — 0 failures (Phase 26 adds drag reorder, blog chips/filter, blog detail chips; Phase 24 added a11y spec)
 - **Test DB connections**: `setupTestDB` caps pool (MaxOpenConns 3) + closes via `t.Cleanup` — prevents "too many clients" with Postgres' default 100-connection limit
@@ -170,6 +180,12 @@
 - `frontend/e2e/07-admin-pages.spec.ts`: pointer-drag reorder test + editor align button assertions
 - `frontend/e2e/24-blog-public.spec.ts`: blog chips + category filter e2e
 
+### Phase 27 files
+- `backend/docs/service-boundaries.md` (new): authoritative route→service table + cross-cutting decisions (trash aggregator, dashboard facade, auth invariants, gateway plan)
+- `backend/internal/events/` (new): `events.go` (CloudEvents envelope + Source/Type constants), `schemas/*.json` (10 JSON Schemas), `events_test.go` (round-trip, catalog validity, completeness)
+- `docker/docker-compose.yml`: `kafka` service (apache/kafka:3.9.0 KRaft single-node, advertised `localhost:9092`, `kafka-data` volume, topics healthcheck)
+- `docker/nginx/nginx.conf`: route-split gateway blueprint — per-service `upstream` blocks (`auth_service`…`trash_service`) + `location` blocks, all targets still `backend:8080` except `/api/audit/` → `audit-service:8081`
+
 ### Documentation
 - `AGENTS.md`: This file
-- `TODO.md`: Phases 20–26 completed; i18n in Backlog
+- `TODO.md`: Phase 27 completed; Phase 28 next; i18n in Backlog

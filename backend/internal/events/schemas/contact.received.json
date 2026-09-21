@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "org.omoikane.messages.contact.received.v1",
+  "title": "Contact Message Received",
+  "type": "object",
+  "description": "Emitted by messages-service when the public contact form is submitted.",
+  "properties": {
+    "id": { "type": "integer" },
+    "name": { "type": "string" },
+    "email": { "type": "string", "format": "email" },
+    "subject": { "type": "string" },
+    "message": { "type": "string" },
+    "receivedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": ["id", "name", "email", "subject", "message", "receivedAt"]
+}

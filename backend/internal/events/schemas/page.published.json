@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "org.omoikane.content.page.published.v1",
+  "title": "Page Published",
+  "type": "object",
+  "description": "Emitted by content-service when a page transitions to published or is re-published.",
+  "properties": {
+    "id": { "type": "integer" },
+    "slug": { "type": "string" },
+    "title": { "type": "string" },
+    "status": { "type": "string", "const": "published" },
+    "publishedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": ["id", "slug", "title", "status", "publishedAt"]
+}

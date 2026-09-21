@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "org.omoikane.auth.login.v1",
+  "title": "User Login",
+  "type": "object",
+  "description": "Emitted by auth-service when a user authenticates successfully.",
+  "properties": {
+    "id": { "type": "integer" },
+    "email": { "type": "string", "format": "email" },
+    "method": { "type": "string", "enum": ["cookie", "token"] }
+  },
+  "required": ["id", "email", "method"]
+}

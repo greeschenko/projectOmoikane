@@ -55,13 +55,14 @@ Flagship demo = webhook module. First result = working platform on a fresh clust
 ### Wave 1 — Docker: prove the architecture (K8s untouched)
 
 #### Phase 27 — Blueprint & contract freeze
-- Service boundary map — exact route→service table:
-  - **auth**: `/api/setup*`, `/api/auth*`, `/api/users*`, `/api-tokens*`, `/api/settings/profile`
-  - **content**: `/api/pages*`, `/api/blog*`, `/api/trash/{page,blog-post,tag,category}*`, `/api/sitemap`
+- Service boundary map — exact route→service table (`backend/docs/service-boundaries.md`):
+  - **auth**: `/api/setup*`, `/api/auth*`, `/api/users*`, `/api-tokens*`, `/api/settings/profile`, `/api/settings/password`
+  - **content**: `/api/pages*`, `/api/blog*`
   - **media**: `/api/media*`, `/api/media/file/*`
-  - **messages**: `/api/messages*`, `/api/contact*`
+  - **messages**: `/api/messages*`, `/api/contact*`, `/api/contacts*`
   - **settings**: `/api/settings*` (site settings + email templates)
-  - **audit**: `/api/audit*` (existing microservice; later event-driven)
+  - **audit**: `/api/audit*` (existing microservice; later event-driven), `/api/audit-logs`
+  - **trash**: cross-cutting — `/api/trash*` spans every entity type (entity in the path, so the gateway cannot prefix-split it) → dedicated trash aggregator service (see service-boundaries.md §2)
 - Monorepo layout: `backend/cmd/<service>`; new `backend/internal/events`
 - CloudEvents schema catalog: `backend/internal/events/schemas/*.json`
 - docker-compose: add Kafka (single-node KRaft); add route-split gateway config in nginx
@@ -89,6 +90,7 @@ Flagship demo = webhook module. First result = working platform on a fresh clust
 #### Phase 31 — Wave 3 services: messages + settings; monolith retired
 - `cmd/messages`: broadcast messages, contact form, notification widgets — own schema
 - `cmd/settings`: site settings incl. favicon, email templates — own schema
+- `cmd/trash`: cross-cutting aggregator over all entities' soft-delete (Phase 27 §2)
 - Dashboard becomes an aggregator (fetches stats from services via internal API)
 - Delete `cmd/api` monolith; migrate Redis public-cache layer per service
 - **First result #2:** full Go + Playwright green; zero monolith; every request flows

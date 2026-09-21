@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "org.omoikane.messages.message.created.v1",
+  "title": "Broadcast Message Created",
+  "type": "object",
+  "description": "Emitted by messages-service when an admin creates a broadcast message.",
+  "properties": {
+    "id": { "type": "integer" },
+    "title": { "type": "string" },
+    "body": { "type": "string" },
+    "createdBy": { "type": ["integer", "null"] },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "required": ["id", "title", "body", "createdAt"]
+}

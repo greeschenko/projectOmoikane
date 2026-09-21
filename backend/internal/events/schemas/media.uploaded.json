@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "org.omoikane.media.uploaded.v1",
+  "title": "Media Uploaded",
+  "type": "object",
+  "description": "Emitted by media-service when a media item is uploaded.",
+  "properties": {
+    "id": { "type": "integer" },
+    "filename": { "type": "string" },
+    "alt": { "type": ["string", "null"] },
+    "url": { "type": "string" },
+    "thumbUrl": { "type": ["string", "null"] },
+    "size": { "type": "integer" },
+    "uploadedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": ["id", "filename", "url", "size", "uploadedAt"]
+}

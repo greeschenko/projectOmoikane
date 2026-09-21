@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "org.omoikane.auth.user.registered.v1",
+  "title": "User Registered",
+  "type": "object",
+  "description": "Emitted by auth-service when a user account is created.",
+  "properties": {
+    "id": { "type": "integer" },
+    "email": { "type": "string", "format": "email" },
+    "role": { "type": "string", "enum": ["admin", "user"] }
+  },
+  "required": ["id", "email", "role"]
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "org.omoikane.content.page.updated.v1",
+  "title": "Page Updated",
+  "type": "object",
+  "description": "Emitted by content-service when a page is created or edited (any status).",
+  "properties": {
+    "id": { "type": "integer" },
+    "slug": { "type": "string" },
+    "title": { "type": "string" },
+    "status": { "type": "string", "enum": ["draft", "published"] },
+    "publishedAt": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "required": ["id", "slug", "title", "status"]
+}
