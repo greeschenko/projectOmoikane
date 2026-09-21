@@ -119,7 +119,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Role:     role,
 		Status:   status,
 	}
-	if err := h.DB.Create(&user).Error; err != nil {
+	if err := h.createUserAndEmit(r.Context(), &user); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create user"})
 		return

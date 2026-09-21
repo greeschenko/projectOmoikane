@@ -22,7 +22,7 @@ and Kubernetes.
 - **Frontend:** Next.js 16 (App Router), MUI 9, TipTap (rich text)
 - **Backend:** Go 1.24, GORM, PostgreSQL, JWT (httpOnly cookie auth), Redis cache
 - **Events:** Kafka (single-node KRaft dev default; managed MSK/Confluent for production), CloudEvents 1.0, outbox pattern
-- **Infrastructure (dev):** Docker Compose (nginx gateway, Next.js, Go + Air hot-reload, PostgreSQL, Redis, Kafka, audit service)
+- **Infrastructure (dev):** Docker Compose (nginx gateway, Next.js, Go + Air hot-reload, PostgreSQL, Redis, Kafka, audit + auth services)
 - **Infrastructure (platform):** minikube/kind locally → Helm chart → any cloud K8s
 - **Testing:** Go tests (`make go-test`) + Playwright desktop & mobile (`make test`) + K8s smoke tests (`make k8s-test`)
 
@@ -59,7 +59,7 @@ and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN
 | 17–26 — Bug fixes, audit microservice, OpenAPI, API tokens, Redis cache, CDN-ready media, a11y, manual review fix pass | ✅ | Go green; desktop 276/276; mobile 275/275 |
 | 27 — Blueprint & Contract Freeze | ✅ | Go 126 pass; desktop/mobile green; gateway split, Kafka KRaft, CloudEvents catalog |
 | 28 — Event SDK & Outbox | ✅ | Go 129 pass; Kafka round-trip integration tests (producer→consumer, outbox→relay→consumer, DLQ) |
-| 29 — Auth Service | 🔲 | — |
+| 29 — Auth Service (Wave 1) | ✅ | Go 138 pass; gateway routes auth→auth-service; user.registered via outbox→Kafka |
 | 30 — Content + Media Services | 🔲 | — |
 | 31 — Messages + Settings; Monolith Retired | 🔲 | — |
 | 32 — Real Events Live (audit via Kafka) | 🔲 | — |

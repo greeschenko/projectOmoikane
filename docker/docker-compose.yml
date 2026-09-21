@@ -8,6 +8,7 @@ services:
     depends_on:
       - frontend
       - audit-service
+      - auth-service
 
   kafka:
     image: apache/kafka:3.9.0
@@ -16,10 +17,16 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      # Dual listener: PLAINTEXT (external, advertised localhost:9092) serves
+      # host-side tooling + `make go-test` integration tests; PLAINTEXT_INTERNAL
+      # (advertised kafka:29092) serves services inside the compose network
+      # (auth-service relay, later content/media sinks). Distinct ports make the
+      # advertised-address selection unambiguous per connecting client.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -83,6 +90,43 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+
+  # Wave 1 auth service (Phase 29): separate process, shared Postgres store
+  # with the monolith until the Phase 31 aggregator work. Emits user.registered
+  # via the outbox -> Kafka relay (KAFKA_BROKERS reachable inside compose).
+  auth-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/auth
+    ports:
+      - "8082:8082"
+    environment:
+      - AUTH_PORT=8082
+      - AUTH_DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable
+      - JWT_SECRET=dev-secret-change-in-production
+      - SMTP_HOST=
+      - SMTP_PORT=587
+      - SMTP_USER=
+      - SMTP_PASS=
+      - SMTP_FROM=noreply@omoikane.local
+      - RECAPTCHA_SECRET=
+      - AUDIT_SERVICE_URL=http://audit-service:8081
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_EVENTS_TOPIC=omoikane.events
+      - KAFKA_DLQ_TOPIC=omoikane.events.dlq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8082/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   audit-service:
     build:

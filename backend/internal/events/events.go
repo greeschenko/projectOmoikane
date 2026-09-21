@@ -20,7 +20,10 @@
 package events
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -40,6 +43,19 @@ type CloudEvent struct {
 	Time time.Time `json:"time"`
 	// Data holds the event payload (see schemas/ for JSON Schema).
 	Data json.RawMessage `json:"data"`
+}
+
+// NewEventID returns a random 128-bit hex event id suitable for CloudEvent "id".
+// Generated with crypto/rand (not math/rand) so ids are unpredictable across
+// peers and cannot collide.
+func NewEventID() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand failures are unrecoverable in practice; generate from the
+		// current time so a broken platform cannot hard-fail a business request.
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(buf)
 }
 
 // Platform event type prefixes.

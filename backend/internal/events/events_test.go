@@ -132,3 +132,24 @@ func TestSchemaCatalogIsComplete(t *testing.T) {
 		}
 	}
 }
+
+// TestNewEventID ensures event ids are unique, hex-encoded and 32 chars long
+// (16 random bytes) — the CloudEvents "id" must be unique per source.
+func TestNewEventID(t *testing.T) {
+	seen := map[string]bool{}
+	for i := 0; i < 1000; i++ {
+		id := NewEventID()
+		if len(id) != 32 {
+			t.Fatalf("NewEventID length = %d, want 32 (16 bytes hex)", len(id))
+		}
+		for _, c := range id {
+			if !strings.ContainsRune("0123456789abcdef", c) {
+				t.Fatalf("NewEventID %q contains non-hex char %q", id, c)
+			}
+		}
+		if seen[id] {
+			t.Fatalf("NewEventID returned duplicate %q", id)
+		}
+		seen[id] = true
+	}
+}

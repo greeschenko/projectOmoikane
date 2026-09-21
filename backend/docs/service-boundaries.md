@@ -115,7 +115,7 @@ decision deferred to Phase 31; contract unchanged meanwhile.
 | Location | Target today | Target after decomposition |
 |---|---|---|
 | `/api/audit/` | audit-service:8081 | quit (audit moves to `/api/audit-logs` route + events) |
-| `/api/auth/...`, `/api/users*`, `/api-tokens*`, `/api/settings/profile`, `/api/settings/password` | backend:8080 | auth-service |
+| `/api/auth/...`, `/api/users*`, `/api/api-tokens*`, `/api/setup*`, `/api/settings/profile`, `/api/settings/password` | **auth-service:8082** (Phase 29) | auth-service |
 | `/api/pages*`, `/api/blog*` | backend:8080 | content-service |
 | `/api/media*` | backend:8080 | media-service |
 | `/api/contact*`, `/api/contacts*`, `/api/messages*` | backend:8080 | messages-service |
@@ -125,8 +125,32 @@ decision deferred to Phase 31; contract unchanged meanwhile.
 | `/api/dashboard*` | backend:8080 | dashboard (Phase 31) |
 | `/api/*` (unmapped) | backend:8080 | 404 or proxy — fail-loud so unmapped routes surface |
 
-**Phase 27 status:** all targets are still `backend:8080` (contract unchanged).
-Phases 29–31 flip targets per service, gated by the full Playwright suite.
+**Phase 29 status (Wave 1):** the `auth_service` upstream now points at the
+`auth-service` process (`:8082`). Everything else is still `backend:8080`.
+Phases 30–31 flip the remaining targets per service, gated by the full
+Playwright suite.
+
+**Wave 1 store split — process split, shared store:** `auth-service` is its own
+process but connects to the same Postgres `omoikane` store as the monolith. The
+monolith still reads auth data (blog author names, dashboard stats, trash rows,
+Bearer `LookupToken`), so a physical schema partition is deferred to the Phase 31
+aggregator work (trash/dashboard become internal-API consumers instead of shared-DB
+readers). Events are single-writer: only `auth-service` wires the outbox
+(`user.registered`), the monolith's `Handler.Outbox` stays nil.
+
+**Gateway rule — static `proxy_pass` URIs only:** every `proxy_pass` in the
+gateway must be a STATIC URI. A `proxy_pass` containing a variable (e.g.
+`$is_args$args`) is passed upstream verbatim and DROPS the location-remainder
+path segments (`/api/users/5` would arrive as `/users`). With a static URI the
+prefix is replaced correctly and the query string is forwarded automatically.
+This was hit during the Phase 29 gateway flip and fixed for every location.
+
+**Events broker (compose):** Kafka runs a dual-listener setup — external
+`PLAINTEXT` advertised as `localhost:9092` (host-side `make go-test`
+integration tests + kafka CLI), and internal `PLAINTEXT_INTERNAL` advertised as
+`kafka:29092` (services inside the compose network). In-compose services MUST
+use `KAFKA_BROKERS=kafka:29092`; `localhost:9092` is unreachable from inside
+containers (the advertised address resolves to the container itself).
 
 ## 6. Compliance check (Phase 27 gate)
 

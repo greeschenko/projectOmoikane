@@ -378,11 +378,11 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] **Gate:** integration tests round-trip Kafka in compose — producer→consumer-group ack, outbox→relay→consumer, DLQ on handler failure (skip cleanly when Kafka is down)
 - [x] Docs/AGENTS/README updated; Go suite 129 tests green (106 handler + 9 events + 9 middleware + 3 database + 2 mailer)
 
-## 🔲 Phase 29: Wave 1 Services — Auth
-- [ ] `cmd/auth`: setup, auth, users CRUD, roles, API tokens, profile — own DB schema
-- [ ] Gateway routes `/api/auth*`, `/api/users*`, `/api-tokens*` → auth
-- [ ] Emits `user.registered` (behind outbox)
-- [ ] **Gate:** auth/users Go + Playwright specs pass against the gateway
+## ✅ Phase 29: Wave 1 Services — Auth
+- [x] `cmd/auth`: setup, auth, users CRUD, roles, API tokens, profile, forgot/reset password — **process split, shared store** (same `omoikane` Postgres until Phase 31 aggregator work; physical schema partition deferred)
+- [x] Gateway routes `/api/auth*`, `/api/users*`, `/api/api-tokens*`, `/api/setup*`, `/api/settings/profile|password` → auth-service (`auth_service` upstream flipped to `auth-service:8082`)
+- [x] Emits `user.registered` (behind outbox; single-writer — monolith outbox stays nil) from Setup/Register/CreateUser
+- [x] **Gate:** auth/users Go + Playwright specs pass against the gateway (full `make go-test` + `make test`)
 
 ## 🔲 Phase 30: Wave 2 Services — Content + Media
 - [ ] `cmd/content`: pages, blog, tags/categories, sitemap, RSS — own schema

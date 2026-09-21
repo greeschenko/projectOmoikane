@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"omoikane-backend/internal/cache"
+	"omoikane-backend/internal/events"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 
@@ -27,6 +28,11 @@ type Handler struct {
 	AuditServiceURL string
 	MediaBaseURL    string
 	Cache           cache.Cache
+	// Outbox, when non-nil, enables transactional event emission: handlers that
+	// mutate auth data append an outbox row inside the same DB transaction the
+	// business write runs in (atomic outbox). The monolith leaves this nil
+	// (single-writer: only the auth service emits auth events).
+	Outbox events.OutboxStore
 }
 
 // flushCache invalidates the response cache after any write to a cached entity.

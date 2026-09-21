@@ -109,7 +109,7 @@ func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 		Role:     "admin",
 		Status:   "active",
 	}
-	if err := h.DB.Create(&user).Error; err != nil {
+	if err := h.createUserAndEmit(r.Context(), &user); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create admin"})
 		return
@@ -257,7 +257,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		Role:     "user",
 		Status:   "active",
 	}
-	if err := h.DB.Create(&user).Error; err != nil {
+	if err := h.createUserAndEmit(r.Context(), &user); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create user"})
 		return
