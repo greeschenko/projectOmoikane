@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"omoikane-backend/internal/audit"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 
@@ -56,12 +55,12 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"siteName":          settings.SiteName,
-		"tagline":           settings.Tagline,
-		"logo":              settings.Logo,
-		"favicon":           settings.Favicon,
-		"blogEnabled":       settings.BlogEnabled,
-		"resetEmailSubject": settings.ResetEmailSubject,
+		"siteName":           settings.SiteName,
+		"tagline":            settings.Tagline,
+		"logo":               settings.Logo,
+		"favicon":            settings.Favicon,
+		"blogEnabled":        settings.BlogEnabled,
+		"resetEmailSubject":  settings.ResetEmailSubject,
 		"resetEmailBodyHTML": settings.ResetEmailBodyHTML,
 	})
 }
@@ -137,30 +136,17 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	h.DB.First(&settings, 1)
 
-	actorID := middleware.GetUserID(r)
-	var actorName string
-	if actorID > 0 {
-		var actor models.User
-		h.DB.First(&actor, actorID)
-		actorName = actor.Name
-	} else {
-		actorName = "system"
-	}
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     actorID,
-		UserName:   actorName,
-		Action:     "update",
-		EntityType: "settings",
-		Detail:     "Updated site settings",
-	})
+	// Phase 32: settings writes flow to the audit service as settings.updated
+	// events on the Kafka backbone (replaces the retired HTTP audit.Emit).
+	h.emitSettingsUpdated(r.Context(), settings)
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"siteName":          settings.SiteName,
-		"tagline":           settings.Tagline,
-		"logo":              settings.Logo,
-		"favicon":           settings.Favicon,
-		"blogEnabled":       settings.BlogEnabled,
-		"resetEmailSubject": settings.ResetEmailSubject,
+		"siteName":           settings.SiteName,
+		"tagline":            settings.Tagline,
+		"logo":               settings.Logo,
+		"favicon":            settings.Favicon,
+		"blogEnabled":        settings.BlogEnabled,
+		"resetEmailSubject":  settings.ResetEmailSubject,
 		"resetEmailBodyHTML": settings.ResetEmailBodyHTML,
 	})
 	h.flushCache()

@@ -93,17 +93,14 @@ func main() {
 		DB:              db,
 		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-production"),
 		RecaptchaSecret: getEnv("RECAPTCHA_SECRET", ""),
-		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
 		// Messages owns the contact/message trash entities (Phase 31): its
 		// internal endpoints serve only those rows to the trash aggregator.
 		TrashEntities: []string{"contact", "message"},
-		// No outbound events yet (Phase 32 adds contact.received); the outbox
-		// stays wired so the service is event-ready.
+		// Contact form submissions emit contact.received events (Phase 32).
 		Outbox: outbox,
 	}
 
-	// Outbox relay: keeps the (currently empty) outbox drained until the
-	// process shuts down.
+	// Outbox relay: drains contact.received rows to Kafka until shutdown.
 	if producer != nil {
 		relay := events.NewRelay(outbox, producer, eventsCfg)
 		go relay.Run(ctx)

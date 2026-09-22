@@ -401,11 +401,16 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] nginx `/api/` catch-all → `return 404` fail-loud; frontend SSR now goes through the gateway (`lib/api.ts`/rss use `http://nginx` + `/api` prefix)
 - [x] **First result #2:** full Go + Playwright green; zero monolith; every request through gateway → microservice
 
-## 🔲 Phase 32: Real Events Live
-- [ ] Outbox relays publish real domain events on writes
-- [ ] `cmd/audit` switches from HTTP proxy to Kafka consumer
-- [ ] Event catalog in Swagger + `docs/events.md`
-- [ ] **Gate:** e2e — publish post → audit entry arrives via event (not HTTP)
+## ✅ Phase 32: Real Events Live — audit is a Kafka consumer
+- [x] New emissions live on the backbone: `auth.login` (Login), `contact.received` (SubmitContact), `settings.updated` (UpdateSettings); `user.registered`/`page.published`/`post.published`/`media.uploaded` already live (Phases 29–30)
+- [x] Retired the HTTP audit write path entirely: `internal/audit` deleted, all 18 `audit.Emit` call sites + `Handler.AuditServiceURL` + `POST /events` removed
+- [x] `cmd/audit` is a Kafka consumer: group `audit`, `ConsumerStartOffset=kafka.LastOffset` (no historical replay), idempotent on `AuditLog.EventID` (unique index), unknown types skipped, malformed mapped payloads → DLQ, reconnect loop + graceful shutdown; `EnsureTopics` log-only
+- [x] `cmd/audit/main_test.go`: 9 tests — health, admin gate (401/403/200), listing/filters, per-type mapping (7 catalog types), unknown-type skip, malformed payload → error, redelivery idempotency, detail content
+- [x] Handler outbox tests for the new emissions (login/contact/settings); existing outbox tests now filter by event type (loginAs emits auth.login)
+- [x] compose: audit-service gets `KAFKA_BROKERS=kafka:29092` + `depends_on kafka`; `AUDIT_SERVICE_URL` dropped from the 5 producers; Makefile `go-test`/`test` scope += `cmd/audit`, `go-build` += `bin/audit`
+- [x] Frontend audit-log page: `ACTION_COLORS` += register/publish/upload/contact; entity tabs += settings
+- [x] Event catalog: `docs/events.md` (topology, envelope, 7 live types + 3 schema-frozen, consumer behavior); service-boundaries §4/§7 updated
+- [x] **Gate:** e2e `25-admin-audit-log.spec.ts` — publish post → poll `/api/audit-logs?entity=post&search=…` for an `action=publish` row (Kafka path, not HTTP)
 
 ## ⬜ Wave 2 — Kubernetes: Pure Deployment Move
 

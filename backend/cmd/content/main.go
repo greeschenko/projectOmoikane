@@ -97,7 +97,6 @@ func main() {
 	h := &handlers.Handler{
 		DB:              db,
 		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-production"),
-		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
 		// Content owns the page/post/tag/category trash entities (Phase 31).
 		TrashEntities: []string{"page", "post", "tag", "category"},
 		// Content is the single writer of content events (page.published,

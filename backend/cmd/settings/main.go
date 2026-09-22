@@ -92,9 +92,7 @@ func main() {
 	h := &handlers.Handler{
 		DB:              db,
 		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-production"),
-		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
-		// No outbound events yet; the outbox stays wired so the service is
-		// event-ready.
+		// Settings.updated events flow through the outbox relay to Kafka.
 		Outbox: outbox,
 	}
 

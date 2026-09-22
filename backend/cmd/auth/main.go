@@ -101,7 +101,6 @@ func main() {
 		SMTPPass:        getEnv("SMTP_PASS", ""),
 		SMTPFrom:        getEnv("SMTP_FROM", "noreply@omoikane.local"),
 		RecaptchaSecret: getEnv("RECAPTCHA_SECRET", ""),
-		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
 		// Auth owns the "user" trash entity (Phase 31): its internal endpoints
 		// serve only user rows to the trash aggregator.
 		TrashEntities: []string{"user"},

@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"omoikane-backend/internal/auth"
-	"omoikane-backend/internal/audit"
-	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 )
 
@@ -226,24 +224,6 @@ func (h *Handler) CreatePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actorID := middleware.GetUserID(r)
-	var actorName string
-	if actorID > 0 {
-		var actor models.User
-		h.DB.First(&actor, actorID)
-		actorName = actor.Name
-	} else {
-		actorName = "system"
-	}
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     actorID,
-		UserName:   actorName,
-		Action:     "create",
-		EntityType: "page",
-		EntityID:   page.ID,
-		Detail:     "Created page \"" + page.Title + "\"",
-	})
-
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(sanitizePageJSON(page))
 	h.flushCache()
@@ -336,24 +316,6 @@ func (h *Handler) UpdatePage(w http.ResponseWriter, r *http.Request) {
 		page = updated
 	}
 
-	actorID := middleware.GetUserID(r)
-	var actorName string
-	if actorID > 0 {
-		var actor models.User
-		h.DB.First(&actor, actorID)
-		actorName = actor.Name
-	} else {
-		actorName = "system"
-	}
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     actorID,
-		UserName:   actorName,
-		Action:     "update",
-		EntityType: "page",
-		EntityID:   page.ID,
-		Detail:     "Updated page \"" + page.Title + "\"",
-	})
-
 	json.NewEncoder(w).Encode(sanitizePageJSON(page))
 	h.flushCache()
 }
@@ -388,24 +350,6 @@ func (h *Handler) DeletePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.DB.Delete(&page)
-
-	actorID := middleware.GetUserID(r)
-	var actorName string
-	if actorID > 0 {
-		var actor models.User
-		h.DB.First(&actor, actorID)
-		actorName = actor.Name
-	} else {
-		actorName = "system"
-	}
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     actorID,
-		UserName:   actorName,
-		Action:     "delete",
-		EntityType: "page",
-		EntityID:   page.ID,
-		Detail:     "Deleted page \"" + page.Title + "\"",
-	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 	h.flushCache()
@@ -487,23 +431,6 @@ func (h *Handler) BatchPages(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown action"})
 		return
 	}
-
-	actorID := middleware.GetUserID(r)
-	var actorName string
-	if actorID > 0 {
-		var actor models.User
-		h.DB.First(&actor, actorID)
-		actorName = actor.Name
-	} else {
-		actorName = "system"
-	}
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     actorID,
-		UserName:   actorName,
-		Action:     "batch_" + req.Action,
-		EntityType: "page",
-		Detail:     "Batch " + req.Action + " on " + strconv.Itoa(len(req.IDs)) + " pages",
-	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 	h.flushCache()

@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/segmentio/kafka-go"
 )
 
 // Config holds the Kafka + outbox-relay settings shared by every service.
@@ -26,6 +28,12 @@ type Config struct {
 
 	// RetryBackoff is the delay between consumer handler retries.
 	RetryBackoff time.Duration
+
+	// ConsumerStartOffset is where a NEW consumer group (no committed offsets)
+	// begins: kafka.FirstOffset (-2, replay the backlog) or kafka.LastOffset
+	// (-1, only events published after the group starts). It is ignored once
+	// the group has committed offsets. Defaults to FirstOffset.
+	ConsumerStartOffset int64
 
 	// RelayBatchSize is how many pending outbox rows the relay publishes per run.
 	RelayBatchSize int
@@ -50,14 +58,15 @@ const (
 // broker reachable at "kafka:9092" from services, "localhost:9092" from host).
 func DefaultConfig() Config {
 	return Config{
-		Brokers:            []string{"kafka:9092"},
-		Topic:              DefaultTopic,
-		DLQTopic:           DefaultDLQTopic,
-		ConsumerMaxRetries: 3,
-		RetryBackoff:       200 * time.Millisecond,
-		RelayBatchSize:     100,
-		RelayInterval:      time.Second,
-		OutboxMaxAttempts:  5,
+		Brokers:             []string{"kafka:9092"},
+		Topic:               DefaultTopic,
+		DLQTopic:            DefaultDLQTopic,
+		ConsumerMaxRetries:  3,
+		RetryBackoff:        200 * time.Millisecond,
+		ConsumerStartOffset: kafka.FirstOffset,
+		RelayBatchSize:      100,
+		RelayInterval:       time.Second,
+		OutboxMaxAttempts:   5,
 	}
 }
 

@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	_ "omoikane-backend/cmd/audit/docs"
+	"omoikane-backend/internal/events"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 
+	"github.com/segmentio/kafka-go"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -19,7 +25,7 @@ import (
 
 // @title Omoikane Audit Service
 // @version 1.0
-// @description Internal microservice that receives and stores audit log events emitted by the main API. Not meant for direct public use.
+// @description Internal microservice that consumes CloudEvents from the Kafka backbone and stores them as audit log entries. Not meant for direct public use.
 // @BasePath /api/audit
 var db *gorm.DB
 
@@ -50,20 +56,102 @@ func main() {
 		jwtSecret = "dev-secret-change-in-production"
 	}
 
+	// Events wiring (Phase 32): audit write path is the Kafka backbone, NOT
+	// the retired HTTP POST /events. EnsureTopics is best-effort — if Kafka is
+	// down the consumer retries in a loop and the service stays up.
+	eventsCfg := events.ConfigFromEnv()
+	// Never replay the historical backbone into a fresh audit store: only
+	// events published after this group's first start are ingested (ignored
+	// once the group has committed offsets).
+	eventsCfg.ConsumerStartOffset = kafka.LastOffset
+
+	ctx, stop := signalContext()
+	defer stop()
+
+	if err := events.EnsureTopics(ctx, eventsCfg.Brokers, []string{eventsCfg.Topic, eventsCfg.DLQTopic}); err != nil {
+		log.Printf("WARNING: audit-service: ensure kafka topics: %v (consumer will retry)", err)
+	}
+
+	handler := &auditEventHandler{db: db}
+	consumer, err := events.NewConsumer(eventsCfg, "audit", handler)
+	if err != nil {
+		log.Printf("WARNING: audit-service: kafka consumer disabled (%v); no events will be ingested", err)
+		consumer = nil
+	}
+
+	mux := newAuditMux(jwtSecret)
+
+	addr := ":" + port
+	log.Printf("Audit service starting on %s", addr)
+	srv := &http.Server{Addr: addr, Handler: mux}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Audit service failed: %v", err)
+		}
+	}()
+
+	if consumer != nil {
+		go runConsumerLoop(ctx, consumer)
+	}
+
+	<-ctx.Done()
+	log.Println("Audit service shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("audit-service: shutdown error: %v", err)
+	}
+	if consumer != nil {
+		if err := consumer.Close(); err != nil {
+			log.Printf("audit-service: consumer close error: %v", err)
+		}
+	}
+}
+
+// newAuditMux registers every audit-service route. Mux paths carry NO /api
+// prefix — nginx prefix locations strip the prefix, so /api/audit-logs ->
+// /audit-logs. Exposed as a function so cmd/audit tests can exercise the
+// full wiring. The admin surface (gateway-facing) validates the admin JWT.
+func newAuditMux(jwtSecret string) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /swagger/", httpSwagger.Handler())
-	mux.HandleFunc("POST /events", handleReceiveEvent)
 	mux.HandleFunc("GET /logs", handleGetLogs)
 	// Admin-only surface exposed directly to the gateway (Phase 31): the
 	// frontend audit-log page calls /api/audit-logs with the admin session
 	// cookie, and nginx routes it here (no monolith proxy).
 	mux.HandleFunc("GET /audit-logs", middleware.AdminRequired(jwtSecret, handleAuditLogsAdmin))
 	mux.HandleFunc("GET /health", handleHealth)
+	return mux
+}
 
-	addr := ":" + port
-	log.Printf("Audit service starting on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("Audit service failed: %v", err)
+// signalContext returns a context cancelled on SIGINT/SIGTERM.
+func signalContext() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-stop
+		cancel()
+	}()
+	return ctx, cancel
+}
+
+// runConsumerLoop runs the audit consumer until ctx is done, retrying with a
+// short backoff on transient Kafka errors (broker restarts, rebalances) so the
+// service never dies because the backbone hiccupped.
+func runConsumerLoop(ctx context.Context, consumer *events.Consumer) {
+	for {
+		err := consumer.Run(ctx)
+		if err == nil || ctx.Err() != nil {
+			log.Println("audit-service: kafka consumer stopped")
+			return
+		}
+		log.Printf("WARNING: audit-service: kafka consumer error: %v (retrying in 2s)", err)
+		select {
+		case <-time.After(2 * time.Second):
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -77,51 +165,6 @@ func main() {
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-}
-
-// handleReceiveEvent stores a single audit event.
-// @Summary Ingest audit event
-// @Description Stores an audit log event emitted by the main API.
-// @Tags audit
-// @Accept json
-// @Produce json
-// @Param body body models.AuditLog true "Audit event"
-// @Success 200 {object} map[string]bool
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /events [post]
-func handleReceiveEvent(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var event models.AuditLog
-	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
-		return
-	}
-
-	if event.UserName == "" {
-		event.UserName = "system"
-	}
-	if event.Action == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "action is required"})
-		return
-	}
-	if event.EntityType == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "entityType is required"})
-		return
-	}
-
-	if err := db.Create(&event).Error; err != nil {
-		log.Printf("[audit] failed to store event: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to store event"})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // handleAuditLogsAdmin is the gateway-facing admin wrapper around handleGetLogs

@@ -79,61 +79,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/events": {
-            "post": {
-                "description": "Stores an audit log event emitted by the main API.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "audit"
-                ],
-                "summary": "Ingest audit event",
-                "parameters": [
-                    {
-                        "description": "Audit event",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.AuditLog"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "boolean"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/health": {
             "get": {
                 "description": "Returns the audit service status.",
@@ -216,61 +161,6 @@ const docTemplate = `{
                 }
             }
         }
-    },
-    "definitions": {
-        "gorm.DeletedAt": {
-            "type": "object",
-            "properties": {
-                "time": {
-                    "type": "string"
-                },
-                "valid": {
-                    "description": "Valid is true if Time is not NULL",
-                    "type": "boolean"
-                }
-            }
-        },
-        "models.AuditLog": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string"
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
-                },
-                "detail": {
-                    "type": "string"
-                },
-                "entityID": {
-                    "type": "integer"
-                },
-                "entityType": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "ip": {
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "type": "string"
-                },
-                "userAgent": {
-                    "type": "string"
-                },
-                "userID": {
-                    "type": "integer"
-                },
-                "userName": {
-                    "type": "string"
-                }
-            }
-        }
     }
 }`
 
@@ -281,7 +171,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/audit",
 	Schemes:          []string{},
 	Title:            "Omoikane Audit Service",
-	Description:      "Internal microservice that receives and stores audit log events emitted by the main API. Not meant for direct public use.",
+	Description:      "Internal microservice that consumes CloudEvents from the Kafka backbone and stores them as audit log entries. Not meant for direct public use.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -50,8 +50,8 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"messages":     result,
-		"unreadCount":  unreadCount,
+		"messages":    result,
+		"unreadCount": unreadCount,
 	})
 }
 

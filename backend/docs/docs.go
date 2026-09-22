@@ -290,7 +290,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Clears the session cookie and emits a logout audit event.",
+                "description": "Clears the session cookie. (No logout audit event yet — Phase 33+ catalog addition.)",
                 "produces": [
                     "application/json"
                 ],

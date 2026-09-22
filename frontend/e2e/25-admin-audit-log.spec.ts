@@ -31,4 +31,34 @@ test.describe("Admin Audit Log", () => {
     await page.goto("/admin/audit-logs");
     await expect(page.getByPlaceholder(/search/i)).toBeVisible();
   });
+
+  // Phase 32 gate: the audit write path is the Kafka backbone, not HTTP. This
+  // proves the full pipeline end to end — content-service publishes
+  // post.published via its outbox relay -> Kafka -> audit-service consumer
+  // (group "audit") -> audit_logs row -> readable via the admin API.
+  test("publishing a blog post produces an audit row via Kafka", async ({ page }) => {
+    const unique = `Phase32 Post ${Date.now()}`;
+    const res = await page.request.post("/api/blog/posts", {
+      data: { title: unique, slug: `phase32-${Date.now()}`, content: "<p>hello</p>", status: "published" },
+    });
+    expect(res.ok()).toBeTruthy();
+
+    await expect
+      .poll(
+        async () => {
+          const r = await page.request.get("/api/audit-logs", {
+            params: { entity: "post", search: unique },
+          });
+          if (!r.ok()) return "";
+          const body = await r.json();
+          const hit = (body?.logs ?? []).find(
+            (l: { action?: string; detail?: string }) =>
+              l.action === "publish" && (l.detail ?? "").includes(unique)
+          );
+          return hit?.detail ?? "";
+        },
+        { timeout: 20000, intervals: [1000] }
+      )
+      .toContain(unique);
+  });
 });

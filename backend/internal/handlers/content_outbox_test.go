@@ -43,9 +43,9 @@ func TestCreatePage_Published_EnqueuesPagePublishedOutboxEvent(t *testing.T) {
 		t.Fatalf("expected page create success, got %d (%s)", resp.StatusCode, readBody(t, resp))
 	}
 
-	rows := pendingOutboxRows(t, db)
+	rows := pendingOutboxRowsOfType(t, db, events.TypePagePublished)
 	if len(rows) != 1 {
-		t.Fatalf("expected 1 pending outbox row, got %d", len(rows))
+		t.Fatalf("expected 1 page.published outbox row, got %d", len(rows))
 	}
 	row := rows[0]
 	if row.EventType != events.TypePagePublished || row.Source != events.SourceContent {
@@ -103,9 +103,9 @@ func TestCreatePage_Draft_EnqueuesNoOutboxEvent(t *testing.T) {
 		t.Fatalf("expected page create success, got %d (%s)", resp.StatusCode, readBody(t, resp))
 	}
 
-	rows := pendingOutboxRows(t, db)
+	rows := pendingOutboxRowsOfType(t, db, events.TypePagePublished)
 	if len(rows) != 0 {
-		t.Fatalf("expected 0 pending rows for draft create, got %d", len(rows))
+		t.Fatalf("expected no page.published rows for draft create, got %d", len(rows))
 	}
 }
 
@@ -137,8 +137,8 @@ func TestUpdatePage_PublishedTransition_Enqueues(t *testing.T) {
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		t.Fatalf("page create failed: %d", resp.StatusCode)
 	}
-	if rows := pendingOutboxRows(t, db); len(rows) != 0 {
-		t.Fatalf("expected 0 rows after draft create, got %d", len(rows))
+	if rows := pendingOutboxRowsOfType(t, db, events.TypePagePublished); len(rows) != 0 {
+		t.Fatalf("expected 0 page.published rows after draft create, got %d", len(rows))
 	}
 
 	// Publish the page -> exactly one page.published row.
@@ -148,7 +148,7 @@ func TestUpdatePage_PublishedTransition_Enqueues(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected update success, got %d (%s)", resp.StatusCode, readBody(t, resp))
 	}
-	rows := pendingOutboxRows(t, db)
+	rows := pendingOutboxRowsOfType(t, db, events.TypePagePublished)
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 pending row after publish transition, got %d", len(rows))
 	}
@@ -182,7 +182,7 @@ func TestUpdatePage_NoEmissionWhenAlreadyPublished(t *testing.T) {
 	resp := authenticatedRequest(t, "POST", s.URL+"/pages",
 		`{"title":"Live","slug":"live","content":"<p>x</p>","status":"published"}`, cookie)
 	resp.Body.Close()
-	if rows := pendingOutboxRows(t, db); len(rows) != 1 {
+	if rows := pendingOutboxRowsOfType(t, db, events.TypePagePublished); len(rows) != 1 {
 		t.Fatalf("expected 1 row from initial publish, got %d", len(rows))
 	}
 
@@ -192,7 +192,7 @@ func TestUpdatePage_NoEmissionWhenAlreadyPublished(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("update failed: %d", resp.StatusCode)
 	}
-	rows := pendingOutboxRows(t, db)
+	rows := pendingOutboxRowsOfType(t, db, events.TypePagePublished)
 	if len(rows) != 1 {
 		t.Fatalf("expected no additional row for already-published update, got %d", len(rows))
 	}
@@ -284,9 +284,9 @@ func TestCreatePost_Published_EnqueuesPostPublishedOutboxEvent(t *testing.T) {
 		t.Fatalf("expected post create success, got %d (%s)", resp.StatusCode, readBody(t, resp))
 	}
 
-	rows := pendingOutboxRows(t, db)
+	rows := pendingOutboxRowsOfType(t, db, events.TypePostPublished)
 	if len(rows) != 1 {
-		t.Fatalf("expected 1 pending outbox row, got %d", len(rows))
+		t.Fatalf("expected 1 post.published outbox row, got %d", len(rows))
 	}
 	row := rows[0]
 	if row.EventType != events.TypePostPublished || row.Source != events.SourceContent {
@@ -347,8 +347,8 @@ func TestUpdatePost_PublishedTransition_Enqueues(t *testing.T) {
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		t.Fatalf("post create failed: %d", resp.StatusCode)
 	}
-	if rows := pendingOutboxRows(t, db); len(rows) != 0 {
-		t.Fatalf("expected 0 rows after draft post create, got %d", len(rows))
+	if rows := pendingOutboxRowsOfType(t, db, events.TypePostPublished); len(rows) != 0 {
+		t.Fatalf("expected 0 post.published rows after draft post create, got %d", len(rows))
 	}
 
 	resp = authenticatedRequest(t, "PUT", s.URL+"/blog/posts/1",
@@ -357,7 +357,7 @@ func TestUpdatePost_PublishedTransition_Enqueues(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected update success, got %d (%s)", resp.StatusCode, readBody(t, resp))
 	}
-	rows := pendingOutboxRows(t, db)
+	rows := pendingOutboxRowsOfType(t, db, events.TypePostPublished)
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 pending row after post publish transition, got %d", len(rows))
 	}
@@ -456,9 +456,9 @@ func TestUploadMedia_EnqueuesMediaUploadedOutboxEvent(t *testing.T) {
 		t.Fatalf("expected 201, got %d (%s)", resp.StatusCode, readBody(t, resp))
 	}
 
-	rows := pendingOutboxRows(t, db)
+	rows := pendingOutboxRowsOfType(t, db, events.TypeMediaUploaded)
 	if len(rows) != 1 {
-		t.Fatalf("expected 1 pending outbox row, got %d", len(rows))
+		t.Fatalf("expected 1 media.uploaded outbox row, got %d", len(rows))
 	}
 	row := rows[0]
 	if row.EventType != events.TypeMediaUploaded || row.Source != events.SourceMedia {

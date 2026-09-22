@@ -30,9 +30,15 @@ const ACTION_COLORS: Record<string, "success" | "error" | "warning" | "info" | "
   restore: "warning",
   batch_delete: "error",
   batch_update: "info",
+  // Phase 32: event-driven audit rows (Kafka backbone) reuse the palette;
+  // 'delete'/'restore' stay for future fine-grained CRUD events.
+  register: "success",
+  publish: "success",
+  upload: "info",
+  contact: "warning",
 };
 
-const ENTITY_TYPES = ["all", "user", "page", "post", "media", "contact", "message", "tag", "category"];
+const ENTITY_TYPES = ["all", "user", "page", "post", "media", "contact", "message", "tag", "category", "settings"];
 
 export default function AdminAuditLog() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);

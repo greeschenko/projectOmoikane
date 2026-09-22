@@ -64,7 +64,7 @@ See [PLAN.md](./PLAN.md).
 | 29 — Auth Service (Wave 1) | ✅ | Go 138 pass; gateway routes auth→auth-service; user.registered via outbox→Kafka |
 | 30 — Content + Media Services (Wave 2) | ✅ | Go 158 pass; gateway routes content/media→services; page.published/post.published/media.uploaded via outbox→Kafka |
 | 31 — Messages + Settings; Monolith Retired | ✅ | Go 176 pass; gateway fully decomposed (zero monolith); trash/dashboard aggregators over internal APIs; audit-logs direct; frontend SSR via gateway |
-| 32 — Real Events Live (audit via Kafka) | 🔲 | — |
+| 32 — Real Events Live (audit via Kafka) | ✅ | Go 188 pass; audit = Kafka consumer (group `audit`, idempotent); auth.login/contact.received/settings.updated emitted; `POST /events` retired; event catalog + events.md |
 | 33 — Helm Chart + Local K8s | 🔲 | — |
 | 34 — Observability & Ops | 🔲 | — |
 | 35 — Webhook Module (Flagship) | 🔲 | — |

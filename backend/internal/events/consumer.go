@@ -71,8 +71,12 @@ func NewConsumer(cfg Config, groupID string, handler Handler) (*Consumer, error)
 		CommitInterval: time.Second,
 		// Bound how long an idle fetch waits (default 10s) so a low-volume
 		// backbone delivers events promptly instead of in slow polls.
-		MaxWait:     500 * time.Millisecond,
-		StartOffset: kafka.FirstOffset,
+		MaxWait: 500 * time.Millisecond,
+		// Where a NEW group starts (ignored once the group has committed
+		// offsets). Auditors default to FirstOffset (full backlog) but the
+		// audit-service overrides via Config to LastOffset so it does not
+		// replay history on first deploy.
+		StartOffset: cfg.ConsumerStartOffset,
 	})
 	dlqW := &kafka.Writer{
 		Addr:                   kafka.TCP(cfg.Brokers...),

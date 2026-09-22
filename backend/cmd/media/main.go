@@ -90,7 +90,6 @@ func main() {
 	h := &handlers.Handler{
 		DB:              db,
 		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-production"),
-		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
 		UploadDir:       getEnv("UPLOAD_DIR", "./uploads"),
 		MediaBaseURL:    getEnv("MEDIA_BASE_URL", ""),
 		// Media owns the "media" trash entity (Phase 31); hard-delete keeps the

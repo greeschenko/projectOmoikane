@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"omoikane-backend/internal/audit"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 
@@ -280,23 +279,6 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var actorName string
-	if userID > 0 {
-		var actor models.User
-		h.DB.First(&actor, userID)
-		actorName = actor.Name
-	} else {
-		actorName = "system"
-	}
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     userID,
-		UserName:   actorName,
-		Action:     "create",
-		EntityType: "post",
-		EntityID:   post.ID,
-		Detail:     "Created post \"" + post.Title + "\"",
-	})
-
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 	h.flushCache()
@@ -380,24 +362,6 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	post = updated
 
-	actorID := middleware.GetUserID(r)
-	var actorName string
-	if actorID > 0 {
-		var actor models.User
-		h.DB.First(&actor, actorID)
-		actorName = actor.Name
-	} else {
-		actorName = "system"
-	}
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     actorID,
-		UserName:   actorName,
-		Action:     "update",
-		EntityType: "post",
-		EntityID:   post.ID,
-		Detail:     "Updated post \"" + post.Title + "\"",
-	})
-
 	json.NewEncoder(w).Encode(sanitizePostJSON(h, post))
 	h.flushCache()
 }
@@ -432,24 +396,6 @@ func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.DB.Delete(&post)
-
-	actorID := middleware.GetUserID(r)
-	var actorName string
-	if actorID > 0 {
-		var actor models.User
-		h.DB.First(&actor, actorID)
-		actorName = actor.Name
-	} else {
-		actorName = "system"
-	}
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     actorID,
-		UserName:   actorName,
-		Action:     "delete",
-		EntityType: "post",
-		EntityID:   post.ID,
-		Detail:     "Deleted post \"" + post.Title + "\"",
-	})
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 	h.flushCache()
@@ -552,8 +498,8 @@ func (h *Handler) ToggleLike(w http.ResponseWriter, r *http.Request) {
 
 	h.DB.First(&post, postID)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"liked":  liked,
-		"count":  post.LikeCount,
+		"liked": liked,
+		"count": post.LikeCount,
 	})
 	h.flushCache()
 }

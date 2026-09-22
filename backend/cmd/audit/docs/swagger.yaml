@@ -1,44 +1,8 @@
 basePath: /api/audit
-definitions:
-  gorm.DeletedAt:
-    properties:
-      time:
-        type: string
-      valid:
-        description: Valid is true if Time is not NULL
-        type: boolean
-    type: object
-  models.AuditLog:
-    properties:
-      action:
-        type: string
-      createdAt:
-        type: string
-      deletedAt:
-        $ref: '#/definitions/gorm.DeletedAt'
-      detail:
-        type: string
-      entityID:
-        type: integer
-      entityType:
-        type: string
-      id:
-        type: integer
-      ip:
-        type: string
-      updatedAt:
-        type: string
-      userAgent:
-        type: string
-      userID:
-        type: integer
-      userName:
-        type: string
-    type: object
 info:
   contact: {}
-  description: Internal microservice that receives and stores audit log events emitted
-    by the main API. Not meant for direct public use.
+  description: Internal microservice that consumes CloudEvents from the Kafka backbone
+    and stores them as audit log entries. Not meant for direct public use.
   title: Omoikane Audit Service
   version: "1.0"
 paths:
@@ -82,42 +46,6 @@ paths:
       security:
       - BearerAuth: []
       summary: List audit logs (admin)
-      tags:
-      - audit
-  /events:
-    post:
-      consumes:
-      - application/json
-      description: Stores an audit log event emitted by the main API.
-      parameters:
-      - description: Audit event
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.AuditLog'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: boolean
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Ingest audit event
       tags:
       - audit
   /health:

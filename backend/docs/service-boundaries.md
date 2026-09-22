@@ -125,9 +125,12 @@ Unreachable owners fail loud (502). No shared-DB reads remain.
 - Public reads are cached per service through the **shared Redis**
   (`CacheRead`, 30s TTL): content, auth, and settings mounted it; a `flushCache()`
   (FlushDB) in any service invalidates every other service's SSR/cache tier.
-- Audit events are **written by the owning service** (outbox → Kafka → audit)
-  starting Phase 32; until then `GET /api/audit-logs` hits the audit-service
-  directly (Phase 31) and the audit microservice keeps its DB-backed log table.
+- Audit events are **written by the owning service**: each service appends
+  domain events to its transactional outbox, the relay publishes them to the
+  Kafka backbone (`omoikane.events`), and the **audit-service consumes them**
+  (group `audit`) into its `AuditLog` table — no HTTP audit path exists since
+  Phase 32. `GET /api/audit-logs` hits the audit-service directly (Phase 31).
+  See [`events.md`](./events.md) for the full event catalog.
 
 ## 5. Gateway routing plan (nginx)
 
@@ -219,3 +222,16 @@ containers (the advertised address resolves to the container itself).
 - [x] No route listed more than once under a non-cross-cutting owner
 - [x] Auth invariants (§4) hold after each service extraction
 - [x] Full Go + Playwright suites green on the frozen contract (Phase 31 gate)
+- [x] Audit rows arrive via the Kafka backbone, not HTTP (Phase 32 gate: post
+      publish → `action=publish` row through the audit consumer)
+
+## 7. Event catalog
+
+Live domain events, producers, and consumers are documented in
+[`events.md`](./events.md). In short: the seven live event types
+(`user.registered`, `auth.login`, `page.published`, `post.published`,
+`media.uploaded`, `contact.received`, `settings.updated`) are emitted by their
+owning services via the transactional outbox → relay → `omoikane.events`;
+`cmd/audit` consumes group `audit` (start `kafka.LastOffset`,
+idempotent on `AuditLog.EventID`) and maps them to audit rows. `page.updated`,
+`post.updated`, and `message.created` are schema-frozen but not yet emitted.

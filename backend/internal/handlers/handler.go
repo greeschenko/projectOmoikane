@@ -25,7 +25,6 @@ type Handler struct {
 	SMTPPass        string
 	SMTPFrom        string
 	RecaptchaSecret string
-	AuditServiceURL string
 	MediaBaseURL    string
 	Cache           cache.Cache
 	// Outbox, when non-nil, enables transactional event emission: handlers that

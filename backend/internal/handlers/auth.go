@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"omoikane-backend/internal/auth"
-	"omoikane-backend/internal/audit"
 	"omoikane-backend/internal/mailer"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
@@ -185,15 +184,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   86400,
 	})
 
-	audit.Emit(h.AuditServiceURL, audit.Event{
-		UserID:     user.ID,
-		UserName:   user.Name,
-		Action:     "login",
-		EntityType: "user",
-		EntityID:   user.ID,
-		IP:         r.RemoteAddr,
-		UserAgent:  r.UserAgent(),
-	})
+	// Phase 32: logins flow to the audit service as auth.login events on the
+	// Kafka backbone (replaces the retired HTTP audit.Emit).
+	h.emitAuthLogin(r.Context(), user, "cookie")
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
@@ -272,7 +265,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 // Logout clears the session cookie.
 // @Summary User logout
-// @Description Clears the session cookie and emits a logout audit event.
+// @Description Clears the session cookie. (No logout audit event yet — Phase 33+ catalog addition.)
 // @Tags auth
 // @Produce json
 // @Security BearerAuth
@@ -280,19 +273,6 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 // @Router /auth/logout [post]
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	userID := middleware.GetUserID(r)
-	if userID > 0 {
-		var user models.User
-		h.DB.First(&user, userID)
-		audit.Emit(h.AuditServiceURL, audit.Event{
-			UserID:     userID,
-			UserName:   user.Name,
-			Action:     "logout",
-			EntityType: "user",
-			EntityID:   userID,
-		})
-	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -485,14 +465,14 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 func sanitizeUserJSON(user models.User) map[string]interface{} {
 	return map[string]interface{}{
-		"id":         user.ID,
-		"name":       user.Name,
-		"email":      user.Email,
-		"role":       user.Role,
-		"status":     user.Status,
-		"avatar":     user.Avatar,
-		"createdAt":  user.CreatedAt,
-		"updatedAt":  user.UpdatedAt,
+		"id":        user.ID,
+		"name":      user.Name,
+		"email":     user.Email,
+		"role":      user.Role,
+		"status":    user.Status,
+		"avatar":    user.Avatar,
+		"createdAt": user.CreatedAt,
+		"updatedAt": user.UpdatedAt,
 	}
 }
 

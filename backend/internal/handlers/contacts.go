@@ -63,7 +63,7 @@ func (h *Handler) SubmitContact(w http.ResponseWriter, r *http.Request) {
 		Subject: req.Subject,
 		Message: req.Message,
 	}
-	if err := h.DB.Create(&msg).Error; err != nil {
+	if err := h.createContactAndEmit(r.Context(), &msg); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save message"})
 		return
