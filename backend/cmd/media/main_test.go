@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -84,8 +85,11 @@ func setupMediaService(t *testing.T) (*gorm.DB, *httptest.Server, *events.Relay,
 		JWTSecret: "test-secret",
 		UploadDir: t.TempDir(),
 		Outbox:    outbox,
+		// Media owns the media trash entity (Phase 31); internal endpoints serve
+		// it to the trash aggregator + dashboard facade.
+		TrashEntities: []string{"media"},
 	}
-	s := httptest.NewServer(newMediaMux(h))
+	s := httptest.NewServer(newMediaMux(h, "test-internal-token"))
 	t.Cleanup(s.Close)
 
 	stub := &stubProducer{}
@@ -230,5 +234,85 @@ func TestMediaService_ProtectedRoutesRejectAnonymous(t *testing.T) {
 		if resp.StatusCode != http.StatusUnauthorized {
 			t.Errorf("%s %s: expected 401, got %d", tc.method, tc.path, resp.StatusCode)
 		}
+	}
+}
+
+// TestMediaService_InternalEndpoints covers the Phase 31 /internal/* surface:
+// token-gated, dashboard stats (media count) and the media-owned trash entity.
+func TestMediaService_InternalEndpoints(t *testing.T) {
+	db, s, _, _ := setupMediaService(t)
+
+	// 401 without the shared internal token.
+	for _, path := range []string{"/internal/stats", "/internal/trash", "/internal/trash/count"} {
+		resp, err := http.Get(s.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("GET %s without token: expected 401, got %d", path, resp.StatusCode)
+		}
+	}
+
+	internal := func(method, path string) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest(method, s.URL+path, nil)
+		req.Header.Set("X-Internal-Token", "test-internal-token")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s %s: %v", method, path, err)
+		}
+		return resp
+	}
+
+	m := models.MediaItem{Filename: "pic.png", MimeType: "image/png", Size: 10, FilePath: "uploads/pic.png"}
+	if err := db.Create(&m).Error; err != nil {
+		t.Fatalf("create media: %v", err)
+	}
+
+	// Stats: media count.
+	resp := internal("GET", "/internal/stats")
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		t.Fatalf("GET /internal/stats: expected 200, got %d", resp.StatusCode)
+	}
+	var stats struct {
+		Media int64 `json:"media"`
+	}
+	json.NewDecoder(resp.Body).Decode(&stats)
+	resp.Body.Close()
+	if stats.Media != 1 {
+		t.Errorf("media stat = %d, want 1", stats.Media)
+	}
+
+	// Trash: soft-delete the media row, list/count show it, restore clears it.
+	db.Delete(&m)
+	resp = internal("GET", "/internal/trash/count")
+	var count struct {
+		Count int64 `json:"count"`
+	}
+	json.NewDecoder(resp.Body).Decode(&count)
+	resp.Body.Close()
+	if count.Count != 1 {
+		t.Errorf("trash count = %d, want 1", count.Count)
+	}
+	resp = internal("GET", "/internal/trash")
+	var items []json.RawMessage
+	json.NewDecoder(resp.Body).Decode(&items)
+	resp.Body.Close()
+	if len(items) != 1 {
+		t.Errorf("trash list = %d items, want 1", len(items))
+	}
+	resp = internal("POST", fmt.Sprintf("/internal/trash/media/%d/restore", m.ID))
+	code := resp.StatusCode
+	resp.Body.Close()
+	if code != http.StatusOK {
+		t.Errorf("restore: expected 200, got %d", code)
+	}
+	resp = internal("GET", "/internal/trash/count")
+	json.NewDecoder(resp.Body).Decode(&count)
+	resp.Body.Close()
+	if count.Count != 0 {
+		t.Errorf("trash count after restore = %d, want 0", count.Count)
 	}
 }

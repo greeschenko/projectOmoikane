@@ -42,6 +42,48 @@ info:
   title: Omoikane Audit Service
   version: "1.0"
 paths:
+  /audit-logs:
+    get:
+      description: Returns stored audit log entries. Supports filters and pagination
+        (limit <= 500).
+      parameters:
+      - description: Filter by entity type
+        in: query
+        name: entity
+        type: string
+      - description: Filter by action
+        in: query
+        name: action
+        type: string
+      - description: Filter by actor user ID
+        in: query
+        name: userId
+        type: integer
+      - description: Search user name or detail
+        in: query
+        name: search
+        type: string
+      - description: Max results (1-500, default 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List audit logs (admin)
+      tags:
+      - audit
   /events:
     post:
       consumes:

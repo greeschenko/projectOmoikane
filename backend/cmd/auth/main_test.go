@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"omoikane-backend/internal/database"
 	"omoikane-backend/internal/events"
 	"omoikane-backend/internal/handlers"
+	"omoikane-backend/internal/models"
 
 	"gorm.io/gorm"
 )
@@ -72,8 +74,11 @@ func setupAuthService(t *testing.T) (*gorm.DB, *httptest.Server, *events.Relay, 
 		DB:        db,
 		JWTSecret: "test-secret",
 		Outbox:    outbox,
+		// Auth owns the user trash entity (Phase 31); internal endpoints serve
+		// it to the trash aggregator + dashboard facade.
+		TrashEntities: []string{"user"},
 	}
-	s := httptest.NewServer(newAuthMux(h))
+	s := httptest.NewServer(newAuthMux(h, "test-internal-token"))
 	t.Cleanup(s.Close)
 
 	stub := &stubProducer{}
@@ -195,5 +200,87 @@ func TestAuthService_ProtectedRoutesRejectAnonymous(t *testing.T) {
 		if resp.StatusCode != http.StatusUnauthorized {
 			t.Errorf("%s %s: expected 401, got %d", tc.method, tc.path, resp.StatusCode)
 		}
+	}
+}
+
+// TestAuthService_InternalEndpoints covers the Phase 31 /internal/* surface:
+// it must be token-gated (401 without the shared internal token) and serve the
+// dashboard facade (stats) + trash aggregator (user entity) within the rows the
+// auth service owns.
+func TestAuthService_InternalEndpoints(t *testing.T) {
+	db, s, _, _ := setupAuthService(t)
+
+	// 401 without the shared internal token.
+	for _, path := range []string{"/internal/stats", "/internal/trash", "/internal/trash/count"} {
+		resp, err := http.Get(s.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("GET %s without token: expected 401, got %d", path, resp.StatusCode)
+		}
+	}
+
+	internal := func(method, path string) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest(method, s.URL+path, nil)
+		req.Header.Set("X-Internal-Token", "test-internal-token")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s %s: %v", method, path, err)
+		}
+		return resp
+	}
+
+	// Stats: user count + 7-day zero-filled registrations chart.
+	u := models.User{Name: "Internal", Email: "i@t.com", Password: "x", Role: "admin", Status: "active"}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	resp := internal("GET", "/internal/stats")
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		t.Fatalf("GET /internal/stats: expected 200, got %d", resp.StatusCode)
+	}
+	var stats struct {
+		Users               int64                    `json:"users"`
+		RecentRegistrations []map[string]interface{} `json:"recentRegistrations"`
+	}
+	json.NewDecoder(resp.Body).Decode(&stats)
+	resp.Body.Close()
+	if stats.Users != 1 || len(stats.RecentRegistrations) != 7 {
+		t.Errorf("stats = %+v, want users=1, 7 registration entries", stats)
+	}
+
+	// Trash: soft-delete a user; list + count must show it; restore clears it.
+	db.Delete(&u)
+	resp = internal("GET", "/internal/trash/count")
+	var count struct {
+		Count int64 `json:"count"`
+	}
+	json.NewDecoder(resp.Body).Decode(&count)
+	resp.Body.Close()
+	if count.Count != 1 {
+		t.Errorf("trash count = %d, want 1", count.Count)
+	}
+	resp = internal("GET", "/internal/trash")
+	var items []json.RawMessage
+	json.NewDecoder(resp.Body).Decode(&items)
+	resp.Body.Close()
+	if len(items) != 1 {
+		t.Errorf("trash list = %d items, want 1", len(items))
+	}
+	resp = internal("POST", fmt.Sprintf("/internal/trash/user/%d/restore", u.ID))
+	code := resp.StatusCode
+	resp.Body.Close()
+	if code != http.StatusOK {
+		t.Errorf("restore: expected 200, got %d", code)
+	}
+	resp = internal("GET", "/internal/trash/count")
+	json.NewDecoder(resp.Body).Decode(&count)
+	resp.Body.Close()
+	if count.Count != 0 {
+		t.Errorf("trash count after restore = %d, want 0", count.Count)
 	}
 }

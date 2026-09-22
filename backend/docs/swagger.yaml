@@ -369,48 +369,6 @@ paths:
       summary: Revoke API token
       tags:
       - api-tokens
-  /audit-logs:
-    get:
-      description: Returns audit log entries from the audit microservice. Supports
-        filters and pagination (limit <= 500).
-      parameters:
-      - description: Filter by entity type (e.g. user, page, post)
-        in: query
-        name: entity
-        type: string
-      - description: Filter by action (e.g. create, update, delete)
-        in: query
-        name: action
-        type: string
-      - description: Filter by actor user ID
-        in: query
-        name: userId
-        type: integer
-      - description: Search user name or detail
-        in: query
-        name: search
-        type: string
-      - description: Max results (1-500, default 100)
-        in: query
-        name: limit
-        type: integer
-      - description: Pagination offset
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - BearerAuth: []
-      summary: List audit logs
-      tags:
-      - audit
   /auth/forgot-password:
     post:
       consumes:
@@ -1176,6 +1134,145 @@ paths:
       summary: Health check
       tags:
       - system
+  /internal/stats:
+    get:
+      description: Returns the message count and most recent messages used by the
+        dashboard facade.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Messages dashboard stats (internal)
+      tags:
+      - dashboard
+  /internal/trash:
+    delete:
+      description: Hard-deletes all owned trash rows, or only the given entity's when
+        ?entity= is provided.
+      parameters:
+      - description: Only empty this owned entity type
+        in: query
+        name: entity
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Empty owned trash (internal)
+      tags:
+      - trash
+    get:
+      description: Returns the soft-deleted rows for the entities this service owns.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_handlers.TrashItem'
+            type: array
+      summary: List owned trash items (internal)
+      tags:
+      - trash
+  /internal/trash/{entity}/{id}:
+    delete:
+      description: Hard-deletes a soft-deleted row by entity type and ID; media files
+        are removed from disk.
+      parameters:
+      - description: Owned entity type (page, user, post, media, contact, message,
+          tag, category)
+        in: path
+        name: entity
+        required: true
+        type: string
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Permanently delete owned trash item (internal)
+      tags:
+      - trash
+  /internal/trash/{entity}/{id}/restore:
+    post:
+      description: Restores a soft-deleted row by entity type and ID.
+      parameters:
+      - description: Owned entity type (page, user, post, media, contact, message,
+          tag, category)
+        in: path
+        name: entity
+        required: true
+        type: string
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Restore owned trash item (internal)
+      tags:
+      - trash
+  /internal/trash/count:
+    get:
+      description: Returns the total number of soft-deleted rows this service owns.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+      summary: Count owned trash (internal)
+      tags:
+      - trash
   /media:
     get:
       description: Returns all media items, newest first, each with base64-encoded
@@ -2060,6 +2157,12 @@ paths:
           schema:
             additionalProperties:
               type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
             type: object
       security:
       - BearerAuth: []

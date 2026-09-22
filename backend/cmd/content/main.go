@@ -7,16 +7,16 @@
 //
 // Store split (Wave 2): "process split, shared store". The content service is
 // its own process (CONTENT_PORT, default 8083) but connects to the same
-// Postgres `omoikane` store as the monolith and auth service, because the
-// monolith still reads content data (public SSR fetches, dashboard, trash)
-// until the Phase 31 aggregator work. A physical schema partition is deferred.
+// Postgres `omoikane` store as the other services. Since Phase 31 the
+// trash/dashboard aggregators read via internal APIs — no service reads
+// another's tables directly. A physical schema partition is deferred.
 //
 // Events: content is the single writer of content events. It wires the Phase 28
 // outbox (page/post writes enqueue inside the business transaction) and runs a
 // Relay that publishes page.published / post.published CloudEvents to Kafka.
-// The monolith deliberately leaves its own outbox nil, so there is never double
-// emission. Kafka being unreachable must not fatal the service: topic
-// provisioning is best-effort and the relay keeps retrying pending rows.
+// Content is the only service with a non-nil outbox for these rows, so there is
+// never double emission. Kafka being unreachable must not fatal the service:
+// topic provisioning is best-effort and the relay keeps retrying pending rows.
 package main
 
 import (
@@ -98,15 +98,17 @@ func main() {
 		DB:              db,
 		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-production"),
 		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
+		// Content owns the page/post/tag/category trash entities (Phase 31).
+		TrashEntities: []string{"page", "post", "tag", "category"},
 		// Content is the single writer of content events (page.published,
 		// post.published). The outbox store is transactional (handler enqueues
 		// inside the business DB tx); the relay below flushes it to Kafka.
 		Outbox: outbox,
 	}
 
-	// Public GET caches share the monolith's Redis instance, so cache flushes
-	// from either process keep SSR reads (backend:8080) and gateway reads
-	// (content-service) mutually consistent.
+	// Public GET caches share the platform Redis instance, so cache flushes
+	// from any service keep SSR reads (through the gateway) and gateway reads
+	// (content-service, settings-service, auth-service) mutually consistent.
 	var c cache.Cache = cache.NoopCache{}
 	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
 		if rc, rerr := cache.NewRedis(redisURL, 30*time.Second); rerr != nil {
@@ -126,7 +128,7 @@ func main() {
 		log.Println("WARNING: content-service: outbox relay not started (no producer)")
 	}
 
-	mux := newContentMux(h)
+	mux := newContentMux(h, getEnv("INTERNAL_TOKEN", ""))
 
 	addr := ":" + port
 	log.Printf("content-service starting on %s", addr)
@@ -149,7 +151,9 @@ func main() {
 // newContentMux registers every content-service route. Mux paths carry NO /api
 // prefix — nginx prefix locations strip the prefix, so /api/pages -> /pages.
 // Exposed as a function so cmd/content tests can exercise the full wiring.
-func newContentMux(h *handlers.Handler) *http.ServeMux {
+// internalToken authenticates the /internal/* endpoints (trash aggregator +
+// dashboard facade) via the shared X-Internal-Token header.
+func newContentMux(h *handlers.Handler, internalToken string) *http.ServeMux {
 	mux := http.NewServeMux()
 	cacheTTL := 30 * time.Second
 
@@ -184,6 +188,16 @@ func newContentMux(h *handlers.Handler) *http.ServeMux {
 	mux.HandleFunc("GET /blog/categories", h.GetCategories)
 	mux.HandleFunc("POST /blog/categories", h.Admin(h.CreateCategory))
 	mux.HandleFunc("DELETE /blog/categories/{id}", h.Admin(h.DeleteCategory))
+
+	// Internal endpoints (Phase 31): served to the trash aggregator and the
+	// dashboard facade inside the compose network. Guarded by the shared
+	// internal token; the gateway never exposes /internal/*.
+	mux.HandleFunc("GET /internal/stats", middleware.InternalAuth(internalToken, h.InternalStatsContent))
+	mux.HandleFunc("GET /internal/trash", middleware.InternalAuth(internalToken, h.InternalTrashList))
+	mux.HandleFunc("GET /internal/trash/count", middleware.InternalAuth(internalToken, h.InternalTrashCount))
+	mux.HandleFunc("POST /internal/trash/{entity}/{id}/restore", middleware.InternalAuth(internalToken, h.InternalTrashRestore))
+	mux.HandleFunc("DELETE /internal/trash/{entity}/{id}", middleware.InternalAuth(internalToken, h.InternalTrashHardDelete))
+	mux.HandleFunc("DELETE /internal/trash", middleware.InternalAuth(internalToken, h.InternalTrashEmpty))
 
 	return mux
 }

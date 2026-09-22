@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -79,8 +80,12 @@ func setupContentService(t *testing.T) (*gorm.DB, *httptest.Server, *events.Rela
 		DB:        db,
 		JWTSecret: "test-secret",
 		Outbox:    outbox,
+		// Content owns the page/post/tag/category trash entities (Phase 31);
+		// internal endpoints serve them to the trash aggregator + dashboard
+		// facade.
+		TrashEntities: []string{"page", "post", "tag", "category"},
 	}
-	s := httptest.NewServer(newContentMux(h))
+	s := httptest.NewServer(newContentMux(h, "test-internal-token"))
 	t.Cleanup(s.Close)
 
 	stub := &stubProducer{}
@@ -290,5 +295,82 @@ func TestContentService_ProtectedRoutesRejectAnonymous(t *testing.T) {
 		if resp.StatusCode != http.StatusUnauthorized {
 			t.Errorf("%s %s: expected 401, got %d", tc.method, tc.path, resp.StatusCode)
 		}
+	}
+}
+
+// TestContentService_InternalEndpoints covers the Phase 31 /internal/* surface:
+// token-gated, dashboard stats (page/post counts) and the content-owned trash
+// entities (page/post/tag/category only).
+func TestContentService_InternalEndpoints(t *testing.T) {
+	db, s, _, _ := setupContentService(t)
+
+	// 401 without the shared internal token.
+	for _, path := range []string{"/internal/stats", "/internal/trash", "/internal/trash/count"} {
+		resp, err := http.Get(s.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("GET %s without token: expected 401, got %d", path, resp.StatusCode)
+		}
+	}
+
+	internal := func(method, path string) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest(method, s.URL+path, nil)
+		req.Header.Set("X-Internal-Token", "test-internal-token")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s %s: %v", method, path, err)
+		}
+		return resp
+	}
+
+	// Stats: page + post counts.
+	p := models.Page{Title: "Internal", Slug: "internal", Content: "<p>x</p>", Status: "published"}
+	post := models.BlogPost{Title: "Post", Slug: "post", Content: "<p>y</p>", Status: "published"}
+	if err := db.Create(&p).Error; err != nil {
+		t.Fatalf("create page: %v", err)
+	}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("create post: %v", err)
+	}
+	resp := internal("GET", "/internal/stats")
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		t.Fatalf("GET /internal/stats: expected 200, got %d", resp.StatusCode)
+	}
+	var stats struct {
+		Pages int64 `json:"pages"`
+		Posts int64 `json:"posts"`
+	}
+	json.NewDecoder(resp.Body).Decode(&stats)
+	resp.Body.Close()
+	if stats.Pages != 1 || stats.Posts != 1 {
+		t.Errorf("stats = %+v, want pages=1 posts=1", stats)
+	}
+
+	// Trash is scoped to owned entities: a page row is listed, a media row is
+	// NOT (content service is not the media owner).
+	db.Delete(&p)
+	m := models.MediaItem{Filename: "x.png", MimeType: "image/png", Size: 1, FilePath: "uploads/x.png"}
+	db.Create(&m)
+	db.Delete(&m)
+	resp = internal("GET", "/internal/trash")
+	var items []struct {
+		ID     uint   `json:"id"`
+		Entity string `json:"entity"`
+	}
+	json.NewDecoder(resp.Body).Decode(&items)
+	resp.Body.Close()
+	if len(items) != 1 || items[0].Entity != "page" {
+		t.Errorf("trash list = %+v, want exactly 1 page item (media not owned)", items)
+	}
+	resp = internal("POST", fmt.Sprintf("/internal/trash/page/%d/restore", p.ID))
+	code := resp.StatusCode
+	resp.Body.Close()
+	if code != http.StatusOK {
+		t.Errorf("restore: expected 200, got %d", code)
 	}
 }

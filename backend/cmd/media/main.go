@@ -8,17 +8,17 @@
 //
 // Store split (Wave 2): "process split, shared store". The media service is its
 // own process (MEDIA_PORT, default 8084) but connects to the same Postgres
-// `omoikane` store as the monolith and auth service, because the monolith still
-// reads media data (SSR media JSON, trash) until the Phase 31 aggregator work.
-// Uploaded files stay on the shared bind-mounted disk (../backend:/app), so
-// ./uploads resolves to the same backend/uploads directory every container sees.
+// `omoikane` store as the other services. Since Phase 31 the trash/dashboard
+// aggregators read via internal APIs — no service reads another's tables
+// directly. Uploaded files stay on the shared bind-mounted disk (../backend:/app),
+// so ./uploads resolves to the same backend/uploads directory every container sees.
 //
 // Events: media is the single writer of media events. It wires the Phase 28
 // outbox (media upload enqueues inside the business transaction) and runs a
-// Relay that publishes media.uploaded CloudEvents to Kafka. The monolith
-// deliberately leaves its own outbox nil, so there is never double emission.
-// Kafka being unreachable must not fatal the service: topic provisioning is
-// best-effort and the relay keeps retrying pending rows.
+// Relay that publishes media.uploaded CloudEvents to Kafka. Media is the only
+// service with a non-nil outbox for these rows, so there is never double
+// emission. Kafka being unreachable must not fatal the service: topic
+// provisioning is best-effort and the relay keeps retrying pending rows.
 package main
 
 import (
@@ -32,6 +32,7 @@ import (
 
 	"omoikane-backend/internal/events"
 	"omoikane-backend/internal/handlers"
+	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 
 	"gorm.io/driver/postgres"
@@ -92,6 +93,9 @@ func main() {
 		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
 		UploadDir:       getEnv("UPLOAD_DIR", "./uploads"),
 		MediaBaseURL:    getEnv("MEDIA_BASE_URL", ""),
+		// Media owns the "media" trash entity (Phase 31); hard-delete keeps the
+		// disk cleanup in this service.
+		TrashEntities: []string{"media"},
 		// Media is the single writer of media events (media.uploaded). The
 		// outbox store is transactional (handler enqueues inside the business
 		// DB tx); the relay below flushes it to Kafka.
@@ -107,7 +111,7 @@ func main() {
 		log.Println("WARNING: media-service: outbox relay not started (no producer)")
 	}
 
-	mux := newMediaMux(h)
+	mux := newMediaMux(h, getEnv("INTERNAL_TOKEN", ""))
 
 	addr := ":" + port
 	log.Printf("media-service starting on %s", addr)
@@ -130,7 +134,9 @@ func main() {
 // newMediaMux registers every media-service route. Mux paths carry NO /api
 // prefix — nginx prefix locations strip the prefix, so /api/media -> /media.
 // Exposed as a function so cmd/media tests can exercise the full wiring.
-func newMediaMux(h *handlers.Handler) *http.ServeMux {
+// internalToken authenticates the /internal/* endpoints (trash aggregator +
+// dashboard facade) via the shared X-Internal-Token header.
+func newMediaMux(h *handlers.Handler, internalToken string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Health (readiness check from Makefile / compose healthcheck)
@@ -146,6 +152,16 @@ func newMediaMux(h *handlers.Handler) *http.ServeMux {
 	mux.HandleFunc("PUT /media/{id}", h.Auth(h.UpdateMedia))
 	mux.HandleFunc("DELETE /media/{id}", h.Auth(h.DeleteMedia))
 	mux.HandleFunc("POST /media/batch", h.Auth(h.BatchMedia))
+
+	// Internal endpoints (Phase 31): served to the trash aggregator + dashboard
+	// facade inside the compose network. Guarded by the shared internal token;
+	// the gateway never exposes /internal/*.
+	mux.HandleFunc("GET /internal/stats", middleware.InternalAuth(internalToken, h.InternalStatsMedia))
+	mux.HandleFunc("GET /internal/trash", middleware.InternalAuth(internalToken, h.InternalTrashList))
+	mux.HandleFunc("GET /internal/trash/count", middleware.InternalAuth(internalToken, h.InternalTrashCount))
+	mux.HandleFunc("POST /internal/trash/{entity}/{id}/restore", middleware.InternalAuth(internalToken, h.InternalTrashRestore))
+	mux.HandleFunc("DELETE /internal/trash/{entity}/{id}", middleware.InternalAuth(internalToken, h.InternalTrashHardDelete))
+	mux.HandleFunc("DELETE /internal/trash", middleware.InternalAuth(internalToken, h.InternalTrashEmpty))
 
 	return mux
 }

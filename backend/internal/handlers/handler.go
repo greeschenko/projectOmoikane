@@ -33,6 +33,10 @@ type Handler struct {
 	// business write runs in (atomic outbox). The monolith leaves this nil
 	// (single-writer: only the auth service emits auth events).
 	Outbox events.OutboxStore
+	// TrashEntities names the soft-delete entities this service owns (Phase 31):
+	// the internal /internal/trash* endpoints only serve these. auth = user;
+	// content = page/post/tag/category; media = media; messages = contact/message.
+	TrashEntities []string
 }
 
 // flushCache invalidates the response cache after any write to a cached entity.

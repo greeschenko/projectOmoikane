@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	_ "omoikane-backend/cmd/audit/docs"
+	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
 
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -44,10 +45,19 @@ func main() {
 	}
 	log.Println("Audit service connected and migrated")
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret-change-in-production"
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /swagger/", httpSwagger.Handler())
 	mux.HandleFunc("POST /events", handleReceiveEvent)
 	mux.HandleFunc("GET /logs", handleGetLogs)
+	// Admin-only surface exposed directly to the gateway (Phase 31): the
+	// frontend audit-log page calls /api/audit-logs with the admin session
+	// cookie, and nginx routes it here (no monolith proxy).
+	mux.HandleFunc("GET /audit-logs", middleware.AdminRequired(jwtSecret, handleAuditLogsAdmin))
 	mux.HandleFunc("GET /health", handleHealth)
 
 	addr := ":" + port
@@ -112,6 +122,26 @@ func handleReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+// handleAuditLogsAdmin is the gateway-facing admin wrapper around handleGetLogs
+// (Phase 31). It carries the /audit-logs swagger annotations; the raw /logs
+// endpoint remains for direct service calls.
+// @Summary List audit logs (admin)
+// @Description Returns stored audit log entries. Supports filters and pagination (limit <= 500).
+// @Tags audit
+// @Produce json
+// @Security BearerAuth
+// @Param entity query string false "Filter by entity type"
+// @Param action query string false "Filter by action"
+// @Param userId query int false "Filter by actor user ID"
+// @Param search query string false "Search user name or detail"
+// @Param limit query int false "Max results (1-500, default 100)"
+// @Param offset query int false "Pagination offset"
+// @Success 200 {object} map[string]interface{}
+// @Router /audit-logs [get]
+func handleAuditLogsAdmin(w http.ResponseWriter, r *http.Request) {
+	handleGetLogs(w, r)
 }
 
 // handleGetLogs returns stored audit logs with filters and pagination.

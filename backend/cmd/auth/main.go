@@ -7,15 +7,15 @@
 //
 // Store split (Wave 1): "process split, shared store". The auth service is its
 // own process (AUTH_PORT, default 8082) but connects to the same Postgres
-// `omoikane` store as the monolith, because the monolith still reads auth data
-// (blog author names, dashboard stats, trash, Bearer-token lookups) until the
-// Phase 31 aggregator work. A physical schema partition is deferred.
+// `omoikane` store as the other services. Since Phase 31 the trash/dashboard
+// aggregators read via internal APIs — no service reads another's tables
+// directly. A physical schema partition is deferred.
 //
 // Events: auth is the single writer of auth events. It wires the Phase 28
 // outbox (User/ApiToken writes enqueue inside the business transaction) and
-// runs a Relay that publishes user.registered CloudEvents to Kafka. The
-// monolith deliberately leaves its own outbox nil so there is never double
-// emission. Kafka being unreachable must not fatal the service: topic
+// runs a Relay that publishes user.registered CloudEvents to Kafka. Auth is
+// the only service with a non-nil outbox for these rows so there is never
+// double emission. Kafka being unreachable must not fatal the service: topic
 // provisioning is best-effort and the relay keeps retrying pending rows.
 package main
 
@@ -28,6 +28,7 @@ import (
 	"syscall"
 	"time"
 
+	"omoikane-backend/internal/cache"
 	"omoikane-backend/internal/events"
 	"omoikane-backend/internal/handlers"
 	"omoikane-backend/internal/middleware"
@@ -101,11 +102,27 @@ func main() {
 		SMTPFrom:        getEnv("SMTP_FROM", "noreply@omoikane.local"),
 		RecaptchaSecret: getEnv("RECAPTCHA_SECRET", ""),
 		AuditServiceURL: getEnv("AUDIT_SERVICE_URL", ""),
+		// Auth owns the "user" trash entity (Phase 31): its internal endpoints
+		// serve only user rows to the trash aggregator.
+		TrashEntities: []string{"user"},
 		// Auth is the single writer of auth events. The outbox store is
 		// transactional (handler enqueues inside the business DB tx); the relay
 		// below flushes it to Kafka.
 		Outbox: outbox,
 	}
+
+	// User writes invalidate the shared public cache (blog lists render author
+	// names), so auth joins the platform Redis instance and flushes on user
+	// mutations — invalidating every service's SSR/cache tier.
+	var c cache.Cache = cache.NoopCache{}
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		if rc, rerr := cache.NewRedis(redisURL, 30*time.Second); rerr != nil {
+			log.Printf("WARNING: auth-service: cache disabled (%v)", rerr)
+		} else {
+			c = rc
+		}
+	}
+	h.Cache = c
 
 	// Outbox relay: publishes user.registered to Kafka on an interval until the
 	// process shuts down. When Kafka is down, publish fails -> rows are kept
@@ -117,7 +134,7 @@ func main() {
 		log.Println("WARNING: auth-service: outbox relay not started (no producer)")
 	}
 
-	mux := newAuthMux(h)
+	mux := newAuthMux(h, getEnv("INTERNAL_TOKEN", ""))
 
 	addr := ":" + port
 	log.Printf("auth-service starting on %s", addr)
@@ -140,7 +157,9 @@ func main() {
 // newAuthMux registers every auth-service route. Mux paths carry NO /api prefix
 // — nginx prefix locations strip the prefix, so /api/auth/login -> /auth/login.
 // Exposed as a function so cmd/auth tests can exercise the full wiring.
-func newAuthMux(h *handlers.Handler) *http.ServeMux {
+// internalToken authenticates the /internal/* endpoints (trash aggregator +
+// dashboard facade) via the shared X-Internal-Token header.
+func newAuthMux(h *handlers.Handler, internalToken string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Health (readiness check from Makefile / compose healthcheck)
@@ -159,8 +178,8 @@ func newAuthMux(h *handlers.Handler) *http.ServeMux {
 	mux.HandleFunc("POST /auth/forgot-password", forgotPasswordLimiter.Middleware(h.ForgotPassword))
 	mux.HandleFunc("POST /auth/reset-password", h.ResetPassword)
 
-	// Settings — only the authenticated profile surface moves in Wave 1; the
-	// public GET /settings stays on the monolith until the settings service.
+	// Settings — only the authenticated profile surface lives here; the public
+	// GET/PUT /settings route belongs to the settings-service (Phase 31).
 	mux.HandleFunc("GET /settings/profile", h.Auth(h.GetProfile))
 	mux.HandleFunc("PUT /settings/profile", h.Auth(h.UpdateProfile))
 	mux.HandleFunc("POST /settings/password", h.Auth(h.ChangePassword))
@@ -176,6 +195,16 @@ func newAuthMux(h *handlers.Handler) *http.ServeMux {
 	mux.HandleFunc("GET /api-tokens", h.Admin(h.GetApiTokens))
 	mux.HandleFunc("POST /api-tokens", h.Admin(h.CreateApiToken))
 	mux.HandleFunc("DELETE /api-tokens/{id}", h.Admin(h.DeleteApiToken))
+
+	// Internal endpoints (Phase 31): served to the trash aggregator and the
+	// dashboard facade inside the compose network. Guarded by the shared
+	// internal token; the gateway never exposes /internal/*.
+	mux.HandleFunc("GET /internal/stats", middleware.InternalAuth(internalToken, h.InternalStatsUsers))
+	mux.HandleFunc("GET /internal/trash", middleware.InternalAuth(internalToken, h.InternalTrashList))
+	mux.HandleFunc("GET /internal/trash/count", middleware.InternalAuth(internalToken, h.InternalTrashCount))
+	mux.HandleFunc("POST /internal/trash/{entity}/{id}/restore", middleware.InternalAuth(internalToken, h.InternalTrashRestore))
+	mux.HandleFunc("DELETE /internal/trash/{entity}/{id}", middleware.InternalAuth(internalToken, h.InternalTrashHardDelete))
+	mux.HandleFunc("DELETE /internal/trash", middleware.InternalAuth(internalToken, h.InternalTrashEmpty))
 
 	return mux
 }

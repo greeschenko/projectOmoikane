@@ -1,15 +1,17 @@
 export const dynamic = "force-dynamic";
 
-const apiBase = process.env.API_URL || "http://backend:8080";
+// Route-handler API base. Phase 31 retires the backend process, so fetches flow
+// through the nginx gateway (/api/* prefix).
+const apiBase = process.env.API_URL || "http://nginx";
 
 export async function GET() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-  const settingsRes = await fetch(`${apiBase}/settings`);
+  const settingsRes = await fetch(`${apiBase}/api/settings`);
   const settings = settingsRes.ok ? await settingsRes.json() : null;
   const siteName = settings?.siteName || "Omoikane";
 
-  const postsRes = await fetch(`${apiBase}/blog/posts`);
+  const postsRes = await fetch(`${apiBase}/api/blog/posts`);
   const allPosts = postsRes.ok ? await postsRes.json() : [];
   const posts = (Array.isArray(allPosts) ? allPosts : (allPosts.posts ?? []))
     .filter((p: any) => p.status === "published")

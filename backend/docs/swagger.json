@@ -170,70 +170,6 @@
                 }
             }
         },
-        "/audit-logs": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns audit log entries from the audit microservice. Supports filters and pagination (limit \u003c= 500).",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "audit"
-                ],
-                "summary": "List audit logs",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Filter by entity type (e.g. user, page, post)",
-                        "name": "entity",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by action (e.g. create, update, delete)",
-                        "name": "action",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Filter by actor user ID",
-                        "name": "userId",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Search user name or detail",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Max results (1-500, default 100)",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Pagination offset",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/auth/forgot-password": {
             "post": {
                 "description": "Emails a password reset link if the account exists. Rate limited to 3 requests per 15 minutes per IP.",
@@ -1391,6 +1327,208 @@
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/stats": {
+            "get": {
+                "description": "Returns the message count and most recent messages used by the dashboard facade.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Messages dashboard stats (internal)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/trash": {
+            "get": {
+                "description": "Returns the soft-deleted rows for the entities this service owns.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trash"
+                ],
+                "summary": "List owned trash items (internal)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_handlers.TrashItem"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Hard-deletes all owned trash rows, or only the given entity's when ?entity= is provided.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trash"
+                ],
+                "summary": "Empty owned trash (internal)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Only empty this owned entity type",
+                        "name": "entity",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/trash/count": {
+            "get": {
+                "description": "Returns the total number of soft-deleted rows this service owns.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trash"
+                ],
+                "summary": "Count owned trash (internal)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer",
+                                "format": "int64"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/trash/{entity}/{id}": {
+            "delete": {
+                "description": "Hard-deletes a soft-deleted row by entity type and ID; media files are removed from disk.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trash"
+                ],
+                "summary": "Permanently delete owned trash item (internal)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owned entity type (page, user, post, media, contact, message, tag, category)",
+                        "name": "entity",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Item ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/trash/{entity}/{id}/restore": {
+            "post": {
+                "description": "Restores a soft-deleted row by entity type and ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trash"
+                ],
+                "summary": "Restore owned trash item (internal)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owned entity type (page, user, post, media, contact, message, tag, category)",
+                        "name": "entity",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Item ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2784,6 +2922,15 @@
                             "type": "object",
                             "additionalProperties": {
                                 "type": "boolean"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     }

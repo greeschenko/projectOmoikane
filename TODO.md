@@ -391,13 +391,15 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] Gateway: `/api/pages*`, `/api/blog*`, `/api/admin/blog/` → content-service:8083; `/api/media*`, `/media/` → media-service:8084
 - [x] **First result #1:** pages/blog/media Playwright specs green against the gateway (full `make go-test` + `make test`)
 
-## 🔲 Phase 31: Wave 3 Services — Messages + Settings; Monolith Retired
-- [ ] `cmd/messages`: broadcasts, contact form, notifications — own schema
-- [ ] `cmd/settings`: site settings, email templates — own schema
-- [ ] `cmd/trash`: cross-cutting soft-delete aggregator over all entities (Phase 27 §2)
-- [ ] Dashboard becomes an aggregator (internal fetches)
-- [ ] Delete `cmd/api` monolith; migrate Redis public cache per service
-- [ ] **First result #2:** full Go + Playwright green; zero monolith; every request through gateway → microservice
+## ✅ Phase 31: Wave 3 Services — Messages + Settings; Monolith Retired
+- [x] `cmd/messages` (:8085): broadcasts, contact form, contacts — migrations + outbox; emits nothing new yet
+- [x] `cmd/settings` (:8086): site settings, email templates — migration + outbox + shared-Redis CacheRead (30s)
+- [x] `cmd/trash` (:8087): cross-cutting soft-delete aggregator over all entities — **no shared DB**, fans out to each owner's `/internal/trash*` with `X-Internal-Token` (Phase 27 §2)
+- [x] Dashboard became an aggregator facade (:8088) — fetches each owner's `/internal/stats`, merges into the exact Phase 26 JSON shapes; **no shared DB**
+- [x] Deleted `cmd/api` monolith + `internal/config`; Redis public cache migrated per service (auth + content + settings share one Redis; FlushDB invalidates across services)
+- [x] `cmd/docs` (:8089) — Swagger UI service after monolith removal; `location = /api/audit-logs` → audit-service directly
+- [x] nginx `/api/` catch-all → `return 404` fail-loud; frontend SSR now goes through the gateway (`lib/api.ts`/rss use `http://nginx` + `/api` prefix)
+- [x] **First result #2:** full Go + Playwright green; zero monolith; every request through gateway → microservice
 
 ## 🔲 Phase 32: Real Events Live
 - [ ] Outbox relays publish real domain events on writes

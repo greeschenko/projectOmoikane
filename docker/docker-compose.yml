@@ -11,6 +11,11 @@ services:
       - auth-service
       - content-service
       - media-service
+      - messages-service
+      - settings-service
+      - trash-service
+      - dashboard-service
+      - docs-service
 
   kafka:
     image: apache/kafka:3.9.0
@@ -55,38 +60,19 @@ services:
     environment:
       - NODE_ENV=development
       - WATCHPACK_POLLING=true
-      - API_URL=http://backend:8080
+      # SSR fetches flow through the gateway (http://nginx), not a backend
+      # process — the monolith is retired in Phase 31.
+      - API_URL=http://nginx
     depends_on:
-      - backend
-
-  backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile.dev
-    volumes:
-      - ../backend:/app
-    ports:
-      - "8080:8080"
-    environment:
-      - PORT=8080
-      - DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable
-      - JWT_SECRET=dev-secret-change-in-production
-      - SMTP_HOST=
-      - SMTP_PORT=587
-      - SMTP_USER=
-      - SMTP_PASS=
-      - SMTP_FROM=noreply@omoikane.local
-      - RECAPTCHA_SECRET=
-      - AUDIT_SERVICE_URL=http://audit-service:8081
-      - REDIS_URL=redis://redis:6379/0
-      - MEDIA_BASE_URL=
-    depends_on:
-      postgres:
-        condition: service_healthy
-      audit-service:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - audit-service
+      - auth-service
+      - content-service
+      - media-service
+      - messages-service
+      - settings-service
+      - trash-service
+      - dashboard-service
+      - docs-service
 
   redis:
     image: redis:7-alpine
@@ -96,6 +82,9 @@ services:
   # Wave 1 auth service (Phase 29): separate process, shared Postgres store
   # with the monolith until the Phase 31 aggregator work. Emits user.registered
   # via the outbox -> Kafka relay (KAFKA_BROKERS reachable inside compose).
+  # Phase 31: serves the dashboard facade + trash aggregator over /internal/*
+  # (INTERNAL_TOKEN), and joins the shared Redis so user writes flush the
+  # public cache the content service + SSR reads share.
   auth-service:
     build:
       context: ../backend
@@ -116,6 +105,8 @@ services:
       - SMTP_FROM=noreply@omoikane.local
       - RECAPTCHA_SECRET=
       - AUDIT_SERVICE_URL=http://audit-service:8081
+      - REDIS_URL=redis://redis:6379/0
+      - INTERNAL_TOKEN=dev-internal-token-change-me
       - KAFKA_BROKERS=kafka:29092
       - KAFKA_EVENTS_TOPIC=omoikane.events
       - KAFKA_DLQ_TOPIC=omoikane.events.dlq
@@ -134,8 +125,9 @@ services:
   # with the monolith until the Phase 31 aggregator work. Owns pages + blog
   # (posts/tags/categories); gateway flips /api/pages*, /api/blog/* and
   # /api/admin/blog/* here. Emits page.published / post.published via the
-  # outbox -> Kafka relay. Shares the monolith's Redis so cache flushes stay
-  # consistent across SSR (backend:8080) and gateway reads.
+  # outbox -> Kafka relay. Shares the shared Redis so cache flushes stay
+  # consistent across SSR and gateway reads. Phase 31: serves the dashboard
+  # facade + trash aggregator over /internal/* (INTERNAL_TOKEN).
   content-service:
     build:
       context: ../backend
@@ -151,6 +143,7 @@ services:
       - JWT_SECRET=dev-secret-change-in-production
       - AUDIT_SERVICE_URL=http://audit-service:8081
       - REDIS_URL=redis://redis:6379/0
+      - INTERNAL_TOKEN=dev-internal-token-change-me
       - KAFKA_BROKERS=kafka:29092
       - KAFKA_EVENTS_TOPIC=omoikane.events
       - KAFKA_DLQ_TOPIC=omoikane.events.dlq
@@ -171,7 +164,9 @@ services:
   # shared uploads disk (../backend:/app bind mounts both containers at the same
   # backend/uploads directory). Owns media CRUD + CDN-ready file delivery;
   # gateway flips /api/media* and /media/ here. Emits media.uploaded via the
-  # outbox -> Kafka relay.
+  # outbox -> Kafka relay. Phase 31: serves the dashboard facade + trash
+  # aggregator over /internal/* (INTERNAL_TOKEN); media hard-delete keeps the
+  # disk cleanup in this service.
   media-service:
     build:
       context: ../backend
@@ -188,6 +183,7 @@ services:
       - AUDIT_SERVICE_URL=http://audit-service:8081
       - UPLOAD_DIR=/app/uploads
       - MEDIA_BASE_URL=
+      - INTERNAL_TOKEN=dev-internal-token-change-me
       - KAFKA_BROKERS=kafka:29092
       - KAFKA_EVENTS_TOPIC=omoikane.events
       - KAFKA_DLQ_TOPIC=omoikane.events.dlq
@@ -202,6 +198,159 @@ services:
       timeout: 3s
       retries: 10
 
+  # Wave 3 messages service (Phase 31): separate process, shared Postgres store.
+  # Owns the public contact form + admin contact inbox + broadcast messages;
+  # gateway flips /api/contact*, /api/contacts*, /api/messages* here. No public
+  # GET surface, so no cache wiring. Phase 31: serves the dashboard facade +
+  # trash aggregator over /internal/* (INTERNAL_TOKEN).
+  messages-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/messages
+    ports:
+      - "8085:8085"
+    environment:
+      - MESSAGES_PORT=8085
+      - MESSAGES_DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable
+      - JWT_SECRET=dev-secret-change-in-production
+      - RECAPTCHA_SECRET=
+      - AUDIT_SERVICE_URL=http://audit-service:8081
+      - INTERNAL_TOKEN=dev-internal-token-change-me
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_EVENTS_TOPIC=omoikane.events
+      - KAFKA_DLQ_TOPIC=omoikane.events.dlq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8085/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Wave 3 settings service (Phase 31): separate process, shared Postgres store.
+  # Owns the public cached GET /settings + admin PUT /settings; gateway flips
+  # /api/settings here (auth keeps /api/settings/profile|password via
+  # longest-prefix matching in nginx). Shares the shared Redis so settings
+  # writes flush the public cache.
+  settings-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/settings
+    ports:
+      - "8086:8086"
+    environment:
+      - SETTINGS_PORT=8086
+      - SETTINGS_DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable
+      - JWT_SECRET=dev-secret-change-in-production
+      - AUDIT_SERVICE_URL=http://audit-service:8081
+      - REDIS_URL=redis://redis:6379/0
+      - INTERNAL_TOKEN=dev-internal-token-change-me
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_EVENTS_TOPIC=omoikane.events
+      - KAFKA_DLQ_TOPIC=omoikane.events.dlq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8086/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Wave 3 trash aggregator (Phase 31): thin cross-cutting service, NO database.
+  # Owns GET/POST/DELETE /trash* for the gateway and fans out to each owning
+  # service's /internal/trash endpoints with the shared INTERNAL_TOKEN.
+  trash-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/trash
+    ports:
+      - "8087:8087"
+    environment:
+      - TRASH_PORT=8087
+      - JWT_SECRET=dev-secret-change-in-production
+      - INTERNAL_TOKEN=dev-internal-token-change-me
+      - AUTH_SERVICE_URL=http://auth-service:8082
+      - CONTENT_SERVICE_URL=http://content-service:8083
+      - MEDIA_SERVICE_URL=http://media-service:8084
+      - MESSAGES_SERVICE_URL=http://messages-service:8085
+    depends_on:
+      - auth-service
+      - content-service
+      - media-service
+      - messages-service
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8087/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Wave 3 dashboard facade (Phase 31): aggregator over every owning service's
+  # /internal/stats endpoint, NO database. Owns GET /dashboard* for the gateway.
+  dashboard-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/dashboard
+    ports:
+      - "8088:8088"
+    environment:
+      - DASHBOARD_PORT=8088
+      - JWT_SECRET=dev-secret-change-in-production
+      - INTERNAL_TOKEN=dev-internal-token-change-me
+      - AUTH_SERVICE_URL=http://auth-service:8082
+      - CONTENT_SERVICE_URL=http://content-service:8083
+      - MEDIA_SERVICE_URL=http://media-service:8084
+      - MESSAGES_SERVICE_URL=http://messages-service:8085
+    depends_on:
+      - auth-service
+      - content-service
+      - media-service
+      - messages-service
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8088/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Wave 3 docs service (Phase 31): serves the main API Swagger UI
+  # (httpSwagger over the swag-generated backend/docs embed). Gateway routes
+  # /api/swagger/ here.
+  docs-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/docs
+    ports:
+      - "8089:8089"
+    environment:
+      - DOCS_PORT=8089
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8089/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   audit-service:
     build:
       context: ../backend
@@ -209,9 +358,14 @@ services:
     volumes:
       - ../backend:/app
     command: go run ./cmd/audit
+    ports:
+      - "8081:8081"
     environment:
       - AUDIT_DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane_audit sslmode=disable
       - AUDIT_PORT=8081
+      # Phase 31: the gateway routes /api/audit-logs directly here, so the
+      # audit service validates the admin JWT itself (shared JWT_SECRET).
+      - JWT_SECRET=dev-secret-change-in-production
     depends_on:
       postgres:
         condition: service_healthy

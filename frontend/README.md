@@ -33,9 +33,9 @@ PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test \
 
 ## Key Conventions
 
-- **Go API backend** — nginx proxies `/api/*` → Go:8080; server components use `lib/api.ts` for direct Go fetches
+- **Go API backend** — nginx is the single gateway: every `/api/*` prefix routes to its owning microservice (auth 8082, content 8083, media 8084, messages 8085, settings 8086, trash 8087, dashboard 8088, docs 8089, audit 8081); unmapped `/api/*` → `return 404`. Server components go through the gateway via `lib/api.ts`
 - **Docker node_modules** — anonymous volume; install new packages via `docker exec`
-- **Auth** — JWT in httpOnly "session" cookie, set by Go login handler, decoded by `getSession()`
-- **Settings** — fetched from Go `GET /api/settings` (public endpoint)
-- **API_URL** — `process.env.API_URL || 'http://backend:8080'` used by server components
+- **Auth** — JWT in httpOnly "session" cookie, set by the auth-service login handler, decoded by `getSession()`
+- **Settings** — fetched from settings-service `GET /api/settings` (public endpoint, cached via shared Redis)
+- **API_URL** — `process.env.API_URL || 'http://nginx'` used by server components (Phase 31: SSR now flows through the gateway with the `/api` prefix)
 - **app/api/ deleted** — Phase 10 removed the entire tree (716 lines); nginx is the sole `/api/*` proxy

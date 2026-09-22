@@ -1,9 +1,10 @@
 # Service Boundary Map (Contract)
 
 Source of truth for the Phase 27+ decomposition. Every route the frontend or an
-external client can call is listed with its current owner (monolith `cmd/api`)
-and its target microservice. The **external API contract** (paths, methods,
-auth, request/response bodies) is frozen — this document records ownership only.
+external client can call is listed with its owner (the microservice process
+serving it since Phase 31 retired the monolith `cmd/api`). The **external API
+contract** (paths, methods, auth, request/response bodies) is frozen — this
+document records ownership only.
 
 Owners:
 - **auth** — identity: setup, login/register, users, roles, API tokens, profile/password
@@ -63,7 +64,7 @@ Owners:
 ### Audit
 | Method(s) | Path | Notes |
 |---|---|---|
-| GET | `/audit-logs` | admin; **today**: monolith proxies → audit microservice. Target: gateway routes `/api/audit-logs` → audit directly |
+| GET | `/audit-logs` | admin; routes straight to the audit microservice (Phase 31) |
 
 ### Trash — cross-cutting (§2)
 | Method(s) | Path | Notes |
@@ -88,50 +89,94 @@ the path, not the prefix). A gateway cannot prefix-split it. Chosen design:
   soft-delete columns and exposes an internal endpoint for trash listing/restore/hard-delete.
 - Media hard-delete keeps doing disk cleanup (in media service).
 
-This is deliberately the *last* boundary wired (Phase 31) since it has the most
-dependencies; until then `cmd/api` continues to serve `/trash*` as today.
+**Status (Phase 31): implemented.** `trash-service` (8087) owns `/trash*`
+(admin-gated with its own JWT validation), fans out to each owner's
+`/internal/trash*` with the shared internal token, sums counts, routes
+restore/hard-delete by entity→owner, and supports `DELETE /trash?entity=` for a
+single entity. The per-service internal endpoints are scoped by
+`Handler.TrashEntities` (400 on foreign entities). No shared-DB reads remain.
 
 ## 3. Dashboard: aggregator decision
 
 `/dashboard` and `/dashboard/stats` read across **users, content, media, messages**
 (existing handlers already aggregate in memory). After decomposition the dashboard
 service is a **facade**: it calls each service's internal stats endpoint.
-Owned by **dashboard** (own deployment unit) or folded into the gateway service —
-decision deferred to Phase 31; contract unchanged meanwhile.
+Owned by **dashboard** (own deployment unit).
+
+**Status (Phase 31): implemented.** `dashboard-service` (8088) owns `/dashboard*`
+(admin-gated), fetches each owner's `GET /internal/stats` with the shared internal
+token, and merges them into the exact Phase 26 JSON shapes
+(`users/pages/posts/media/messages` counts; `recentRegistrations` = 7-day
+zero-filled chart from auth; `recentMessages` = last-5 from messages; dashboard
+keys `userCount/pageCount/blogCount/mediaCount/recentMessages/recentRegistrations`).
+Unreachable owners fail loud (502). No shared-DB reads remain.
 
 ## 4. Cross-service invariants
 
 - Authentication (JWT cookie + `Authorization: Bearer`) is validated **in every
   service** via the shared `internal/middleware` + `internal/auth` packages —
-  the gateway never terminates auth.
-- Public reads currently carried by the monolith's Redis cache (`CacheRead`,
-  30s TTL) move **into each service** (each owns its cache configuration); the
-  monolith-level flush calls migrate to per-service flush (Phase 32).
+  the gateway never terminates auth. (Trash + dashboard facades validate the
+  admin JWT locally; Bearer API tokens are NOT accepted there — the accepted
+  trade-off of a fully stateless facade.)
+- Service-to-service calls (trash aggregation, dashboard stats, audit-logs
+  strictness) authenticate with the shared `INTERNAL_TOKEN` via the
+  `X-Internal-Token` header and `middleware.InternalAuth`; these `/internal/*`
+  endpoints are never exposed through the gateway.
+- Public reads are cached per service through the **shared Redis**
+  (`CacheRead`, 30s TTL): content, auth, and settings mounted it; a `flushCache()`
+  (FlushDB) in any service invalidates every other service's SSR/cache tier.
 - Audit events are **written by the owning service** (outbox → Kafka → audit)
-  starting Phase 32; until then the existing HTTP proxy path stays.
+  starting Phase 32; until then `GET /api/audit-logs` hits the audit-service
+  directly (Phase 31) and the audit microservice keeps its DB-backed log table.
 
 ## 5. Gateway routing plan (nginx)
 
-| Location | Target today | Target after decomposition |
-|---|---|---|
-| `/api/audit/` | audit-service:8081 | quit (audit moves to `/api/audit-logs` route + events) |
-| `/api/auth/...`, `/api/users*`, `/api/api-tokens*`, `/api/setup*`, `/api/settings/profile`, `/api/settings/password` | **auth-service:8082** (Phase 29) | auth-service |
-| `/api/pages*`, `/api/admin/blog/`, `/api/blog*` | **content-service:8083** (Phase 30) | content-service |
-| `/api/media*`, `/media/` (file serving) | **media-service:8084** (Phase 30) | media-service |
-| `/api/contact*`, `/api/contacts*`, `/api/messages*` | backend:8080 | messages-service |
-| `/api/settings`, `/api/settings/*` (site) | backend:8080 | settings-service |
-| `/api/audit-logs` | backend:8080 (proxy) | audit-service |
-| `/api/trash*` (all entities) | backend:8080 | trash-service (Phase 31) — one prefix owner (§2) |
-| `/api/dashboard*` | backend:8080 | dashboard (Phase 31) |
-| `/api/*` (unmapped) | backend:8080 | 404 or proxy — fail-loud so unmapped routes surface |
+| Location | Target after decomposition (all live as of Phase 31) |
+|---|---|
+| `/api/audit/` | audit-service:8081 (kept for the public Swagger UI) |
+| `/api/auth/...`, `/api/users*`, `/api/api-tokens*`, `/api/setup*`, `/api/settings/profile`, `/api/settings/password` | **auth-service:8082** (Phase 29) |
+| `/api/pages*`, `/api/admin/blog/`, `/api/blog*` | **content-service:8083** (Phase 30) |
+| `/api/media*`, `/media/` (file serving) | **media-service:8084** (Phase 30) |
+| `/api/contact*`, `/api/contacts*`, `/api/messages*` | **messages-service:8085** (Phase 31) |
+| `/api/settings`, `/api/settings/*` (site) | **settings-service:8086** (Phase 31) — exact-match `location = /api/settings` so `/api/settings/profile` stays with auth |
+| `/api/trash*` (all entities) | **trash-service:8087** (Phase 31) — one prefix owner (§2) |
+| `/api/dashboard*` | **dashboard-service:8088** (Phase 31) |
+| `/api/swagger/` | **docs-service:8089** (Phase 31, monolith docs UI) |
+| `GET /api/audit-logs` | **audit-service:8081** directly (Phase 31; was monolith proxy) |
+| `/api/*` (unmapped) | **`return 404` fail-loud** — unmapped routes surface instead of hitting a dead monolith |
 
-**Phase 29 status (Wave 1):** the `auth_service` upstream now points at the
-`auth-service` process (`:8082`). Everything else is still `backend:8080`.
+**Phase 31 status (Wave 3 — decomposition complete):** the monolith `cmd/api`
+is **retired**. Every route flows gateway → its owning service. New services:
+`messages-service` (8085, messages + contacts + outbox), `settings-service`
+(8086, site settings + shared-Redis cache),
+`trash-service` (8087, aggregator, NO DB),
+`dashboard-service` (8088, facade, NO DB),
+`docs-service` (8089, main Swagger UI after `cmd/api` removal).
+All of auth/content/media/messages/settings wire the events outbox
+(producer + relay + `EnsureTopics`, log-only on failure); no new emissions in
+this phase. `npm install` note: the frontend container is `API_URL=http://nginx`
+and enriches with `/api` — SSR now goes through the gateway too.
+
+**Internal-API layer (Phase 31):** owning services expose token-gated internal
+endpoints consumed by the trash + dashboard aggregators — `X-Internal-Token`
+header (shared `INTERNAL_TOKEN` env from the platform compose), validated by
+`middleware.InternalAuth`, NEVER exposed via the gateway:
+- `GET /internal/stats` — per-service dashboard slice (auth: users +
+  recentRegistrations; content: pages/posts; media: media; messages: messages +
+  recentMessages)
+- `GET /internal/trash`, `GET /internal/trash/count`,
+  `POST /internal/trash/{entity}/{id}/restore`,
+  `DELETE /internal/trash/{entity}/{id}`, `DELETE /internal/trash[?entity=]` —
+  scoped to the entities the service owns (`TrashEntities`):
+  auth=`user`, content=`page,post,tag,category`, media=`media`,
+  messages=`contact,message`. Foreign entities return 400 locally.
+
+**Phase 29 status (Wave 1):** `auth_service` upstream → `auth-service:8082`.
 
 **Phase 30 status (Wave 2):** `content_service` → `content-service:8083`
 (pages + blog), `media_service` → `media-service:8084` (media CRUD + file
-serving). The `/media/` rich-text location flips to media-service too (full path,
-no URI rewrite). Remaining targets still `backend:8080` flip in Phase 31.
+serving). The `/media/` rich-text location flips to media-service (full path,
+no URI rewrite).
 
 **Gateway note — `/api/admin/blog/` needs its own location:** `/api/admin/blog/posts`
 does NOT match the trailing-slash `location /api/blog/` prefix (it fell to
@@ -141,21 +186,18 @@ does NOT match the trailing-slash `location /api/blog/` prefix (it fell to
 **Wave 2 store split — process split, shared store:** like auth-service, both
 content-service and media-service are separate processes over the same Postgres
 `omoikane` store and the shared uploads disk (`../backend:/app` bind in every
-container → `backend/uploads`). The monolith still reads content/media data (SSR,
-trash, dashboard) and serves the `/media/*` records list for trash, so physical
-partition stays deferred to Phase 31. Events stay single-writer: `content-service`
-emits `page.published`/`post.published`, `media-service` emits `media.uploaded`,
-monolith `Handler.Outbox` remains nil. Content-service also wires the shared
-Redis (`REDIS_URL=redis://redis:6379/0`) so its `flushCache()` (FlushDB)
-invalidates the monolith SSR cache and vice versa.
+container → `backend/uploads`). Physical partition stays deferred (Phase 32+).
+Events stay single-writer: `content-service`
+emits `page.published`/`post.published`, `media-service` emits `media.uploaded`
+(no other service wires the content/media outbox). Content-service also wires the
+shared Redis (`REDIS_URL=redis://redis:6379/0`) for CacheRead + flushCache (FlushDB).
 
 **Wave 1 store split — process split, shared store:** `auth-service` is its own
-process but connects to the same Postgres `omoikane` store as the monolith. The
-monolith still reads auth data (blog author names, dashboard stats, trash rows,
-Bearer `LookupToken`), so a physical schema partition is deferred to the Phase 31
-aggregator work (trash/dashboard become internal-API consumers instead of shared-DB
-readers). Events are single-writer: only `auth-service` wires the outbox
-(`user.registered`), the monolith's `Handler.Outbox` stays nil.
+process but connects to the same Postgres `omoikane` store. Since Phase 31 the
+trash/dashboard aggregators read EVERYTHING via internal APIs — the auth store
+is only touched by auth-service and the other owners. Events are single-writer:
+only `auth-service` wires the outbox (`user.registered`, Phase 31 adds Redis for
+CacheRead).
 
 **Gateway rule — static `proxy_pass` URIs only:** every `proxy_pass` in the
 gateway must be a STATIC URI. A `proxy_pass` containing a variable (e.g.
@@ -171,9 +213,9 @@ integration tests + kafka CLI), and internal `PLAINTEXT_INTERNAL` advertised as
 use `KAFKA_BROKERS=kafka:29092`; `localhost:9092` is unreachable from inside
 containers (the advertised address resolves to the container itself).
 
-## 6. Compliance check (Phase 27 gate)
+## 6. Compliance check
 
-- [ ] Every route in the table is served by today's monolith (no orphan)
-- [ ] No route listed more than once under a non-cross-cutting owner
-- [ ] Auth invariants (§4) hold after each service extraction
-- [ ] Full Go + Playwright suites still green on the frozen contract
+- [x] Every route in the table is served by its owning service — monolith `cmd/api` retired (Phase 31)
+- [x] No route listed more than once under a non-cross-cutting owner
+- [x] Auth invariants (§4) hold after each service extraction
+- [x] Full Go + Playwright suites green on the frozen contract (Phase 31 gate)

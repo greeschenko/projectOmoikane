@@ -10,6 +10,8 @@ import (
 	"omoikane-backend/internal/models"
 )
 
+// TrashItem is one soft-deleted row surfaced by the owning services' internal
+// trash endpoints and aggregated by the trash service.
 type TrashItem struct {
 	ID        uint      `json:"id"`
 	Title     string    `json:"title"`
@@ -17,141 +19,97 @@ type TrashItem struct {
 	DeletedAt time.Time `json:"deletedAt"`
 }
 
-// GetTrash returns all soft-deleted items across entities (admin only).
-// @Summary List trash items
-// @Description Returns soft-deleted pages, users, posts, media, contacts, messages, tags and categories.
-// @Tags trash
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {array} TrashItem
-// @Router /trash [get]
-func (h *Handler) GetTrash(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	items := []TrashItem{}
-
-	var pages []models.Page
-	h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&pages)
-	for _, p := range pages {
-		items = append(items, TrashItem{
-			ID: p.ID, Title: p.Title, Entity: "page",
-			DeletedAt: p.DeletedAt.Time,
-		})
+// trashEntityOwned reports whether this service owns the entity's trash surface
+// (i.e. the entity appears in the handler's TrashEntities).
+func (h *Handler) trashEntityOwned(entity string) bool {
+	for _, e := range h.TrashEntities {
+		if e == entity {
+			return true
+		}
 	}
-
-	var users []models.User
-	h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&users)
-	for _, u := range users {
-		items = append(items, TrashItem{
-			ID: u.ID, Title: u.Name, Entity: "user",
-			DeletedAt: u.DeletedAt.Time,
-		})
-	}
-
-	var posts []models.BlogPost
-	h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&posts)
-	for _, p := range posts {
-		items = append(items, TrashItem{
-			ID: p.ID, Title: p.Title, Entity: "post",
-			DeletedAt: p.DeletedAt.Time,
-		})
-	}
-
-	var media []models.MediaItem
-	h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&media)
-	for _, m := range media {
-		items = append(items, TrashItem{
-			ID: m.ID, Title: m.Filename, Entity: "media",
-			DeletedAt: m.DeletedAt.Time,
-		})
-	}
-
-	var contacts []models.ContactMessage
-	h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&contacts)
-	for _, c := range contacts {
-		items = append(items, TrashItem{
-			ID: c.ID, Title: c.Subject, Entity: "contact",
-			DeletedAt: c.DeletedAt.Time,
-		})
-	}
-
-	var messages []models.Message
-	h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&messages)
-	for _, m := range messages {
-		items = append(items, TrashItem{
-			ID: m.ID, Title: m.Title, Entity: "message",
-			DeletedAt: m.DeletedAt.Time,
-		})
-	}
-
-	var tags []models.Tag
-	h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&tags)
-	for _, t := range tags {
-		items = append(items, TrashItem{
-			ID: t.ID, Title: t.Name, Entity: "tag",
-			DeletedAt: t.DeletedAt.Time,
-		})
-	}
-
-	var categories []models.Category
-	h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&categories)
-	for _, c := range categories {
-		items = append(items, TrashItem{
-			ID: c.ID, Title: c.Name, Entity: "category",
-			DeletedAt: c.DeletedAt.Time,
-		})
-	}
-
-	json.NewEncoder(w).Encode(items)
+	return false
 }
 
-// GetTrashCount returns the total number of items in trash (admin only).
-// @Summary Trash count
-// @Description Returns the total number of soft-deleted items across all entities.
-// @Tags trash
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} map[string]int64
-// @Router /trash/count [get]
-func (h *Handler) GetTrashCount(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var count int64
-
-	for _, model := range []interface{}{&models.Page{}, &models.User{}, &models.BlogPost{},
-		&models.MediaItem{}, &models.ContactMessage{}, &models.Message{},
-		&models.Tag{}, &models.Category{}} {
-		var c int64
-		h.DB.Unscoped().Model(model).Where("deleted_at IS NOT NULL").Count(&c)
-		count += c
+// appendTrashItems appends the soft-deleted rows for one owned entity.
+func (h *Handler) appendTrashItems(entity string, items *[]TrashItem) {
+	switch entity {
+	case "page":
+		var rows []models.Page
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&rows)
+		for _, r := range rows {
+			*items = append(*items, TrashItem{ID: r.ID, Title: r.Title, Entity: "page", DeletedAt: r.DeletedAt.Time})
+		}
+	case "user":
+		var rows []models.User
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&rows)
+		for _, r := range rows {
+			*items = append(*items, TrashItem{ID: r.ID, Title: r.Name, Entity: "user", DeletedAt: r.DeletedAt.Time})
+		}
+	case "post":
+		var rows []models.BlogPost
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&rows)
+		for _, r := range rows {
+			*items = append(*items, TrashItem{ID: r.ID, Title: r.Title, Entity: "post", DeletedAt: r.DeletedAt.Time})
+		}
+	case "media":
+		var rows []models.MediaItem
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&rows)
+		for _, r := range rows {
+			*items = append(*items, TrashItem{ID: r.ID, Title: r.Filename, Entity: "media", DeletedAt: r.DeletedAt.Time})
+		}
+	case "contact":
+		var rows []models.ContactMessage
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&rows)
+		for _, r := range rows {
+			*items = append(*items, TrashItem{ID: r.ID, Title: r.Subject, Entity: "contact", DeletedAt: r.DeletedAt.Time})
+		}
+	case "message":
+		var rows []models.Message
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&rows)
+		for _, r := range rows {
+			*items = append(*items, TrashItem{ID: r.ID, Title: r.Title, Entity: "message", DeletedAt: r.DeletedAt.Time})
+		}
+	case "tag":
+		var rows []models.Tag
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&rows)
+		for _, r := range rows {
+			*items = append(*items, TrashItem{ID: r.ID, Title: r.Name, Entity: "tag", DeletedAt: r.DeletedAt.Time})
+		}
+	case "category":
+		var rows []models.Category
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Order("deleted_at desc").Find(&rows)
+		for _, r := range rows {
+			*items = append(*items, TrashItem{ID: r.ID, Title: r.Name, Entity: "category", DeletedAt: r.DeletedAt.Time})
+		}
 	}
-
-	json.NewEncoder(w).Encode(map[string]int64{"count": count})
 }
 
-// RestoreItem restores a soft-deleted item (admin only).
-// @Summary Restore trash item
-// @Description Restores a soft-deleted item by entity type and ID.
-// @Tags trash
-// @Produce json
-// @Security BearerAuth
-// @Param entity path string true "Entity type (page, user, post, media, contact, message, tag, category)"
-// @Param id path int true "Item ID"
-// @Success 200 {object} map[string]bool
-// @Failure 400 {object} map[string]string
-// @Router /trash/{entity}/{id}/restore [post]
-func (h *Handler) RestoreItem(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	entity := r.PathValue("entity")
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid ID"})
-		return
+// trashRowCount returns the number of soft-deleted rows for one owned entity.
+func (h *Handler) trashRowCount(entity string) int64 {
+	var c int64
+	switch entity {
+	case "page":
+		h.DB.Unscoped().Model(&models.Page{}).Where("deleted_at IS NOT NULL").Count(&c)
+	case "user":
+		h.DB.Unscoped().Model(&models.User{}).Where("deleted_at IS NOT NULL").Count(&c)
+	case "post":
+		h.DB.Unscoped().Model(&models.BlogPost{}).Where("deleted_at IS NOT NULL").Count(&c)
+	case "media":
+		h.DB.Unscoped().Model(&models.MediaItem{}).Where("deleted_at IS NOT NULL").Count(&c)
+	case "contact":
+		h.DB.Unscoped().Model(&models.ContactMessage{}).Where("deleted_at IS NOT NULL").Count(&c)
+	case "message":
+		h.DB.Unscoped().Model(&models.Message{}).Where("deleted_at IS NOT NULL").Count(&c)
+	case "tag":
+		h.DB.Unscoped().Model(&models.Tag{}).Where("deleted_at IS NOT NULL").Count(&c)
+	case "category":
+		h.DB.Unscoped().Model(&models.Category{}).Where("deleted_at IS NOT NULL").Count(&c)
 	}
+	return c
+}
 
+// restoreTrashRow clears the soft-delete marker for a row owned by this service.
+func (h *Handler) restoreTrashRow(entity string, id uint) {
 	switch entity {
 	case "page":
 		h.DB.Unscoped().Model(&models.Page{}).Where("id = ?", id).Update("deleted_at", nil)
@@ -169,39 +127,12 @@ func (h *Handler) RestoreItem(w http.ResponseWriter, r *http.Request) {
 		h.DB.Unscoped().Model(&models.Tag{}).Where("id = ?", id).Update("deleted_at", nil)
 	case "category":
 		h.DB.Unscoped().Model(&models.Category{}).Where("id = ?", id).Update("deleted_at", nil)
-	default:
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown entity type"})
-		return
 	}
-
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
-	h.flushCache()
 }
 
-// HardDeleteItem permanently deletes a soft-deleted item (admin only).
-// @Summary Permanently delete trash item
-// @Description Hard-deletes an item by entity type and ID. Media files are removed from disk.
-// @Tags trash
-// @Produce json
-// @Security BearerAuth
-// @Param entity path string true "Entity type (page, user, post, media, contact, message, tag, category)"
-// @Param id path int true "Item ID"
-// @Success 200 {object} map[string]bool
-// @Failure 400 {object} map[string]string
-// @Router /trash/{entity}/{id} [delete]
-func (h *Handler) HardDeleteItem(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	entity := r.PathValue("entity")
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid ID"})
-		return
-	}
-
+// hardDeleteTrashRow permanently deletes a soft-deleted row. Media rows also
+// remove their files from disk (media service owns that cleanup).
+func (h *Handler) hardDeleteTrashRow(entity string, id uint) {
 	switch entity {
 	case "page":
 		h.DB.Unscoped().Delete(&models.Page{}, id)
@@ -223,58 +154,162 @@ func (h *Handler) HardDeleteItem(w http.ResponseWriter, r *http.Request) {
 		h.DB.Unscoped().Delete(&models.Tag{}, id)
 	case "category":
 		h.DB.Unscoped().Delete(&models.Category{}, id)
-	default:
+	}
+}
+
+// emptyTrashRows hard-deletes all soft-deleted rows of one owned entity. Media
+// files are removed from disk when the entity is media.
+func (h *Handler) emptyTrashRows(entity string) {
+	switch entity {
+	case "page":
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Page{})
+	case "user":
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.User{})
+	case "post":
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.BlogPost{})
+	case "media":
+		var items []models.MediaItem
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Find(&items)
+		for _, m := range items {
+			osRemove(m.FilePath)
+		}
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.MediaItem{})
+	case "contact":
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.ContactMessage{})
+	case "message":
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Message{})
+	case "tag":
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Tag{})
+	case "category":
+		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Category{})
+	}
+}
+
+// InternalTrashList returns this service's soft-deleted rows (internal). The
+// trash service fans out to each owning service and merges the results.
+// @Summary List owned trash items (internal)
+// @Description Returns the soft-deleted rows for the entities this service owns.
+// @Tags trash
+// @Produce json
+// @Success 200 {array} TrashItem
+// @Router /internal/trash [get]
+func (h *Handler) InternalTrashList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	items := []TrashItem{}
+	for _, entity := range h.TrashEntities {
+		h.appendTrashItems(entity, &items)
+	}
+
+	json.NewEncoder(w).Encode(items)
+}
+
+// InternalTrashCount returns this service's trash total (internal).
+// @Summary Count owned trash (internal)
+// @Description Returns the total number of soft-deleted rows this service owns.
+// @Tags trash
+// @Produce json
+// @Success 200 {object} map[string]int64
+// @Router /internal/trash/count [get]
+func (h *Handler) InternalTrashCount(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var count int64
+	for _, entity := range h.TrashEntities {
+		count += h.trashRowCount(entity)
+	}
+
+	json.NewEncoder(w).Encode(map[string]int64{"count": count})
+}
+
+// InternalTrashRestore restores one owned soft-deleted row (internal).
+// @Summary Restore owned trash item (internal)
+// @Description Restores a soft-deleted row by entity type and ID.
+// @Tags trash
+// @Produce json
+// @Param entity path string true "Owned entity type (page, user, post, media, contact, message, tag, category)"
+// @Param id path int true "Item ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /internal/trash/{entity}/{id}/restore [post]
+func (h *Handler) InternalTrashRestore(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	entity := r.PathValue("entity")
+	if !h.trashEntityOwned(entity) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown entity type"})
 		return
 	}
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid ID"})
+		return
+	}
+
+	h.restoreTrashRow(entity, uint(id))
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 	h.flushCache()
 }
 
-// EmptyTrash permanently deletes all (or one entity's) trash items (admin only).
-// @Summary Empty trash
-// @Description Hard-deletes all trash items, or only the given entity's items when ?entity= is provided.
+// InternalTrashHardDelete permanently deletes one owned soft-deleted row (internal).
+// @Summary Permanently delete owned trash item (internal)
+// @Description Hard-deletes a soft-deleted row by entity type and ID; media files are removed from disk.
 // @Tags trash
 // @Produce json
-// @Security BearerAuth
-// @Param entity query string false "Only empty this entity type (page, user, post, media, contact, message, tag, category)"
+// @Param entity path string true "Owned entity type (page, user, post, media, contact, message, tag, category)"
+// @Param id path int true "Item ID"
 // @Success 200 {object} map[string]bool
-// @Router /trash [delete]
-func (h *Handler) EmptyTrash(w http.ResponseWriter, r *http.Request) {
+// @Failure 400 {object} map[string]string
+// @Router /internal/trash/{entity}/{id} [delete]
+func (h *Handler) InternalTrashHardDelete(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	entity := r.PathValue("entity")
+	if !h.trashEntityOwned(entity) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown entity type"})
+		return
+	}
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid ID"})
+		return
+	}
+
+	h.hardDeleteTrashRow(entity, uint(id))
+
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	h.flushCache()
+}
+
+// InternalTrashEmpty empties all (or one ?entity's) owned trash (internal).
+// @Summary Empty owned trash (internal)
+// @Description Hard-deletes all owned trash rows, or only the given entity's when ?entity= is provided.
+// @Tags trash
+// @Produce json
+// @Param entity query string false "Only empty this owned entity type"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Router /internal/trash [delete]
+func (h *Handler) InternalTrashEmpty(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	entity := r.URL.Query().Get("entity")
-
-	if entity == "" || entity == "media" {
-		var media []models.MediaItem
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Find(&media)
-		for _, m := range media {
-			osRemove(m.FilePath)
+	if entity != "" {
+		if !h.trashEntityOwned(entity) {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Unknown entity type"})
+			return
 		}
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.MediaItem{})
-	}
-	if entity == "" || entity == "page" {
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Page{})
-	}
-	if entity == "" || entity == "user" {
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.User{})
-	}
-	if entity == "" || entity == "post" {
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.BlogPost{})
-	}
-	if entity == "" || entity == "contact" {
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.ContactMessage{})
-	}
-	if entity == "" || entity == "message" {
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Message{})
-	}
-	if entity == "" || entity == "tag" {
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Tag{})
-	}
-	if entity == "" || entity == "category" {
-		h.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Category{})
+		h.emptyTrashRows(entity)
+	} else {
+		for _, e := range h.TrashEntities {
+			h.emptyTrashRows(e)
+		}
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})

@@ -7,34 +7,36 @@ and Kubernetes.
 
 ## What it is
 
-- **CMS today (Phases 1–26, complete):** pages, blog, media library, auth &
-  users, settings, messages, trash, API tokens (headless) — with a full
-  Go + Playwright regression suite.
-- **Platform next (Phases 27+):** the monolith is decomposed into modular
-  microservices connected by a **Kafka event backbone** (CloudEvents + outbox),
-  deployed via a **cloud-agnostic Helm chart**, with webhooks, workflows, and
-  multi-tenancy as the platform's flagship modules.
+- **CMS (Phases 1–31, complete):** pages, blog, media library, auth &
+  users, settings, messages, trash, API tokens (headless) — decomposed into
+  microservices behind the gateway, with a full Go + Playwright regression suite.
+- **Platform next (Phases 32+):** real domain events on the **Kafka event
+  backbone** (CloudEvents + outbox), deployed via a **cloud-agnostic Helm
+  chart**, with webhooks, workflows, and multi-tenancy as the platform's
+  flagship modules.
 - See [PLAN.md](./PLAN.md) for the full platform roadmap; [TODO.md](./TODO.md)
   for the phase-by-phase checklist.
 
 ## Stack
 
 - **Frontend:** Next.js 16 (App Router), MUI 9, TipTap (rich text)
-- **Backend:** Go 1.24, GORM, PostgreSQL, JWT (httpOnly cookie auth), Redis cache
+- **Backend:** Go 1.24 microservices (auth, content, media, messages, settings, trash, dashboard, audit, docs), GORM, PostgreSQL, JWT (httpOnly cookie auth), Redis cache
 - **Events:** Kafka (single-node KRaft dev default; managed MSK/Confluent for production), CloudEvents 1.0, outbox pattern
-- **Infrastructure (dev):** Docker Compose (nginx gateway, Next.js, Go + Air hot-reload, PostgreSQL, Redis, Kafka, audit + auth + content + media services)
+- **Infrastructure (dev):** Docker Compose (nginx gateway, Next.js, 8 Go services + audit + docs, PostgreSQL, Redis, Kafka)
 - **Infrastructure (platform):** minikube/kind locally → Helm chart → any cloud K8s
 - **Testing:** Go tests (`make go-test`) + Playwright desktop & mobile (`make test`) + K8s smoke tests (`make k8s-test`)
 
-## Architecture (target)
+## Architecture
 
 ```
-Browser / Next.js → Gateway (nginx) → auth | content | media | messages | settings | webhooks | audit
+Browser / Next.js → Gateway (nginx) → auth | content | media | messages | settings | trash | dashboard | audit
                                           └──────────────► Kafka (CloudEvents) ◄──────────────┘
 ```
 
-Each service owns a Postgres schema, publishes domain events via an outbox relay,
-and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN.md).
+Each service owns its data (shared Postgres store today; physical partition
+deferred), publishes domain events via an outbox relay (Phases 29–30), and the
+trash/dashboard aggregators consume per-service internal APIs (`X-Internal-Token`).
+See [PLAN.md](./PLAN.md).
 
 ## Phases
 
@@ -61,7 +63,7 @@ and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN
 | 28 — Event SDK & Outbox | ✅ | Go 129 pass; Kafka round-trip integration tests (producer→consumer, outbox→relay→consumer, DLQ) |
 | 29 — Auth Service (Wave 1) | ✅ | Go 138 pass; gateway routes auth→auth-service; user.registered via outbox→Kafka |
 | 30 — Content + Media Services (Wave 2) | ✅ | Go 158 pass; gateway routes content/media→services; page.published/post.published/media.uploaded via outbox→Kafka |
-| 31 — Messages + Settings; Monolith Retired | 🔲 | — |
+| 31 — Messages + Settings; Monolith Retired | ✅ | Go 176 pass; gateway fully decomposed (zero monolith); trash/dashboard aggregators over internal APIs; audit-logs direct; frontend SSR via gateway |
 | 32 — Real Events Live (audit via Kafka) | 🔲 | — |
 | 33 — Helm Chart + Local K8s | 🔲 | — |
 | 34 — Observability & Ops | 🔲 | — |
@@ -74,7 +76,7 @@ and the dashboard acts as an aggregator over internal APIs. See [PLAN.md](./PLAN
 ### Docker (current dev setup)
 
 ```bash
-make up       # Start Docker services (nginx + frontend + Go monolith + PostgreSQL + Redis + Kafka + audit + auth + content + media)
+make up       # Start Docker services (nginx + frontend + 8 Go services + PostgreSQL + Redis + Kafka)
 make go-test  # Run Go backend tests (requires running PostgreSQL)
 make test     # Run full Playwright suite
 ```
