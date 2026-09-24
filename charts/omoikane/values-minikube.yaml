@@ -1,0 +1,17 @@
+# minikube override (docker driver; `make k8s-up` / `make k8s-test`).
+#
+# Built images are loaded into the node (`minikube image load`), so no registry
+# is involved and IfNotPresent is safe. The gateway is exposed on a fixed
+# NodePort so Playwright reaches it at <minikube ip>:30080 without a tunnel.
+images:
+  backend:
+    pullPolicy: IfNotPresent
+  frontend:
+    pullPolicy: IfNotPresent
+
+gateway:
+  serviceType: NodePort
+  nodePort: 30080
+
+ingress:
+  enabled: false

@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./helpers";
+import { isMobile, loginAsAdmin } from "./helpers";
 
 test.describe("Admin Blog", () => {
   test("sidebar has Blog nav link", async ({ page }) => {
+    test.skip(isMobile(), "Sidebar is collapsed behind hamburger on mobile");
     await loginAsAdmin(page);
     await expect(page.getByRole("link", { name: /blog/i })).toBeVisible();
   });

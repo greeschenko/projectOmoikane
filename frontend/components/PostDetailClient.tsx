@@ -168,11 +168,7 @@ export default function PostDetailClient({
                   value={editTags}
                   onChange={(_, newValue) => setEditTags(newValue)}
                   renderInput={(params) => <TextField {...params} label="Tags" placeholder="Add tag" />}
-                  renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                      <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />
-                    ))
-                  }
+                  slotProps={{ chip: { variant: "outlined", size: "small" } }}
                 />
                 <FormControl fullWidth>
                   <InputLabel>Category</InputLabel>

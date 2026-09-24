@@ -1,0 +1,144 @@
+{{- /*
+Backend services — one Deployment + one Service per entry in .Values.backend.ports.
+Fixed service names ({svc}-service) mirror docker-compose, so the nginx gateway
+ConfigMap (upstream auth-service:8082 etc.) and the trash/dashboard
+*_SERVICE_URL defaults resolve verbatim. Each Deployment runs its binary from
+the shared backend image via `command: ["/app/bin/<svc>"]`.
+*/ -}}
+{{- if .Values.media.uploadStorage }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: media-uploads
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "omoikane.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.media.uploadStorage }}
+{{- end }}
+{{- range $svc, $port := .Values.backend.ports }}
+{{- $upper := $svc | upper }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc }}-service
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $svc }}-service
+    {{- include "omoikane.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $.Values.backend.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $svc }}-service
+  template:
+    metadata:
+      labels:
+        app: {{ $svc }}-service
+        {{- include "omoikane.selectorLabels" $ | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ $.Values.images.backend.repository }}:{{ $.Values.images.backend.tag }}"
+          imagePullPolicy: {{ $.Values.images.backend.pullPolicy }}
+          command: ["/app/bin/{{ $svc }}"]
+          ports:
+            - { name: http, containerPort: {{ $port }} }
+          env:
+            - name: {{ $upper }}_PORT
+              value: "{{ $port }}"
+            {{- if index $.Values.backend.databases $svc }}
+            - name: {{ $upper }}_DATABASE_URL
+              value: {{ include "omoikane.postgresDSN" (dict "Values" $.Values "svc" $svc) | quote }}
+            {{- end }}
+            {{- if has $svc $.Values.backend.redis }}
+            - name: REDIS_URL
+              value: "redis://redis:6379/0"
+            {{- end }}
+            {{- if has $svc $.Values.backend.kafka }}
+            - name: KAFKA_BROKERS
+              value: {{ $.Values.kafka.bootstrap | quote }}
+            - name: KAFKA_EVENTS_TOPIC
+              value: {{ $.Values.kafka.eventsTopic | quote }}
+            - name: KAFKA_DLQ_TOPIC
+              value: {{ $.Values.kafka.dlqTopic | quote }}
+            {{- end }}
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.existingSecret | default "omoikane-secrets" }}
+                  key: jwt-secret
+            {{- if has $svc $.Values.backend.internalToken }}
+            - name: INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.existingSecret | default "omoikane-secrets" }}
+                  key: internal-token
+            {{- end }}
+            {{- if eq $svc "auth" }}
+            - { name: SMTP_HOST, value: "{{ $.Values.auth.smtpHost }}" }
+            - { name: SMTP_PORT, value: "{{ $.Values.auth.smtpPort }}" }
+            - { name: SMTP_USER, value: "{{ $.Values.auth.smtpUser }}" }
+            - { name: SMTP_PASS, value: "{{ $.Values.auth.smtpPass }}" }
+            - { name: SMTP_FROM, value: "{{ $.Values.auth.smtpFrom }}" }
+            - { name: RECAPTCHA_SECRET, value: "{{ $.Values.auth.recaptchaSecret }}" }
+            {{- end }}
+            {{- if eq $svc "messages" }}
+            - { name: RECAPTCHA_SECRET, value: "{{ $.Values.auth.recaptchaSecret }}" }
+            {{- end }}
+            {{- if eq $svc "media" }}
+            - { name: UPLOAD_DIR, value: "/app/uploads" }
+            - { name: MEDIA_BASE_URL, value: "{{ $.Values.media.baseUrl }}" }
+            {{- end }}
+            {{- if or (eq $svc "trash") (eq $svc "dashboard") }}
+            - { name: AUTH_SERVICE_URL, value: "http://auth-service:{{ index $.Values.backend.ports "auth" }}" }
+            - { name: CONTENT_SERVICE_URL, value: "http://content-service:{{ index $.Values.backend.ports "content" }}" }
+            - { name: MEDIA_SERVICE_URL, value: "http://media-service:{{ index $.Values.backend.ports "media" }}" }
+            - { name: MESSAGES_SERVICE_URL, value: "http://messages-service:{{ index $.Values.backend.ports "messages" }}" }
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 6
+          {{- if eq $svc "media" }}
+          volumeMounts:
+            - { name: uploads, mountPath: /app/uploads }
+          {{- end }}
+      {{- if eq $svc "media" }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: media-uploads
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc }}-service
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $svc }}-service
+    {{- include "omoikane.labels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ $svc }}-service
+  ports:
+    - { name: http, port: {{ $port }}, targetPort: {{ $port }} }
+{{- end }}

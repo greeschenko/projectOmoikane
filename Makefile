@@ -1,4 +1,4 @@
-.PHONY: up down reset db-reset test go-test go-build swagger
+.PHONY: up down reset db-reset test go-test go-build swagger k8s-up k8s-images k8s-db-reset k8s-test k8s-down k8s-destroy
 
 SWAG := $(shell command -v swag 2>/dev/null || echo "$(HOME)/prodev/go/bin/swag")
 
@@ -216,3 +216,71 @@ test: up
 	@echo "Resetting database for mobile run..."
 	$(MAKE) db-reset
 	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test --config=e2e/playwright.config.ts --project=mobile
+
+# ---------- Phase 33: Kubernetes (minikube) ----------
+# Same chart + same gate as CI (kind). Service names, env contracts and the
+# nginx gateway config are byte-identical to docker-compose.
+K8S_NS ?= omoikane
+MINIKUBE_PROFILE ?= minikube
+K8S_CHART := charts/omoikane
+K8S_VALUES := $(K8S_CHART)/values-minikube.yaml
+IMAGE_TAG ?= phase33
+K8S_IMAGE_BACKEND := omoikane/backend:$(IMAGE_TAG)
+K8S_IMAGE_FRONTEND := omoikane/frontend:$(IMAGE_TAG)
+GATEWAY_PORT ?= 30080
+# Services owning the `omoikane` (+ audit) databases — restart after a reset so
+# they re-run their startup migrations on the fresh DBs (mirrors compose).
+K8S_DB_SERVICES := auth-service content-service media-service messages-service settings-service audit-service
+# App deployments running locally-built images (omoikane/backend:*, omoikane/frontend:*)
+# plus the nginx gateway (ConfigMap-mounted nginx.conf). Excludes postgres/redis/
+# kafka: stock images, never rebuilt — and restarting kafka risks the KRaft wedge.
+K8S_APP_SERVICES := auth-service content-service media-service messages-service settings-service trash-service dashboard-service docs-service audit-service frontend nginx
+
+k8s-up:
+	minikube status -p $(MINIKUBE_PROFILE) >/dev/null 2>&1 || minikube start -p $(MINIKUBE_PROFILE) --driver=docker --cpus=6 --memory=6144 --disk-size=30g --container-runtime=containerd
+	minikube -p $(MINIKUBE_PROFILE) addons enable ingress
+	minikube -p $(MINIKUBE_PROFILE) addons enable metrics-server
+	minikube -p $(MINIKUBE_PROFILE) addons enable storage-provisioner
+	$(MAKE) k8s-images
+	helm upgrade --install omoikane $(K8S_CHART) -f $(K8S_VALUES) --namespace $(K8S_NS) --create-namespace --wait --timeout 10m
+	# `minikube image load` replaces the image inside containerd, but a rebuilt
+	# image with an UNCHANGED tag makes helm upgrade roll no pods — without this
+	# explicit restart the gate would silently test the PREVIOUS build (this cost
+	# run 3 its a11y fixes: the frontend pod predated the rebuilt image).
+	kubectl rollout restart -n $(K8S_NS) $(addprefix deployment/,$(K8S_APP_SERVICES))
+	kubectl rollout status deployment -n $(K8S_NS) --timeout=600s
+	@echo "Gateway reachable at http://$$(minikube ip -p $(MINIKUBE_PROFILE)):$(GATEWAY_PORT)"
+
+k8s-images:
+	docker build -t $(K8S_IMAGE_BACKEND) -f backend/Dockerfile backend
+	docker build -t $(K8S_IMAGE_FRONTEND) -f frontend/Dockerfile frontend
+	minikube image load -p $(MINIKUBE_PROFILE) $(K8S_IMAGE_BACKEND) $(K8S_IMAGE_FRONTEND)
+
+k8s-db-reset:
+	@echo "Scaling DB-owning services to 0 (mirrors compose stop)..."
+	@for d in $(K8S_DB_SERVICES); do kubectl scale deployment $$d -n $(K8S_NS) --replicas=0; done
+	@for d in $(K8S_DB_SERVICES); do kubectl rollout status deployment $$d -n $(K8S_NS) --timeout=120s; done
+	$(eval PG_POD := $(shell kubectl get pod -n $(K8S_NS) -l app=postgres -o jsonpath='{.items[0].metadata.name}'))
+	kubectl exec -n $(K8S_NS) $(PG_POD) -- psql -U omoikane -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='omoikane' AND pid<>pg_backend_pid();"
+	kubectl exec -n $(K8S_NS) $(PG_POD) -- psql -U omoikane -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='omoikane_audit' AND pid<>pg_backend_pid();"
+	kubectl exec -n $(K8S_NS) $(PG_POD) -- psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane;"
+	kubectl exec -n $(K8S_NS) $(PG_POD) -- psql -U omoikane -d postgres -c "CREATE DATABASE omoikane;"
+	kubectl exec -n $(K8S_NS) $(PG_POD) -- psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane_audit;"
+	kubectl exec -n $(K8S_NS) $(PG_POD) -- psql -U omoikane -d postgres -c "CREATE DATABASE omoikane_audit;"
+	@echo "Scaling services back to 1 (fresh processes re-run startup migrations)..."
+	@for d in $(K8S_DB_SERVICES); do kubectl scale deployment $$d -n $(K8S_NS) --replicas=1; done
+	@for d in $(K8S_DB_SERVICES); do kubectl rollout status deployment $$d -n $(K8S_NS) --timeout=300s; done
+
+k8s-test: k8s-up
+	helm lint $(K8S_CHART)
+	helm template omoikane $(K8S_CHART) -f $(K8S_VALUES) --namespace $(K8S_NS) > /tmp/omoikane-render.yaml
+	$(MAKE) k8s-db-reset
+	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium BASE_URL="http://$$(minikube ip -p $(MINIKUBE_PROFILE)):$(GATEWAY_PORT)" npx playwright test --config=e2e/playwright.config.ts --project=desktop
+	$(MAKE) k8s-db-reset
+	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium BASE_URL="http://$$(minikube ip -p $(MINIKUBE_PROFILE)):$(GATEWAY_PORT)" npx playwright test --config=e2e/playwright.config.ts --project=mobile
+
+k8s-down:
+	helm uninstall omoikane --namespace $(K8S_NS) || true
+
+k8s-destroy: k8s-down
+	minikube delete -p $(MINIKUBE_PROFILE)

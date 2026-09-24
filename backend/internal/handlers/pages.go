@@ -53,7 +53,11 @@ func (h *Handler) GetPages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var pages []models.Page
-	query := h.DB.Order("sort_order asc")
+	// Tiebreak on id: freshly created pages all carry sort_order=0, and Postgres
+	// leaves equal sort keys in UNDEFINED order (non-stable sort) — without the
+	// tiebreaker the tree order varies per run, which broke the pointer-drag
+	// e2e (drop-onto-next-row became a no-op). id asc = creation order.
+	query := h.DB.Order("sort_order asc, id asc")
 
 	// menu=true: return only published pages with inMenu enabled (for public menu widget)
 	if r.URL.Query().Get("menu") == "true" {

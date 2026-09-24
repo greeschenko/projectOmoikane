@@ -412,13 +412,14 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] Event catalog: `docs/events.md` (topology, envelope, 7 live types + 3 schema-frozen, consumer behavior); service-boundaries §4/§7 updated
 - [x] **Gate:** e2e `25-admin-audit-log.spec.ts` — publish post → poll `/api/audit-logs?entity=post&search=…` for an `action=publish` row (Kafka path, not HTTP)
 
-## ⬜ Wave 2 — Kubernetes: Pure Deployment Move
+## ✅ Wave 2 — Kubernetes: Pure Deployment Move
 
-## 🔲 Phase 33: Helm Chart v1 + Local Cluster
-- [ ] Umbrella chart `charts/omoikane` (all services + kafka + postgres + redis + gateway/ingress)
-- [ ] `make k8s-up` (minikube) + `make k8s-test` (Playwright against cluster)
-- [ ] Values files: `values.yaml`, `values-minikube.yaml`, `values-kind.yaml`
-- [ ] **First result #3:** `helm install omoikane` on minikube → CMS fully functional
+## ✅ Phase 33: Helm Chart v1 + Local Cluster
+- [x] Umbrella chart `charts/omoikane` (all services + kafka + postgres + redis + gateway/nginx)
+- [x] `make k8s-up` (minikube) + `make k8s-test` (Playwright against cluster, desktop + mobile, db-reset between suites)
+- [x] Values files: `values.yaml`, `values-minikube.yaml`, `values-kind.yaml`
+- [x] Backend multi-stage image (all 9 binaries); frontend prod standalone image (`next build` type fixes, `sitemap.ts` `force-dynamic`, explicit MUI icon `data-testid`s)
+- [x] **First result #3:** `helm install omoikane` on minikube → CMS fully functional (gateway smoke: setup→login→pages/blog→dashboard aggregator→trash cycle→audit Kafka pipeline→Redis cache→swagger UIs through NodePort→fail-loud `/api/` 404; `make go-test` green; desktop + mobile Playwright green)
 
 ## 🔲 Phase 34: Observability & Ops Hardening
 - [ ] Liveness/readiness probes everywhere

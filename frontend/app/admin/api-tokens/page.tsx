@@ -210,7 +210,7 @@ export default function AdminApiTokens() {
             onChange={(e) => setExpiresInDays(e.target.value)}
             fullWidth
             margin="normal"
-            inputProps={{ min: 0 }}
+            slotProps={{ htmlInput: { min: 0 } }}
           />
         </DialogContent>
         <DialogActions>

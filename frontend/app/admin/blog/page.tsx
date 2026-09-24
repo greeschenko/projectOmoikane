@@ -347,6 +347,7 @@ export default function AdminBlog() {
                           if (next.has(post.id)) next.delete(post.id); else next.add(post.id);
                           setSelectedIds(next);
                         }}
+                        slotProps={{ input: { "aria-label": `Select ${post.title} for bulk delete` } }}
                       />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="subtitle1">{post.title}</Typography>
@@ -384,7 +385,7 @@ export default function AdminBlog() {
                         <EditIcon />
                       </IconButton>
                       <IconButton onClick={() => { setDeleteTarget(post); setDeleteType("post"); }} size="small" color="error">
-                        <DeleteIcon />
+                        <DeleteIcon data-testid="DeleteIcon" />
                       </IconButton>
                     </Box>
                     );
@@ -416,7 +417,7 @@ export default function AdminBlog() {
                       <Typography variant="body2" color="text.secondary">/{tag.slug}</Typography>
                     </Box>
                     <IconButton onClick={() => { setDeleteTarget(tag); setDeleteType("tag"); }} size="small" color="error">
-                      <DeleteIcon />
+                      <DeleteIcon data-testid="DeleteIcon" />
                     </IconButton>
                   </Box>
                 ))}
@@ -447,7 +448,7 @@ export default function AdminBlog() {
                       <Typography variant="body2" color="text.secondary">/{cat.slug}{cat.description ? ` — ${cat.description}` : ""}</Typography>
                     </Box>
                     <IconButton onClick={() => { setDeleteTarget(cat); setDeleteType("category"); }} size="small" color="error">
-                      <DeleteIcon />
+                      <DeleteIcon data-testid="DeleteIcon" />
                     </IconButton>
                   </Box>
                 ))}
@@ -510,11 +511,7 @@ export default function AdminBlog() {
                   value={formData.tags}
                   onChange={(_, newValue) => setFormData({ ...formData, tags: newValue })}
                   renderInput={(params) => <TextField {...params} label="Tags" placeholder="Add tag" />}
-                  renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                      <Chip variant="outlined" label={option} size="small" {...getTagProps({ index })} key={option} />
-                    ))
-                  }
+                  slotProps={{ chip: { variant: "outlined", size: "small" } }}
                 />
                 <FormControl fullWidth>
                   <InputLabel>Category</InputLabel>
@@ -599,7 +596,7 @@ export default function AdminBlog() {
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
         <DialogTitle>Delete {deleteType === "post" ? "Post" : deleteType === "tag" ? "Tag" : "Category"}</DialogTitle>
         <DialogContent>
-          Are you sure you want to delete &quot;{deleteTarget?.name || (deleteTarget as BlogPost)?.title}&quot;?
+          Are you sure you want to delete &quot;{deleteTarget ? ("name" in deleteTarget ? deleteTarget.name : deleteTarget.title) : ""}&quot;?
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>

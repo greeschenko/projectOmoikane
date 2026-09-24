@@ -1,0 +1,7 @@
+.git
+.gitignore
+bin/
+uploads/
+*.log
+.coverage
+.air.toml

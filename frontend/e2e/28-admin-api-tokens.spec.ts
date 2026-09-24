@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { loginAsAdmin, waitForHydration } from "./helpers";
+import { isMobile, loginAsAdmin, waitForHydration } from "./helpers";
 
 async function createToken(page: Page, name: string) {
   await page.goto("/admin/api-tokens");
@@ -25,6 +25,7 @@ test.describe("Admin API Tokens", () => {
   });
 
   test("sidebar has API Tokens nav link", async ({ page }) => {
+    test.skip(isMobile(), "Sidebar is collapsed behind hamburger on mobile");
     await expect(page.getByRole("link", { name: /api tokens/i })).toBeVisible();
   });
 

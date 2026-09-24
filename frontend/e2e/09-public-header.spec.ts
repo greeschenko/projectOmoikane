@@ -132,8 +132,12 @@ test.describe("Main Menu Widget", () => {
 
   test("menu links are inside a navigation landmark", async ({ page }) => {
     const banner = page.getByRole("banner", { name: /public/i });
-    const nav = banner.getByRole("navigation");
-    await expect(nav).toBeVisible();
+    if (isMobile()) {
+      await banner.getByRole("button", { name: /menu/i }).click();
+      await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
+    } else {
+      await expect(banner.getByRole("navigation")).toBeVisible();
+    }
   });
 });
 

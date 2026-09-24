@@ -1,0 +1,105 @@
+# Kafka — single-node KRaft, dual-listener (mirror of docker-compose).
+# PLAINTEXT on :9092 (advertised localhost:9092 — host-side tools via
+# `kubectl port-forward svc/kafka 9092:9092`) and PLAINTEXT_INTERNAL on :29092
+# (advertised kafka:29092 — everything inside the cluster, incl. the event
+# relays and the audit consumer). The controller listener stays in-cluster.
+# Data persists on a PVC so consumer-group offsets survive DB resets, exactly
+# like the compose `kafka-data` named volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "omoikane.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.kafka.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: kafka
+    {{- include "omoikane.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+        {{- include "omoikane.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: kafka
+          image: {{ .Values.kafka.image }}
+          ports:
+            - { name: external, containerPort: 9092 }
+            - { name: internal, containerPort: 29092 }
+            - { name: controller, containerPort: 9093 }
+          env:
+            - { name: KAFKA_NODE_ID, value: "1" }
+            - { name: KAFKA_PROCESS_ROLES, value: "broker,controller" }
+            - { name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,CONTROLLER://:9093" }
+            - { name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092" }
+            - { name: KAFKA_CONTROLLER_LISTENER_NAMES, value: "CONTROLLER" }
+            - { name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT" }
+            - { name: KAFKA_INTER_BROKER_LISTENER_NAME, value: "PLAINTEXT" }
+            # Single-node combined mode: point the quorum at localhost (same
+            # process) instead of the Service ClusterIP. Connecting to one's
+            # own Service (kube-proxy hairpin) is flaky for long-lived KRaft
+            # quorum connections in minikube and caused the broker to never
+            # catch up ("Node 1 disconnected" loop).
+            - { name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093" }
+            - { name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1" }
+            - { name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS, value: "0" }
+            - { name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "true" }
+            - { name: CLUSTER_ID, value: "MkU3OEVBNTcwNTJENDM2Qk" }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/kafka/data }
+          readinessProbe:
+            exec:
+              command: ["/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 40
+          livenessProbe:
+            exec:
+              command: ["/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: kafka-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: kafka
+    {{- include "omoikane.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: kafka
+  ports:
+    - { name: external, port: 9092, targetPort: 9092 }
+    - { name: internal, port: 29092, targetPort: 29092 }
+    - { name: controller, port: 9093, targetPort: 9093 }

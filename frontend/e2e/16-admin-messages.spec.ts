@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./helpers";
+import { isMobile, loginAsAdmin } from "./helpers";
 
 test.describe("Admin Messages", () => {
   test.beforeEach(async ({ page }) => {
@@ -8,6 +8,7 @@ test.describe("Admin Messages", () => {
   });
 
   test("sidebar has Messages navigation link", async ({ page }) => {
+    test.skip(isMobile(), "Sidebar is collapsed behind hamburger on mobile");
     await page.goto("/admin");
     const nav = page.getByRole("navigation");
     await expect(nav.getByRole("link", { name: /messages/i })).toBeVisible();

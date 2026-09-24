@@ -65,7 +65,7 @@ See [PLAN.md](./PLAN.md).
 | 30 — Content + Media Services (Wave 2) | ✅ | Go 158 pass; gateway routes content/media→services; page.published/post.published/media.uploaded via outbox→Kafka |
 | 31 — Messages + Settings; Monolith Retired | ✅ | Go 176 pass; gateway fully decomposed (zero monolith); trash/dashboard aggregators over internal APIs; audit-logs direct; frontend SSR via gateway |
 | 32 — Real Events Live (audit via Kafka) | ✅ | Go 188 pass; audit = Kafka consumer (group `audit`, idempotent); auth.login/contact.received/settings.updated emitted; `POST /events` retired; event catalog + events.md |
-| 33 — Helm Chart + Local K8s | 🔲 | — |
+| 33 — Helm Chart + Local K8s | ✅ | Go 188 pass; `make k8s-test` desktop + mobile Playwright green on minikube; `helm install omoikane` → CMS fully functional through the gateway NodePort |
 | 34 — Observability & Ops | 🔲 | — |
 | 35 — Webhook Module (Flagship) | 🔲 | — |
 | 36 — CI/CD + Cloud Runbooks + **First Result** | 🔲 | — |
@@ -83,10 +83,15 @@ make test     # Run full Playwright suite
 
 On first run, navigate to `/setup` to create the admin account.
 
-### Kubernetes (Phases 33+, once available)
+### Kubernetes (Phase 33+)
 
 ```bash
-make k8s-up     # Spin up minikube (or use kind)
-helm install omoikane ./charts/omoikane
-make k8s-test   # Playwright smoke tests against the cluster
+make k8s-up                 # Start minikube (docker driver, ingress/metrics/storage addons) + build/load images + helm upgrade --wait
+make k8s-test               # helm lint + template + Playwright desktop & mobile against the cluster (db-reset between suites)
 ```
+
+The umbrella chart `charts/omoikane` deploys all 9 Go services + nginx gateway +
+frontend + postgres + redis + kafka (single-node KRaft) with the same service
+names/env contracts as docker-compose, so the gateway config and DSNs are reused
+verbatim. `values-minikube.yaml`/`values-kind.yaml` overlay the base
+`values.yaml`.

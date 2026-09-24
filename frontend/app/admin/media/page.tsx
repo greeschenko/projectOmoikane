@@ -176,12 +176,13 @@ export default function AdminMediaPage() {
       ) : (
         <Grid container spacing={2}>
           {media.map((item) => (
-            <Grid item xs={6} sm={4} md={3} key={item.id}>
+            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={item.id}>
               <Card sx={{ position: "relative", bgcolor: selectedIds.has(item.id) ? "action.selected" : undefined }}>
                 <Box sx={{ position: "absolute", top: 4, left: 4, zIndex: 1 }}>
                   <Checkbox
                     checked={selectedIds.has(item.id)}
                     onChange={() => toggleSelect(item.id)}
+                    slotProps={{ input: { "aria-label": `Select ${item.filename} for bulk delete` } }}
                     sx={{ bgcolor: "background.paper", "&:hover": { bgcolor: "action.hover" } }}
                   />
                 </Box>

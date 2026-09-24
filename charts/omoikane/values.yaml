@@ -1,0 +1,112 @@
+# Base values — cloud-agnostic dev defaults. Override per-provider:
+#   values-minikube.yaml / values-kind.yaml / (future) values-eks.yaml ...
+#
+# IMPORTANT — fixed resource names. Every Kubernetes Service is named exactly
+# like its docker-compose counterpart (postgres, redis, kafka, frontend, nginx,
+# auth-service, content-service, ...). The nginx gateway ConfigMap and the
+# service env vars embed those hostnames/DSNs, so verbatim reuse (zero drift)
+# is only possible if these names never change. One release per namespace.
+
+images:
+  backend:
+    repository: omoikane/backend
+    tag: phase33
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: omoikane/frontend
+    tag: phase33
+    pullPolicy: IfNotPresent
+
+secrets:
+  # Dev defaults only. For production pre-create your own Secret and set
+  # `.Values.secrets.existingSecret`; these values are then ignored.
+  jwtSecret: "dev-secret-change-in-production"
+  internalToken: "dev-internal-token-change-me"
+  existingSecret: ""
+
+postgres:
+  image: postgres:16-alpine
+  user: omoikane
+  password: omoikane
+  database: omoikane        # main store (shared by auth/content/media/messages/settings)
+  auditDatabase: omoikane_audit
+  storage: 5Gi
+
+redis:
+  image: redis:7-alpine     # shared public-cache (no persistence needed)
+
+kafka:
+  image: apache/kafka:3.9.0
+  storage: 5Gi
+  bootstrap: kafka:29092    # single-node KRaft dual-listener, internal broker
+  eventsTopic: omoikane.events
+  dlqTopic: omoikane.events.dlq
+
+# Per-service catalog. `ports` is the source of truth: the range in
+# templates/backend.yaml emits one Deployment + one Service per entry.
+# `databases` maps each DB-backed service to its database name, `redis` /
+# `kafka` / `internalToken` are name lists selecting which services receive
+# which env blocks (mirrors docker-compose exactly).
+backend:
+  replicas: 1
+  ports:
+    auth: 8082
+    content: 8083
+    media: 8084
+    messages: 8085
+    settings: 8086
+    trash: 8087
+    dashboard: 8088
+    docs: 8089
+    audit: 8081
+  databases:
+    auth: omoikane
+    content: omoikane
+    media: omoikane
+    messages: omoikane
+    settings: omoikane
+    audit: omoikane_audit
+  redis:
+    - auth
+    - content
+    - settings
+  kafka:
+    - auth
+    - content
+    - media
+    - messages
+    - settings
+    - audit
+  internalToken:
+    - auth
+    - content
+    - media
+    - messages
+    - settings
+    - trash
+    - dashboard
+
+auth:
+  smtpHost: ""
+  smtpPort: "587"
+  smtpUser: ""
+  smtpPass: ""
+  smtpFrom: noreply@omoikane.local
+  recaptchaSecret: ""
+
+media:
+  baseUrl: ""               # absolute CDN URL override when set (else relative)
+  uploadStorage: 5Gi        # RWO PVC; scale media replicas >1 needs RWX + shared FS
+
+gateway:
+  image: nginx:alpine
+  serviceType: LoadBalancer # minikube/kind override to NodePort for k8s-test
+  nodePort: 30080
+
+frontend:
+  replicas: 1
+  apiUrl: http://nginx      # SSR fetches flow through the gateway Service DNS
+
+ingress:
+  enabled: false            # optional cloud Ingress in front of the nginx gateway
+  host: omoikane.local

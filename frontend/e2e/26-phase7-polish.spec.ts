@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin, waitForHydration } from "./helpers";
+import { isMobile, loginAsAdmin, waitForHydration } from "./helpers";
 
 test.describe("Phase 7 — Blog View Button", () => {
   test.beforeEach(async ({ page }) => {
@@ -114,6 +114,7 @@ test.describe("Phase 7 — Admin Menu Icons", () => {
   });
 
   test("sidebar nav items have visible icons", async ({ page }) => {
+    test.skip(isMobile(), "Sidebar is collapsed behind hamburger on mobile");
     await page.goto("/admin");
     const sidebar = page.getByRole("navigation");
     const icons = sidebar.locator("svg");

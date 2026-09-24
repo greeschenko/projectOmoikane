@@ -1,0 +1,16 @@
+# kind override (CI; `kind load docker-image` before `helm install`).
+#
+# Mirrors values-minikube.yaml — same NodePort exposure for the CI runner to
+# reach the gateway. Phase 36 wires the GitHub Actions workflow around this file.
+images:
+  backend:
+    pullPolicy: IfNotPresent
+  frontend:
+    pullPolicy: IfNotPresent
+
+gateway:
+  serviceType: NodePort
+  nodePort: 30080
+
+ingress:
+  enabled: false

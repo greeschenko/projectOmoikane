@@ -37,6 +37,13 @@ const ENTITY_COLORS: Record<string, "primary" | "success" | "warning" | "info" |
   category: "default",
 };
 
+// MUI `info` (#0288d1) and `warning` (#ed6c02) fail WCAG AA 4.5:1 with white
+// text; darken with the 900 shades so the entity chips pass the a11y gate.
+const ENTITY_BG: Record<string, string> = {
+  post: "#01579b", // lightBlue 900
+  media: "#bf360c", // deepOrange 900
+};
+
 const ALL_ENTITIES = ["all", "page", "user", "post", "media", "contact", "message", "tag", "category"];
 
 export default function AdminTrash() {
@@ -119,6 +126,7 @@ export default function AdminTrash() {
                       label={ENTITY_LABELS[item.entity] || item.entity}
                       color={ENTITY_COLORS[item.entity] || "default"}
                       size="small"
+                      sx={ENTITY_BG[item.entity] ? { bgcolor: ENTITY_BG[item.entity] } : undefined}
                     />
                   </TableCell>
                   <TableCell>{new Date(item.deletedAt).toLocaleString()}</TableCell>

@@ -1,5 +1,8 @@
-node_modules
-.next
 .git
 .gitignore
-*.md
+node_modules
+.next
+.next-root-owned
+e2e
+playwright-report
+test-results

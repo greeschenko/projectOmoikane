@@ -1,6 +1,12 @@
 import type { MetadataRoute } from "next";
 import { apiFetch } from "@/lib/api";
 
+// Next marks sitemap as a cached Route Handler by default; the prod build
+// (k8s frontend image) bakes it at `next build` time — with an empty DB the
+// sitemap would be root-only forever. Force per-request rendering so published
+// pages/posts always reflect the live data (compose's `next dev` never noticed).
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let pages: Array<Record<string, unknown>> = [];
   let blogPosts: Array<Record<string, unknown>> = [];

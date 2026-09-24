@@ -73,7 +73,7 @@ export default function AdminLayout({
   const sidebarContent = (
     <List>
       {navItems.map((item) => (
-        <ListItem key={item.href} disablePadding sx={{ pl: item.indent ? 2 : 0 }}>
+        <ListItem key={item.href} disablePadding sx={{ pl: 0 }}>
           <ListItemButton
             component={Link}
             href={item.href}

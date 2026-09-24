@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./helpers";
+import { isMobile, loginAsAdmin } from "./helpers";
 
 function uniqueEmail(): string {
   return `u_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@test.com`;
@@ -81,6 +81,9 @@ test.describe("Phase 8 — Blog in MainMenu", () => {
 
   test("blog link visible in main menu when enabled", async ({ page }) => {
     await page.goto("/");
+    if (isMobile()) {
+      await page.getByRole("button", { name: "Open menu" }).click();
+    }
     const menu = page.getByRole("navigation");
     await expect(menu.getByRole("link", { name: /blog/i })).toBeVisible();
   });

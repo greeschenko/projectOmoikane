@@ -38,6 +38,16 @@ const ACTION_COLORS: Record<string, "success" | "error" | "warning" | "info" | "
   contact: "warning",
 };
 
+// MUI `info` (#0288d1) and `warning` (#ed6c02) fail WCAG AA 4.5:1 with white
+// text; darken with the 900 shades so the action chips pass the a11y gate.
+const ACTION_BG: Record<string, string> = {
+  update: "#01579b", // lightBlue 900
+  batch_update: "#01579b",
+  upload: "#01579b",
+  restore: "#bf360c", // deepOrange 900
+  contact: "#bf360c",
+};
+
 const ENTITY_TYPES = ["all", "user", "page", "post", "media", "contact", "message", "tag", "category", "settings"];
 
 export default function AdminAuditLog() {
@@ -87,12 +97,14 @@ export default function AdminAuditLog() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: 250 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <Typography variant="body2" color="text.secondary">
@@ -144,6 +156,7 @@ export default function AdminAuditLog() {
                       label={log.action}
                       color={ACTION_COLORS[log.action] || "default"}
                       size="small"
+                      sx={ACTION_BG[log.action] ? { bgcolor: ACTION_BG[log.action] } : undefined}
                     />
                   </TableCell>
                   <TableCell>

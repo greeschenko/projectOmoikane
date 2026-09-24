@@ -443,6 +443,7 @@ function PageTreeItem({
           checked={selectedIds.has(page.id)}
           onChange={() => onToggleSelect(page.id)}
           size="small"
+          slotProps={{ input: { "aria-label": `Select ${page.title} for bulk delete` } }}
         />
         <Box
           component="span"
@@ -456,7 +457,7 @@ function PageTreeItem({
           }}
           onPointerDown={handlePointerDown}
         >
-          <DragIndicatorIcon fontSize="small" color="disabled" />
+          <DragIndicatorIcon fontSize="small" color="disabled" data-testid="DragIndicatorIcon" />
         </Box>
         <IconButton size="small" onClick={() => handleMove("up")} aria-label={`Move ${page.title} up`}>
           <ArrowUpwardIcon fontSize="small" />

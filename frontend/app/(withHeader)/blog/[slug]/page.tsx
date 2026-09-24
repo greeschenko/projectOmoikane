@@ -39,7 +39,7 @@ export default async function BlogPostPage({
           content: post.content as string,
           authorId: post.authorId as string,
           status: post.status as string,
-          publishDate: post.publishDate as string | undefined,
+          publishDate: (post.publishDate as string | undefined) || (post.createdAt as string),
           likeCount: post.likeCount as number,
           createdAt: post.createdAt as string,
           authorName: post.authorName as string | undefined,
