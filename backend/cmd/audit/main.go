@@ -15,6 +15,7 @@ import (
 	"omoikane-backend/internal/events"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
+	"omoikane-backend/internal/observability"
 
 	"github.com/segmentio/kafka-go"
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -30,6 +31,9 @@ import (
 var db *gorm.DB
 
 func main() {
+	// JSON structured logs + process-wide Prometheus registry (Phase 34).
+	observability.Setup("audit")
+
 	dsn := os.Getenv("AUDIT_DATABASE_URL")
 	if dsn == "" {
 		dsn = "host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane_audit sslmode=disable"
@@ -50,6 +54,14 @@ func main() {
 		log.Fatalf("Failed to migrate audit database: %v", err)
 	}
 	log.Println("Audit service connected and migrated")
+
+	// Migration-only mode (Phase 34): the Helm chart runs each DB service as a
+	// post-install migration Job with MIGRATE_ONLY=1 so schema deploys are
+	// explicit and restart-safe. Exit cleanly once migrations are applied.
+	if os.Getenv("MIGRATE_ONLY") == "1" {
+		log.Println("audit-service: migrations complete, exiting (MIGRATE_ONLY=1)")
+		return
+	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -83,7 +95,7 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("Audit service starting on %s", addr)
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{Addr: addr, Handler: observability.Middleware(mux)}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Audit service failed: %v", err)
@@ -115,6 +127,8 @@ func main() {
 func newAuditMux(jwtSecret string) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /swagger/", httpSwagger.Handler())
+	// Prometheus scrape endpoint (Phase 34); service-level, never gateway-exposed.
+	mux.Handle("GET /metrics", observability.MetricsHandler())
 	mux.HandleFunc("GET /logs", handleGetLogs)
 	// Admin-only surface exposed directly to the gateway (Phase 31): the
 	// frontend audit-log page calls /api/audit-logs with the admin session

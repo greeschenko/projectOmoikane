@@ -1,0 +1,73 @@
+{{- /*
+HorizontalPodAutoscalers (Phase 34). Rendered only when `.Values.autoscaling
+.enabled` is true (default false). CAVEAT: an HPA with minReplicas > 0 fights
+`make k8s-db-reset`'s scale-to-0 — enable only in environments where the local
+k8s gate tooling is not used, and keep DB-backed services (or the whole set)
+out of scaling if you still run DB resets.
+
+One HPA per backend service (scaling the same Deployments `backend.yaml`
+renders) plus the frontend. kube-prometheus-stack uses these out of the box;
+metrics-server (minikube addon) provides the metrics API for CPU/Memory.
+*/ -}}
+{{- if .Values.autoscaling.enabled }}
+{{- range $svc, $port := .Values.backend.ports }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $svc }}-service
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $svc }}-service
+    {{- include "omoikane.labels" $ | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $svc }}-service
+  minReplicas: {{ $.Values.autoscaling.minReplicas }}
+  maxReplicas: {{ $.Values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $.Values.autoscaling.targetCPUUtilization }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $.Values.autoscaling.targetMemoryUtilization }}
+{{- end }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: frontend
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: frontend
+    {{- include "omoikane.labels" $ | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend
+  minReplicas: {{ $.Values.autoscaling.minReplicas }}
+  maxReplicas: {{ $.Values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $.Values.autoscaling.targetCPUUtilization }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $.Values.autoscaling.targetMemoryUtilization }}
+{{- end }}

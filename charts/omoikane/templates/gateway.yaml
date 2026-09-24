@@ -39,6 +39,8 @@ spec:
           image: {{ .Values.gateway.image }}
           ports:
             - { name: http, containerPort: 80 }
+          resources:
+            {{- toYaml .Values.resources.gateway | nindent 12 }}
           volumeMounts:
             - { name: conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true }
           readinessProbe:

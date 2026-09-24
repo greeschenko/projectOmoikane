@@ -5,8 +5,8 @@ description: >-
   all microservices (auth/content/media/messages/settings/trash/dashboard/docs/audit),
   nginx gateway, Postgres, Redis and Kafka (single-node KRaft).
 type: application
-version: 0.1.0
-appVersion: "33"
+version: 0.2.0
+appVersion: "34"
 keywords:
   - cms
   - kafka

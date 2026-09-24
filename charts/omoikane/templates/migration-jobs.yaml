@@ -1,0 +1,71 @@
+{{- /*
+Migration Jobs (Phase 34). Each DB-backed service binary supports MIGRATE_ONLY=1:
+connect to Postgres, run AutoMigrate (+ outbox table), print, exit 0. Rendering
+one Job per `backend.databases` entry makes schema deploys explicit and
+hermetic — and fails the release loudly if a migration does, because hook Jobs
+complete before `helm ... --wait` returns.
+
+Startup auto-migration stays in every Deployment (restart-safe; k8s-db-reset
+drops the databases and relies on the scaled-back services re-running
+migrations), so these Jobs are belt-and-suspenders for deploy-time ordering,
+not required for runtime correctness.
+
+IMPORTANT (Helm hook mechanics): every range iteration MUST be emitted with a
+leading `---` YAML document separator. Helm groups hook resources per template
+FILE and parses the file's rendered text as one multi-document YAML stream. If
+the `---` is omitted, the six Job documents get concatenated into a single
+document with duplicate top-level keys; the last `metadata.name` wins and only
+the LAST Job is ever created/run (verified against Helm v4.3.0 — all six
+migration Jobs silently skipped except the final one).
+*/ -}}
+{{- if .Values.migrations.enabled }}
+{{- range $svc, $db := .Values.backend.databases }}
+{{- $upper := $svc | upper }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $svc }}-migrate
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $svc }}-migrate
+    {{- include "omoikane.labels" $ | nindent 4 }}
+  annotations:
+    # post-install,post-upgrade: run on every install/upgrade; a hook failure
+    # fails the release (fail-loud). before-hook-creation: drop the previous
+    # Job of the same name first (Jobs' spec.template is immutable once
+    # created, so image-tag bumps would otherwise collide on upgrade).
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: {{ $svc }}-migrate
+    spec:
+      restartPolicy: Never
+      initContainers:
+        # The Job may start before the postgres Deployment is Ready (hooks run
+        # once all resources are applied, not once they're healthy). The
+        # postgres image ships pg_isready (the distroless-ish backend alpine
+        # image is busybox-only), so wait on the real readiness signal.
+        - name: wait-postgres
+          image: {{ $.Values.postgres.image }}
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres -U {{ $.Values.postgres.user }}; do echo 'waiting for postgres...'; sleep 2; done"]
+      containers:
+        - name: migrate
+          image: "{{ $.Values.images.backend.repository }}:{{ $.Values.images.backend.tag }}"
+          imagePullPolicy: {{ $.Values.images.backend.pullPolicy }}
+          command: ["/app/bin/{{ $svc }}"]
+          env:
+            - name: {{ $upper }}_DATABASE_URL
+              value: {{ include "omoikane.postgresDSN" (dict "Values" $.Values "svc" $svc) | quote }}
+            - name: MIGRATE_ONLY
+              value: "1"
+          resources:
+            {{- toYaml $.Values.resources.backend | nindent 12 }}
+{{- end }}
+{{- end }}

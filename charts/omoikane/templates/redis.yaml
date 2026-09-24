@@ -24,6 +24,8 @@ spec:
           image: {{ .Values.redis.image }}
           ports:
             - { name: redis, containerPort: 6379 }
+          resources:
+            {{- toYaml .Values.resources.redis | nindent 12 }}
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]

@@ -235,3 +235,12 @@ owning services via the transactional outbox → relay → `omoikane.events`;
 `cmd/audit` consumes group `audit` (start `kafka.LastOffset`,
 idempotent on `AuditLog.EventID`) and maps them to audit rows. `page.updated`,
 `post.updated`, and `message.created` are schema-frozen but not yet emitted.
+
+## 8. Observability & ops (Phase 34)
+
+Structured JSON logs, Prometheus `/metrics` per service (never gateway-exposed),
+probes, migration Jobs, secrets via `secretKeyRef`, HPA manifests (default off),
+and resource requests/limits are documented in
+[`observability.md`](./observability.md). Every service registers `GET /metrics`
+inside its `newXxxMux` so cmd tests can assert it without booting a server; the
+production server wraps the mux in `observability.Middleware`.

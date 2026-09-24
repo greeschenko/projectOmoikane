@@ -10,11 +10,11 @@
 images:
   backend:
     repository: omoikane/backend
-    tag: phase33
+    tag: phase34
     pullPolicy: IfNotPresent
   frontend:
     repository: omoikane/frontend
-    tag: phase33
+    tag: phase34
     pullPolicy: IfNotPresent
 
 secrets:
@@ -22,6 +22,11 @@ secrets:
   # `.Values.secrets.existingSecret`; these values are then ignored.
   jwtSecret: "dev-secret-change-in-production"
   internalToken: "dev-internal-token-change-me"
+  # SMTP password + ReCAPTCHA secret moved into the Secret (Phase 34): the
+  # auth/messages Deployments reference them via secretKeyRef, never as plain
+  # env values. Keep in sync with `.Values.auth.smtp*` when overriding.
+  smtpPass: ""
+  recaptchaSecret: ""
   existingSecret: ""
 
 postgres:
@@ -90,9 +95,9 @@ auth:
   smtpHost: ""
   smtpPort: "587"
   smtpUser: ""
-  smtpPass: ""
   smtpFrom: noreply@omoikane.local
-  recaptchaSecret: ""
+  # smtpPass / recaptchaSecret live in `secrets.*` (rendered into the Secret,
+  # consumed via secretKeyRef — Phase 34).
 
 media:
   baseUrl: ""               # absolute CDN URL override when set (else relative)
@@ -106,6 +111,57 @@ gateway:
 frontend:
   replicas: 1
   apiUrl: http://nginx      # SSR fetches flow through the gateway Service DNS
+
+# Resource requests/limits (Phase 34). Sized to fit the 6 CPU / 6 GiB minikube
+# node used by `make k8s-up`; raise for heavier workloads. Applied to every
+# container in the corresponding template.
+resources:
+  backend:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  frontend:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 1000m, memory: 768Mi }
+  gateway:
+    requests: { cpu: 20m, memory: 32Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+  postgres:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: 1000m, memory: 1536Mi }
+  redis:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 256Mi }
+  kafka:
+    requests: { cpu: 500m, memory: 768Mi }
+    limits: { cpu: 1500m, memory: 1536Mi }
+
+# HorizontalPodAutoscaler manifests (Phase 34). DEFAULT OFF: an HPA with
+# minReplicas > 0 fights `make k8s-db-reset`'s scale-to-0 (HPA would scale the
+# DB-owning deployments back up and block the DROP). Enable per-target only in
+# environments where the gate tooling differs; manifests render (and validate)
+# on demand via helm template --set autoscaling.enabled=true.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilization: 60
+  targetMemoryUtilization: 70
+
+# Per-service schema migration Jobs (Phase 34). Each DB-backed service ships a
+# MIGRATE_ONLY=1 early-exit (connect + AutoMigrate + outbox, then exit) so the
+# chart can run it as a hermetic post-install/post-upgrade hook Job — schema
+# deploys become explicit and a failed migration fails the release (fail-loud).
+# Startup auto-migration stays in place (restart-safe; k8s-db-reset relies on
+# it re-running migrations on scale-back-to-1).
+migrations:
+  enabled: true
+
+# Prometheus scrape annotations on backend pods (Phase 34). /metrics is served
+# by every service on its own port; the gateway intentionally has no /metrics
+# route. Wire these annotations into your scraping config (Prometheus
+# Operator / kube-prometheus-stack discover them out of the box).
+observability:
+  prometheusAnnotations: true
 
 ingress:
   enabled: false            # optional cloud Ingress in front of the nginx gateway

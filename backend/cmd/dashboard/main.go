@@ -23,9 +23,13 @@ import (
 
 	"omoikane-backend/internal/handlers"
 	"omoikane-backend/internal/middleware"
+	"omoikane-backend/internal/observability"
 )
 
 func main() {
+	// JSON structured logs + process-wide Prometheus registry (Phase 34).
+	observability.Setup("dashboard")
+
 	port := os.Getenv("DASHBOARD_PORT")
 	if port == "" {
 		port = "8088"
@@ -47,7 +51,7 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("dashboard-service starting on %s", addr)
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{Addr: addr, Handler: observability.Middleware(mux)}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("dashboard-service failed: %v", err)
@@ -86,6 +90,9 @@ func newDashboardMux(cfg dashboardCfg) *http.ServeMux {
 
 	// Health (readiness check from Makefile / compose healthcheck)
 	mux.HandleFunc("GET /health", handlers.HealthHandler)
+
+	// Prometheus scrape endpoint (Phase 34); service-level, never gateway-exposed.
+	mux.Handle("GET /metrics", observability.MetricsHandler())
 
 	// Dashboard surface (admin only; JWT claims are self-contained so the
 	// facade needs no DB).

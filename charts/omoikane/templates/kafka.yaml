@@ -46,6 +46,8 @@ spec:
             - { name: external, containerPort: 9092 }
             - { name: internal, containerPort: 29092 }
             - { name: controller, containerPort: 9093 }
+          resources:
+            {{- toYaml .Values.resources.kafka | nindent 12 }}
           env:
             - { name: KAFKA_NODE_ID, value: "1" }
             - { name: KAFKA_PROCESS_ROLES, value: "broker,controller" }

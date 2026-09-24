@@ -40,6 +40,12 @@ spec:
       labels:
         app: {{ $svc }}-service
         {{- include "omoikane.selectorLabels" $ | nindent 8 }}
+      {{- if $.Values.observability.prometheusAnnotations }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ $port }}"
+        prometheus.io/path: /metrics
+      {{- end }}
     spec:
       containers:
         - name: {{ $svc }}
@@ -48,6 +54,8 @@ spec:
           command: ["/app/bin/{{ $svc }}"]
           ports:
             - { name: http, containerPort: {{ $port }} }
+          resources:
+            {{- toYaml $.Values.resources.backend | nindent 12 }}
           env:
             - name: {{ $upper }}_PORT
               value: "{{ $port }}"
@@ -83,12 +91,24 @@ spec:
             - { name: SMTP_HOST, value: "{{ $.Values.auth.smtpHost }}" }
             - { name: SMTP_PORT, value: "{{ $.Values.auth.smtpPort }}" }
             - { name: SMTP_USER, value: "{{ $.Values.auth.smtpUser }}" }
-            - { name: SMTP_PASS, value: "{{ $.Values.auth.smtpPass }}" }
+            - name: SMTP_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.existingSecret | default "omoikane-secrets" }}
+                  key: smtp-pass
             - { name: SMTP_FROM, value: "{{ $.Values.auth.smtpFrom }}" }
-            - { name: RECAPTCHA_SECRET, value: "{{ $.Values.auth.recaptchaSecret }}" }
+            - name: RECAPTCHA_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.existingSecret | default "omoikane-secrets" }}
+                  key: recaptcha-secret
             {{- end }}
             {{- if eq $svc "messages" }}
-            - { name: RECAPTCHA_SECRET, value: "{{ $.Values.auth.recaptchaSecret }}" }
+            - name: RECAPTCHA_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.existingSecret | default "omoikane-secrets" }}
+                  key: recaptcha-secret
             {{- end }}
             {{- if eq $svc "media" }}
             - { name: UPLOAD_DIR, value: "/app/uploads" }

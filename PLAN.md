@@ -114,13 +114,11 @@ Flagship demo = webhook module. First result = working platform on a fresh clust
 - Values files: `values.yaml` (base), `values-minikube.yaml`, `values-kind.yaml`
 - **First result #3:** `helm install omoikane` on minikube → CMS fully functional
 
-#### Phase 34 — Observability & ops hardening
-- Liveness/readiness probes on all services (health endpoints already exist)
-- Prometheus metrics (`/metrics` per service), OTel tracing (optional collector),
-  JSON structured logs
-- Migration `Jobs` (idempotent per-service schema), secrets via values/Secret,
-  HPA manifests (cpu/memory), resource requests/limits in chart
-- **Gate:** zero-manual-step deploy; failures visible in metrics/logs; restart-safe
+#### Phase 34 — Observability & ops hardening (DONE)
+- Liveness/readiness probes on all services (health endpoints already exist) — all 14 Deployments
+- Prometheus metrics (`/metrics` per service) + JSON structured logs (slog + log bridge); OTel tracing (optional collector) — intentionally skipped, documented
+- Migration `Jobs` (idempotent per-service schema via MIGRATE_ONLY=1), secrets via values/Secret (SMTP_PASS/RECAPTCHA_SECRET via secretKeyRef), HPA manifests (default off), resource requests/limits in chart
+- **Gate:** zero-manual-step deploy; failures visible in metrics/logs; restart-safe — `make go-test` + `make k8s-test` green
 
 #### Phase 35 — Webhook module (flagship demo)
 - `cmd/webhooks`: subscription CRUD (event type → URL, optional HMAC secret),

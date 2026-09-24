@@ -22,6 +22,7 @@ import (
 
 	_ "omoikane-backend/docs"
 	"omoikane-backend/internal/handlers"
+	"omoikane-backend/internal/observability"
 
 	httpSwagger "github.com/swaggo/http-swagger"
 )
@@ -35,6 +36,9 @@ import (
 // @in header
 // @name Authorization
 func main() {
+	// JSON structured logs + process-wide Prometheus registry (Phase 34).
+	observability.Setup("docs")
+
 	port := os.Getenv("DOCS_PORT")
 	if port == "" {
 		port = "8089"
@@ -48,6 +52,9 @@ func main() {
 	// Health (readiness check from Makefile / compose healthcheck)
 	mux.HandleFunc("GET /health", handlers.HealthHandler)
 
+	// Prometheus scrape endpoint (Phase 34); service-level, never gateway-exposed.
+	mux.Handle("GET /metrics", observability.MetricsHandler())
+
 	// Swagger UI (public). httpSwagger emits the HTML UI + a trailing-slash
 	// redirect; nginx rewrites the /swagger/ redirect so the prefixed URL
 	// /api/swagger/ resolves.
@@ -55,7 +62,7 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("docs-service starting on %s", addr)
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{Addr: addr, Handler: observability.Middleware(mux)}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("docs-service failed: %v", err)
@@ -76,6 +83,7 @@ func main() {
 func newDocsMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handlers.HealthHandler)
+	mux.Handle("GET /metrics", observability.MetricsHandler())
 	mux.HandleFunc("GET /swagger/", httpSwagger.Handler())
 	return mux
 }

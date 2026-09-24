@@ -33,6 +33,7 @@ import (
 	"omoikane-backend/internal/handlers"
 	"omoikane-backend/internal/middleware"
 	"omoikane-backend/internal/models"
+	"omoikane-backend/internal/observability"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -40,6 +41,10 @@ import (
 )
 
 func main() {
+	// JSON structured logs + process-wide Prometheus registry (Phase 34). All
+	// stdlib log.* calls below are bridged into JSON with the service attr.
+	observability.Setup("auth")
+
 	dsn := os.Getenv("AUTH_DATABASE_URL")
 	if dsn == "" {
 		dsn = "host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable"
@@ -73,6 +78,14 @@ func main() {
 		log.Fatalf("auth-service: failed to migrate outbox: %v", err)
 	}
 	log.Println("auth-service connected and migrated (shared omoikane store + outbox)")
+
+	// Migration-only mode (Phase 34): the Helm chart runs each DB service as a
+	// post-install migration Job with MIGRATE_ONLY=1 so schema deploys are
+	// explicit and restart-safe. Exit cleanly once migrations are applied.
+	if os.Getenv("MIGRATE_ONLY") == "1" {
+		log.Println("auth-service: migrations complete, exiting (MIGRATE_ONLY=1)")
+		return
+	}
 
 	// Events wiring. EnsureTopics is best-effort: if Kafka is down the relay
 	// simply keeps retrying pending outbox rows; the service stays up.
@@ -137,7 +150,7 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("auth-service starting on %s", addr)
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{Addr: addr, Handler: observability.Middleware(mux)}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("auth-service failed: %v", err)
@@ -163,6 +176,9 @@ func newAuthMux(h *handlers.Handler, internalToken string) *http.ServeMux {
 
 	// Health (readiness check from Makefile / compose healthcheck)
 	mux.HandleFunc("GET /health", handlers.HealthHandler)
+
+	// Prometheus scrape endpoint (Phase 34); service-level, never gateway-exposed.
+	mux.Handle("GET /metrics", observability.MetricsHandler())
 
 	// Setup check (public; used by the frontend home + setup pages to decide
 	// whether to render the installer)

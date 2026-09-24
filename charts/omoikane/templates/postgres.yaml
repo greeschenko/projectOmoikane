@@ -51,6 +51,8 @@ spec:
           image: {{ .Values.postgres.image }}
           ports:
             - { name: pg, containerPort: 5432 }
+          resources:
+            {{- toYaml .Values.resources.postgres | nindent 12 }}
           env:
             - name: POSTGRES_USER
               value: {{ .Values.postgres.user }}

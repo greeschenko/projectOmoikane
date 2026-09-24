@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"omoikane-backend/internal/events"
 	"omoikane-backend/internal/handlers"
 	"omoikane-backend/internal/models"
+	"omoikane-backend/internal/observability"
 
 	"gorm.io/gorm"
 )
@@ -78,7 +80,7 @@ func setupAuthService(t *testing.T) (*gorm.DB, *httptest.Server, *events.Relay, 
 		// it to the trash aggregator + dashboard facade.
 		TrashEntities: []string{"user"},
 	}
-	s := httptest.NewServer(newAuthMux(h, "test-internal-token"))
+	s := httptest.NewServer(observability.Middleware(newAuthMux(h, "test-internal-token")))
 	t.Cleanup(s.Close)
 
 	stub := &stubProducer{}
@@ -116,6 +118,47 @@ func TestAuthService_SetupCheckPublic(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from /setup/check, got %d", resp.StatusCode)
+	}
+}
+
+// TestAuthService_MetricsEndpoint verifies the Phase 34 /metrics route is wired
+// through newAuthMux and serves Prometheus text for the process-wide registry.
+// The setup helper wraps the mux in observability.Middleware (mirroring main())
+// so a request to /health also demonstrates a recorded http_requests_total row.
+func TestAuthService_MetricsEndpoint(t *testing.T) {
+	_, s, _, _ := setupAuthService(t)
+
+	// Record at least one request so the counter family renders.
+	healthResp, err := http.Get(s.URL + "/health")
+	if err != nil {
+		t.Fatalf("health request: %v", err)
+	}
+	healthResp.Body.Close()
+
+	resp, err := http.Get(s.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("metrics request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from /metrics, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
+		t.Errorf("metrics Content-Type = %q, want text/plain (prometheus text format)", ct)
+	}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read metrics body: %v", err)
+	}
+	body := string(bodyBytes)
+	for _, want := range []string{
+		"http_requests_total",
+		"http_request_duration_seconds",
+		`route="/health"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics body missing %q", want)
+		}
 	}
 }
 

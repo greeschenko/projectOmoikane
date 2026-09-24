@@ -28,9 +28,13 @@ import (
 
 	"omoikane-backend/internal/handlers"
 	"omoikane-backend/internal/middleware"
+	"omoikane-backend/internal/observability"
 )
 
 func main() {
+	// JSON structured logs + process-wide Prometheus registry (Phase 34).
+	observability.Setup("trash")
+
 	port := os.Getenv("TRASH_PORT")
 	if port == "" {
 		port = "8087"
@@ -52,7 +56,7 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("trash-service starting on %s", addr)
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{Addr: addr, Handler: observability.Middleware(mux)}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("trash-service failed: %v", err)
@@ -90,6 +94,9 @@ func newTrashMux(cfg trashCfg) *http.ServeMux {
 
 	// Health (readiness check from Makefile / compose healthcheck)
 	mux.HandleFunc("GET /health", handlers.HealthHandler)
+
+	// Prometheus scrape endpoint (Phase 34); service-level, never gateway-exposed.
+	mux.Handle("GET /metrics", observability.MetricsHandler())
 
 	// Trash surface (admin only; JWT claims are self-contained so the facade
 	// needs no DB. Bearer API tokens are NOT accepted here — acceptable loss).

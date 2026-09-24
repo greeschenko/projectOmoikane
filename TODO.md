@@ -421,11 +421,16 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] Backend multi-stage image (all 9 binaries); frontend prod standalone image (`next build` type fixes, `sitemap.ts` `force-dynamic`, explicit MUI icon `data-testid`s)
 - [x] **First result #3:** `helm install omoikane` on minikube → CMS fully functional (gateway smoke: setup→login→pages/blog→dashboard aggregator→trash cycle→audit Kafka pipeline→Redis cache→swagger UIs through NodePort→fail-loud `/api/` 404; `make go-test` green; desktop + mobile Playwright green)
 
-## 🔲 Phase 34: Observability & Ops Hardening
-- [ ] Liveness/readiness probes everywhere
-- [ ] Prometheus metrics, OTel tracing (optional), JSON structured logs
-- [ ] Migration `Jobs`, secrets via values, HPA manifests, resource requests
-- [ ] **Gate:** zero-manual-step deploy; failures visible in metrics/logs; restart-safe
+## ✅ Phase 34: Observability & Ops Hardening
+- [x] JSON structured logs (`internal/observability` — slog JSON + stdlib `log` bridge, `service` attribute, `WARNING:`→warn)
+- [x] Prometheus `/metrics` per service (`http_requests_total{service,method,route,status}`, duration histogram, in-flight gauge; 2-segment route normalization; pod scrape annotations)
+- [x] Liveness/readiness probes on all 14 Deployments (backend `/health`, frontend tcpSocket + high-threshold readiness)
+- [x] Migration `Jobs` — MIGRATE_ONLY=1 early-exit in the 6 DB services + chart post-install/post-upgrade hook Jobs (per-service DSN, pg_isready wait initContainer, fail-loud on release wait)
+- [x] Secrets via values: SMTP_PASS / RECAPTCHA_SECRET moved out of plaintext env into the Secret (`secretKeyRef`); `secrets.existingSecret` override
+- [x] HPA manifests (`autoscaling/v2`, 10 HPAs, default **off** — would fight k8s-db-reset scale-to-0)
+- [x] Resource requests/limits for every container (values-driven; sized to minikube 6 CPU/6 GiB)
+- [x] OTel tracing: skipped (documented as optional — not needed for the local k8s gate)
+- [x] **Gate:** zero-manual-step deploy — `helm install` runs all 6 migration Jobs (fix: `---` document separators per range-emitted hook doc — without them Helm v4 created only the LAST Job); `make go-test` + `make k8s-test` green; `docs/observability.md` added
 
 ## 🔲 Phase 35: Webhook Module (Flagship Demo)
 - [ ] `cmd/webhooks`: subscription CRUD, admin UI, delivery worker (Kafka consumer)
