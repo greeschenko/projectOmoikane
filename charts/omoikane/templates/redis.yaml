@@ -1,5 +1,8 @@
 # Redis — shared public cache (settings/content reads + cache flushes).
 # No persistence: a restart is just a cache flush (matches compose).
+# Phase 36: skipped when external.redis.enabled — services get REDIS_URL from
+# `external.redis.url` (ElastiCache / Redis Cloud) instead.
+{{- if not .Values.external.redis.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -55,3 +58,4 @@ spec:
     app: redis
   ports:
     - { name: redis, port: 6379, targetPort: 6379 }
+{{- end }}

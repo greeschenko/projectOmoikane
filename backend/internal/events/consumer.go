@@ -62,10 +62,24 @@ func NewConsumer(cfg Config, groupID string, handler Handler) (*Consumer, error)
 	if cfg.DLQTopic == "" {
 		cfg.DLQTopic = DefaultDLQTopic
 	}
+	// Managed-broker security (Phase 36): TLS+SASL dialing for reader + DLQ
+	// writer (validate once; both draw from the same Config).
+	if err := cfg.validateSecurity(); err != nil {
+		return nil, fmt.Errorf("events: %w", err)
+	}
+	dialer, derr := cfg.newDialer()
+	if derr != nil {
+		return nil, derr
+	}
+	tr, terr := cfg.newTransport()
+	if terr != nil {
+		return nil, terr
+	}
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        cfg.Brokers,
 		GroupID:        groupID,
 		GroupTopics:    []string{cfg.Topic},
+		Dialer:         dialer,
 		MinBytes:       1,
 		MaxBytes:       10e6, // 10MB
 		CommitInterval: time.Second,
@@ -82,6 +96,7 @@ func NewConsumer(cfg Config, groupID string, handler Handler) (*Consumer, error)
 		Addr:                   kafka.TCP(cfg.Brokers...),
 		Topic:                  cfg.DLQTopic,
 		RequiredAcks:           kafka.RequireAll,
+		Transport:              tr,
 		BatchTimeout:           50 * time.Millisecond,
 		AllowAutoTopicCreation: true,
 	}

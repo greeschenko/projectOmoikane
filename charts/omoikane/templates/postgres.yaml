@@ -1,6 +1,11 @@
 # Postgres — one instance, two databases (omoikane + omoikane_audit),
 # exactly like docker-compose (docker-entrypoint-initdb.d creates the audit DB
 # on first boot; services self-migrate at startup).
+# Phase 36: skipped entirely when external.postgres.enabled — the managed
+# instance (RDS/CloudSQL/Azure DB) replaces this deployment and the
+# *_DATABASE_URL envs are rendered from `external.postgres` by the
+# postgresDSN helper.
+{{- if not .Values.external.postgres.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -99,3 +104,4 @@ spec:
     app: postgres
   ports:
     - { name: pg, port: 5432, targetPort: 5432 }
+{{- end }}

@@ -1,0 +1,43 @@
+# Azure AKS runbook values (docs/cloud/aks.md — Phase 36).
+#
+# Replace every CHANGE-ME placeholder before install:
+#   * Azure Database for PostgreSQL Flexible Server -> <name>.postgres.database.azure.com
+#   * Confluent Cloud bootstrap + API key/secret (SASL_SSL/PLAIN) — Azure has no
+#     native managed Kafka; alternatives: Confluent Cloud, Aiven, Redpanda Cloud
+#     (or keep the in-cluster KRaft broker and only externalize Postgres/Redis)
+#   * Azure Cache for Redis -> <name>.redis.cache.windows.net (port 6380 with SSL,
+#     connection string rediss://:...@<name>.redis.cache.windows.net:6380/0)
+#
+# Credentials never live in this file — pass at install via a gitignored
+# drop-in values file or --set (postgres.password, secrets.externalKafkaPassword,
+# secrets.jwtSecret, secrets.internalToken), or pre-create a Secret + set
+# secrets.existingSecret.
+
+external:
+  postgres:
+    enabled: true
+    host: CHANGE-ME.postgres.database.azure.com
+    port: 5432
+    user: omoikane                 # Flexible Server admin/role for both DBs
+    password: ""                   # --set 'external.postgres.password=...'
+    sslmode: require               # Azure enforces TLS, MinVersion 1.2
+    # Pre-create both databases on the Flexible Server: omoikane + omoikane_audit
+  kafka:
+    enabled: true
+    bootstrap: pkc-xxxxx.eastus.azure.confluent.cloud:9092
+    securityProtocol: SASL_SSL
+    saslMechanism: PLAIN
+    saslUsername: CHANGE-ME-API-KEY   # Confluent API key
+    # SASL password := secrets.externalKafkaPassword (Confluent API secret).
+    eventsTopic: omoikane.events
+    # If the provider disallows auto-create, pre-provision this topic too.
+    dlqTopic: omoikane.events.dlq
+  redis:
+    enabled: true
+    url: "rediss://:CHANGE-ME@CHANGE-ME.redis.cache.windows.net:6380/0"
+    # Azure Cache non-TLS (6379) also supported: redis://...:6379/0
+
+# Ingress/TLS (optional): enable + point at your domain, then cert-manager.
+# ingress:
+#   enabled: true
+#   host: omoikane.example.com

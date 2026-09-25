@@ -13,10 +13,10 @@ not required for runtime correctness.
 IMPORTANT (Helm hook mechanics): every range iteration MUST be emitted with a
 leading `---` YAML document separator. Helm groups hook resources per template
 FILE and parses the file's rendered text as one multi-document YAML stream. If
-the `---` is omitted, the six Job documents get concatenated into a single
+the `---` is omitted, the seven Job documents get concatenated into a single
 document with duplicate top-level keys; the last `metadata.name` wins and only
-the LAST Job is ever created/run (verified against Helm v4.3.0 — all six
-migration Jobs silently skipped except the final one).
+the LAST Job is ever created/run (verified against Helm v4.3.0 — all migration
+Jobs silently skipped except the final one).
 */ -}}
 {{- if .Values.migrations.enabled }}
 {{- range $svc, $db := .Values.backend.databases }}
@@ -46,6 +46,10 @@ spec:
         app: {{ $svc }}-migrate
     spec:
       restartPolicy: Never
+      {{- /* The wait-postgres initContainer only exists when the in-cluster
+             postgres Deployment does (external.postgres enabled => the managed
+             instance is already up and the DSN points straight at it). */ -}}
+      {{- if not $.Values.external.postgres.enabled }}
       initContainers:
         # The Job may start before the postgres Deployment is Ready (hooks run
         # once all resources are applied, not once they're healthy). The
@@ -55,6 +59,7 @@ spec:
           image: {{ $.Values.postgres.image }}
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "until pg_isready -h postgres -U {{ $.Values.postgres.user }}; do echo 'waiting for postgres...'; sleep 2; done"]
+      {{- end }}
       containers:
         - name: migrate
           image: "{{ $.Values.images.backend.repository }}:{{ $.Values.images.backend.tag }}"

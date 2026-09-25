@@ -60,7 +60,7 @@ func uniqueTopic(prefix string) string {
 // producer/consumer): it ensures the platform topic + its DLQ topic exist.
 func provisionTopics(t *testing.T, ctx context.Context, cfg Config) {
 	t.Helper()
-	if err := EnsureTopics(ctx, cfg.Brokers, []string{cfg.Topic, cfg.DLQTopic}); err != nil {
+	if err := EnsureTopics(ctx, cfg, []string{cfg.Topic, cfg.DLQTopic}); err != nil {
 		t.Fatalf("provision topics: %v", err)
 	}
 }

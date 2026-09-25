@@ -5,6 +5,11 @@
 # relays and the audit consumer). The controller listener stays in-cluster.
 # Data persists on a PVC so consumer-group offsets survive DB resets, exactly
 # like the compose `kafka-data` named volume.
+# Phase 36: skipped entirely when external.kafka.enabled — the managed cluster
+# (MSK in-VPC PLAINTEXT, Confluent Cloud SASL_SSL) replaces this deployment and
+# services get KAFKA_BROKERS / KAFKA_SECURITY_PROTOCOL / KAFKA_SASL_* from
+# `external.kafka`.
+{{- if not .Values.external.kafka.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -105,3 +110,4 @@ spec:
     - { name: external, port: 9092, targetPort: 9092 }
     - { name: internal, port: 29092, targetPort: 29092 }
     - { name: controller, port: 9093, targetPort: 9093 }
+{{- end }}

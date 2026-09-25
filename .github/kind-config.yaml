@@ -1,0 +1,19 @@
+# CI cluster config (Phase 36). `make k8s-up K8S_DRIVER=kind` consumes this file
+# (idempotent: skips creation when the `omoikane` cluster already exists).
+#
+# The extraPortMappings publish the gateway NodePort on the runner's localhost,
+# so Playwright reaches the cluster gateway at http://localhost:30080 exactly as
+# the local minikube gate reaches <minikube ip>:30080 (values-kind.yaml exposes
+# the nginx Service as a NodePort on port 30080 — see charts/omoikane/values-kind.yaml).
+#
+# kind ships the local-path-provisioner by default (since v0.11) so the chart's
+# postgres/redis/kafka PVCs provision on the single control-plane node.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: omoikane
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP

@@ -65,15 +65,30 @@ spec:
             {{- end }}
             {{- if has $svc $.Values.backend.redis }}
             - name: REDIS_URL
-              value: "redis://redis:6379/0"
+              value: {{ include "omoikane.redisURL" $ | quote }}
             {{- end }}
             {{- if has $svc $.Values.backend.kafka }}
+            # Managed-broker security (Phase 36) — rendered for every
+            # kafka-connected service. Empty protocol/mechanism keeps the
+            # PLAINTEXT default; the SASL password always comes from the Secret
+            # key external-kafka-password, never a values file.
             - name: KAFKA_BROKERS
-              value: {{ $.Values.kafka.bootstrap | quote }}
+              value: {{ include "omoikane.kafkaBootstrap" $ | quote }}
             - name: KAFKA_EVENTS_TOPIC
-              value: {{ $.Values.kafka.eventsTopic | quote }}
+              value: {{ $.Values.external.kafka.enabled | ternary $.Values.external.kafka.eventsTopic $.Values.kafka.eventsTopic | quote }}
             - name: KAFKA_DLQ_TOPIC
-              value: {{ $.Values.kafka.dlqTopic | quote }}
+              value: {{ $.Values.external.kafka.enabled | ternary $.Values.external.kafka.dlqTopic $.Values.kafka.dlqTopic | quote }}
+            - name: KAFKA_SECURITY_PROTOCOL
+              value: {{ $.Values.external.kafka.securityProtocol | default "" | quote }}
+            - name: KAFKA_SASL_MECHANISM
+              value: {{ $.Values.external.kafka.saslMechanism | default "" | quote }}
+            - name: KAFKA_SASL_USERNAME
+              value: {{ $.Values.external.kafka.saslUsername | default "" | quote }}
+            - name: KAFKA_SASL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.existingSecret | default "omoikane-secrets" }}
+                  key: external-kafka-password
             {{- end }}
             - name: JWT_SECRET
               valueFrom:

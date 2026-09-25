@@ -1,4 +1,4 @@
-.PHONY: up down reset db-reset test go-test go-build swagger k8s-up k8s-images k8s-db-reset k8s-test k8s-down k8s-destroy
+.PHONY: up down reset db-reset test go-test go-build swagger k8s-up k8s-images k8s-db-reset k8s-test k8s-down k8s-destroy cloud-smoke
 
 SWAG := $(shell command -v swag 2>/dev/null || echo "$(HOME)/prodev/go/bin/swag")
 
@@ -239,22 +239,48 @@ test: up
 	cd backend && TEST_DATABASE_URL="host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane_test sslmode=disable" go test -p 1 ./internal/... ./cmd/auth/... ./cmd/content/... ./cmd/media/... ./cmd/messages/... ./cmd/settings/... ./cmd/trash/... ./cmd/dashboard/... ./cmd/docs/... ./cmd/audit/... ./cmd/webhooks/...
 	@echo "Resetting main database for desktop Playwright run..."
 	$(MAKE) db-reset
-	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test --config=e2e/playwright.config.ts --project=desktop
+	cd frontend && $(BROWSER_ENV) npx playwright test --config=e2e/playwright.config.ts --project=desktop
 	@echo "Resetting database for mobile run..."
 	$(MAKE) db-reset
-	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test --config=e2e/playwright.config.ts --project=mobile
+	cd frontend && $(BROWSER_ENV) npx playwright test --config=e2e/playwright.config.ts --project=mobile
 
-# ---------- Phase 33: Kubernetes (minikube) ----------
-# Same chart + same gate as CI (kind). Service names, env contracts and the
-# nginx gateway config are byte-identical to docker-compose.
+# ---------- Phase 33/36: Kubernetes (minikube default, kind for CI) ----------
+# Same chart + same gate as CI. Service names, env contracts and the nginx
+# gateway config are byte-identical to docker-compose. `make k8s-test` runs the
+# full Playwright gate (desktop + mobile) against the cluster gateway.
+#
+# Driver selection (Phase 36): `K8S_DRIVER=minikube` (local dev — Phase 33
+# stack) or `K8S_DRIVER=kind` (CI — `.github/kind-config.yaml`, wired by
+# `.github/workflows/deploy.yml`). The matching values file is picked
+# automatically; both drivers expose the nginx gateway on NodePort
+# $(GATEWAY_PORT) — the minikube VM IP locally, localhost in kind via the
+# extraPortMappings in kind-config.yaml.
 K8S_NS ?= omoikane
 MINIKUBE_PROFILE ?= minikube
+KIND_NAME ?= omoikane
+K8S_DRIVER ?= minikube
 K8S_CHART := charts/omoikane
-K8S_VALUES := $(K8S_CHART)/values-minikube.yaml
-IMAGE_TAG ?= phase35
+IMAGE_TAG ?= phase36
 K8S_IMAGE_BACKEND := omoikane/backend:$(IMAGE_TAG)
 K8S_IMAGE_FRONTEND := omoikane/frontend:$(IMAGE_TAG)
 GATEWAY_PORT ?= 30080
+# Playwright browser selection: dev machines run the system chromium at the
+# classic path; CI installs Playwright's own managed browser
+# (`npx playwright install --with-deps chromium`) and passes
+# `PLAYWRIGHT_BROWSER=` (empty) so the env override is omitted.
+PLAYWRIGHT_BROWSER ?= /usr/bin/chromium
+BROWSER_ENV = $(if $(PLAYWRIGHT_BROWSER),PLAYWRIGHT_EXECUTABLE_PATH=$(PLAYWRIGHT_BROWSER) ,)
+
+ifeq ($(K8S_DRIVER),minikube)
+K8S_VALUES := $(K8S_CHART)/values-minikube.yaml
+K8S_GATEWAY_URL = http://$(shell minikube ip -p $(MINIKUBE_PROFILE)):$(GATEWAY_PORT)
+else ifeq ($(K8S_DRIVER),kind)
+K8S_VALUES := $(K8S_CHART)/values-kind.yaml
+K8S_GATEWAY_URL = http://localhost:$(GATEWAY_PORT)
+else
+$(error K8S_DRIVER must be "minikube" or "kind" (got "$(K8S_DRIVER)"))
+endif
+
 # Services owning the `omoikane` (+ audit) databases — restart after a reset so
 # they re-run their startup migrations on the fresh DBs (mirrors compose).
 K8S_DB_SERVICES := auth-service content-service media-service messages-service settings-service audit-service webhooks-service
@@ -264,24 +290,32 @@ K8S_DB_SERVICES := auth-service content-service media-service messages-service s
 K8S_APP_SERVICES := auth-service content-service media-service messages-service settings-service trash-service dashboard-service docs-service audit-service webhooks-service webhook-sink frontend nginx
 
 k8s-up:
+ifeq ($(K8S_DRIVER),minikube)
 	minikube status -p $(MINIKUBE_PROFILE) >/dev/null 2>&1 || minikube start -p $(MINIKUBE_PROFILE) --driver=docker --cpus=6 --memory=6144 --disk-size=30g --container-runtime=containerd
 	minikube -p $(MINIKUBE_PROFILE) addons enable ingress
 	minikube -p $(MINIKUBE_PROFILE) addons enable metrics-server
 	minikube -p $(MINIKUBE_PROFILE) addons enable storage-provisioner
+else
+	@kind get clusters 2>/dev/null | grep -q "^$(KIND_NAME)$$" || kind create cluster --name $(KIND_NAME) --config .github/kind-config.yaml
+endif
 	$(MAKE) k8s-images
 	helm upgrade --install omoikane $(K8S_CHART) -f $(K8S_VALUES) --namespace $(K8S_NS) --create-namespace --wait --timeout 10m
-	# `minikube image load` replaces the image inside containerd, but a rebuilt
-	# image with an UNCHANGED tag makes helm upgrade roll no pods — without this
-	# explicit restart the gate would silently test the PREVIOUS build (this cost
-	# run 3 its a11y fixes: the frontend pod predated the rebuilt image).
+	# Image loading (minikube image load / kind load) replaces the image inside
+	# the node, but a rebuilt image with an UNCHANGED tag makes helm upgrade
+	# roll no pods — without this explicit restart the gate would silently test
+	# the PREVIOUS build (this cost Phase 33 run 3 its a11y fixes).
 	kubectl rollout restart -n $(K8S_NS) $(addprefix deployment/,$(K8S_APP_SERVICES))
 	kubectl rollout status deployment -n $(K8S_NS) --timeout=600s
-	@echo "Gateway reachable at http://$$(minikube ip -p $(MINIKUBE_PROFILE)):$(GATEWAY_PORT)"
+	@echo "Gateway reachable at $(K8S_GATEWAY_URL)"
 
 k8s-images:
 	docker build -t $(K8S_IMAGE_BACKEND) -f backend/Dockerfile backend
 	docker build -t $(K8S_IMAGE_FRONTEND) -f frontend/Dockerfile frontend
+ifeq ($(K8S_DRIVER),minikube)
 	minikube image load -p $(MINIKUBE_PROFILE) $(K8S_IMAGE_BACKEND) $(K8S_IMAGE_FRONTEND)
+else
+	kind load docker-image $(K8S_IMAGE_BACKEND) $(K8S_IMAGE_FRONTEND) --name $(KIND_NAME)
+endif
 
 k8s-db-reset:
 	@echo "Scaling DB-owning services to 0 (mirrors compose stop)..."
@@ -302,12 +336,26 @@ k8s-test: k8s-up
 	helm lint $(K8S_CHART)
 	helm template omoikane $(K8S_CHART) -f $(K8S_VALUES) --namespace $(K8S_NS) > /tmp/omoikane-render.yaml
 	$(MAKE) k8s-db-reset
-	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium BASE_URL="http://$$(minikube ip -p $(MINIKUBE_PROFILE)):$(GATEWAY_PORT)" npx playwright test --config=e2e/playwright.config.ts --project=desktop
+	cd frontend && $(BROWSER_ENV) BASE_URL="$(K8S_GATEWAY_URL)" npx playwright test --config=e2e/playwright.config.ts --project=desktop
 	$(MAKE) k8s-db-reset
-	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium BASE_URL="http://$$(minikube ip -p $(MINIKUBE_PROFILE)):$(GATEWAY_PORT)" npx playwright test --config=e2e/playwright.config.ts --project=mobile
+	cd frontend && $(BROWSER_ENV) BASE_URL="$(K8S_GATEWAY_URL)" npx playwright test --config=e2e/playwright.config.ts --project=mobile
 
 k8s-down:
 	helm uninstall omoikane --namespace $(K8S_NS) || true
 
 k8s-destroy: k8s-down
+ifeq ($(K8S_DRIVER),minikube)
 	minikube delete -p $(MINIKUBE_PROFILE)
+else
+	kind delete cluster --name $(KIND_NAME)
+endif
+
+# ---------- Phase 36: cloud acceptance smoke ----------
+# FIRST RESULT verification without a browser: fresh deploy -> login -> create a
+# webhook subscription -> publish a post -> the event flows Kafka -> webhook
+# delivery -> the in-cluster demo sink -> assert delivery log + audit log rows.
+# Point CLOUD_SMOKE_URL at the cloud gateway (LoadBalancer/Ingress host) after
+# `helm install` per docs/cloud/*.md.
+CLOUD_SMOKE_URL ?= http://localhost
+cloud-smoke:
+	scripts/cloud-smoke.sh "$(CLOUD_SMOKE_URL)"

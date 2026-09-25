@@ -87,7 +87,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := events.EnsureTopics(ctx, eventsCfg.Brokers, []string{eventsCfg.Topic, eventsCfg.DLQTopic}); err != nil {
+	if err := events.EnsureTopics(ctx, eventsCfg, []string{eventsCfg.Topic, eventsCfg.DLQTopic}); err != nil {
 		log.Printf("WARNING: webhooks-service: ensure kafka topics: %v (consumer will retry)", err)
 	}
 

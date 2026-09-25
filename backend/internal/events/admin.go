@@ -18,21 +18,30 @@ import (
 // auto-creation via metadata exchanges races the controller (first produce to a
 // new topic can fail with UnknownTopicOrPartition), which breaks the outbox
 // guarantee "relay publishes every pending row".
-func EnsureTopic(ctx context.Context, brokers []string, topic string) error {
-	if len(brokers) == 0 {
+func EnsureTopic(ctx context.Context, cfg Config, topic string) error {
+	if len(cfg.Brokers) == 0 {
 		return fmt.Errorf("events: no kafka brokers configured")
 	}
 	if topic == "" {
 		return nil
 	}
-	return EnsureTopics(ctx, brokers, []string{topic})
+	return EnsureTopics(ctx, cfg, []string{topic})
 }
 
 // EnsureTopics creates a list of topics (idempotent). This is what services
 // call at startup (from their own provisioning run) BEFORE starting producer
-// and consumer so the first publish can never race topic creation.
-func EnsureTopics(ctx context.Context, brokers []string, topics []string) error {
-	client := &kafka.Client{Addr: kafka.TCP(brokers...)}
+// and consumer so the first publish can never race topic creation. The broker
+// client honors the Config's TLS/SASL settings (Phase 36) so managed brokers
+// can be provisioned too.
+func EnsureTopics(ctx context.Context, cfg Config, topics []string) error {
+	if err := cfg.validateSecurity(); err != nil {
+		return err
+	}
+	tr, err := cfg.newTransport()
+	if err != nil {
+		return err
+	}
+	client := &kafka.Client{Addr: kafka.TCP(cfg.Brokers...), Transport: tr}
 	req := &kafka.CreateTopicsRequest{}
 	for _, topic := range topics {
 		if topic == "" {

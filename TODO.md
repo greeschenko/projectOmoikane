@@ -443,11 +443,14 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 
 ## ⬜ Wave 3 — Cloud & Scale: Fast-Deploy Story
 
-## 🔲 Phase 36: FIRST RESULT — CI/CD + Cloud Runbooks + Demo
-- [ ] GitHub Actions `deploy.yml`: go-test → Playwright → build/push (GHCR) → helm upgrade
-- [ ] EKS / GKE / AKS runbooks (`docs/cloud/`)
-- [ ] Values for managed Kafka (MSK/Confluent) + managed Postgres (RDS/CloudSQL/Azure DB)
-- [ ] **FIRST RESULT:** fresh cloud cluster → `helm install omoikane` → publish post → webhook delivers to demo sink; all gates green
+## ✅ Phase 36: FIRST RESULT — CI/CD + Cloud Runbooks + Demo
+- [x] GitHub Actions `deploy.yml`: `go-test` (compose postgres+kafka) → `e2e` (`make k8s-test K8S_DRIVER=kind`, desktop + mobile) → `build-push` (GHCR `sha-<sha>` + `phase36`) → `deploy` (`workflow_dispatch`, environment `production`, `helm upgrade` + FIRST-RESULT `cloud-smoke`); `.github/kind-config.yaml` (NodePort 30080 extraPortMappings); actionlint-validated
+- [x] EKS / GKE / AKS runbooks (`docs/cloud/{overview,eks,gke,aks,verify-first-result}.md`)
+- [x] Values for managed Kafka (MSK in-VPC PLAINTEXT / Confluent SASL_SSL) + managed Postgres (RDS/CloudSQL/Azure DB) + managed Redis (ElastiCache/Memorystore/Azure Cache): `external.{postgres,kafka,redis}` switches skip the in-cluster Deployments, `_helpers.tpl` DSN/bootstrap/redisURL helpers, migration Jobs skip the wait initContainer; `values-{eks,gke,aks}.yaml`
+- [x] Managed-broker TLS/SASL in the events SDK: `KAFKA_SECURITY_PROTOCOL`/`KAFKA_SASL_*` (PLAIN + SCRAM-SHA-256/512, TLS ≥1.2), `EnsureTopics`/producer/consumer/DLQ wired — 7 new `internal/events/transport_test.go` tests; SASL password via Secret `external-kafka-password`
+- [x] Makefile: `K8S_DRIVER ?= minikube` (+ kind branch in k8s-up/images/test/destroy; `values-kind.yaml`), `PLAYWRIGHT_BROWSER ?=/usr/bin/chromium` + `BROWSER_ENV` empty-omit trick for the workflow, `IMAGE_TAG ?= phase36`, `cloud-smoke` target wrapping `scripts/cloud-smoke.sh`
+- [x] **FIRST RESULT:** `scripts/cloud-smoke.sh` verified live against the minikube gateway — setup/login → create `post.published` webhook sub → publish post → outbox → Kafka → webhook `delivered` (httpStatus 200, attempts 1) → audit `publish` row → cleanup; ends `FIRST RESULT verified`
+- [x] **Gate:** `make go-test` 220/220 (`internal/events/transport_test.go` +7 → 220 with Kafka up); `helm lint` + `helm template` green for default + minikube + kind (45 kinds, in-cluster infra) and EKS/GKE/AKS (36 kinds, no in-cluster postgres/kafka/redis, external DSNs/bootstrap, 7 migration Jobs without wait); `make k8s-test` green on minikube
 
 ## 🔲 Phase 37: (optional) Workflow/Automation Module
 - [ ] Event → condition → action rules engine; admin UI; e2e workflow tests

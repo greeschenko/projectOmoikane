@@ -133,15 +133,20 @@ Flagship demo = webhook module. First result = working platform on a fresh clust
 
 ### Wave 3 — Cloud & scale: the fast-deploy story
 
-#### Phase 36 — FIRST RESULT: CI/CD + cloud runbooks + demo
+#### Phase 36 — FIRST RESULT: CI/CD + cloud runbooks + demo (DONE)
 - GitHub Actions workflow `deploy.yml`:
   `go-test → playwright (desktop + mobile) → docker build/push (GHCR) → helm upgrade`
-  with versioned image tags; credentials via repo secrets
+  with versioned image tags (`sha-<sha>` + `phase36`); credentials via repo secrets
+  (environment-gated `DEPLOY_KUBECONFIG` / `DEPLOY_VALUES`); kind cluster config for CI
 - Runbooks: EKS, GKE, AKS one-pagers (`docs/cloud/`)
-- Values: managed Kafka (MSK/Confluent) + managed Postgres (RDS/CloudSQL/Azure DB)
+- Values: managed Kafka (MSK/Confluent, TLS/SASL via the events SDK
+  `KAFKA_SECURITY_PROTOCOL`/`KAFKA_SASL_*`) + managed Postgres (RDS/CloudSQL/Azure DB)
+  + managed Redis — `external.*` switches skip in-cluster Deployments
 - **FIRST RESULT:** fresh cloud cluster → `helm install omoikane` → log in →
   publish a post → event → webhook delivers to an in-cluster demo sink →
-  visible in delivery log + audit log; all gates green
+  visible in delivery log + audit log (`scripts/cloud-smoke.sh` verified live);
+  `make go-test` (220) + `make k8s-test` + helm lint/template (default + all 3
+  providers) gate green
 
 #### Phase 37 — (optional) Workflow/automation module
 - Event → condition → action rules engine (e.g. `post.published` + tag=X → call URL / send email)

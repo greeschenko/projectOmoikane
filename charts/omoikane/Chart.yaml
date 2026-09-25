@@ -3,10 +3,11 @@ name: omoikane
 description: >-
   Omoikane — modular event-driven CMS platform. Cloud-agnostic umbrella chart:
   all microservices (auth/content/media/messages/settings/trash/dashboard/docs/audit/webhooks),
-  nginx gateway, Postgres, Redis and Kafka (single-node KRaft).
+  nginx gateway, Postgres, Redis and Kafka (single-node KRaft in-cluster default;
+  `external.*` switches each to managed cloud services — Phase 36).
 type: application
-version: 0.3.0
-appVersion: "35"
+version: 0.4.0
+appVersion: "36"
 keywords:
   - cms
   - kafka

@@ -1,0 +1,50 @@
+# Amazon EKS runbook values (docs/cloud/eks.md — Phase 36).
+#
+# Replace every CHANGE-ME placeholder with real endpoints BEFORE install:
+#   * RDS endpoint  -> aws rds describe-db-instances (writer endpoint)
+#   * MSK bootstrap -> aws kafka get-bootstrap-brokers (in-VPC, PLAINTEXT) or a
+#     SASL-enabled cluster endpoint if you enable auth
+#   * ElastiCache    -> aws elasticache describe-cache-clusters (primary endpoint)
+#
+# Credentials (postgres password + kafka SASL password) are deliberately NOT in
+# this file: pass them per-deploy via a gitignored drop-in values file or
+# `--set secrets.externalKafkaPassword=...`; set `.Values.secrets.jwtSecret` and
+# `.Values.secrets.internalToken` the same way (or pre-create a Secret and use
+# `.Values.secrets.existingSecret`).
+#
+# With these enabled, the in-cluster postgres/kafka/redis Deployments are
+# SKIPPED (templates render empty) and every service points at the managed
+# endpoints. The gateway stays a classic LoadBalancer (default) — finish TLS
+# with an Ingress + cert-manager (see ingress.enabled + docs/cloud/eks.md).
+
+external:
+  postgres:
+    enabled: true
+    host: CHANGE-ME.cluster-xxxxxxxxxxxx.us-east-1.rds.amazonaws.com
+    port: 5432
+    user: omoikane
+    password: ""               # --set 'external.postgres.password=...' at install
+    sslmode: require           # RDS enforces TLS on the default `postgres` db
+    # Both `omoikane` and `omoikane_audit` databases must already exist on the
+    # instance (cloud-smoke and the migration Jobs expect them).
+  kafka:
+    enabled: true
+    bootstrap: b-1.CHANGE-ME.kafka.us-east-1.amazonaws.com:9098
+    securityProtocol: ""       # "" for in-VPC MSK PLAINTEXT; SASL_SSL + SCRAM-SHA-512 for auth'd clusters
+    saslMechanism: ""          # PLAIN | SCRAM-SHA-256 | SCRAM-SHA-512
+    saslUsername: ""           # e.g. the MSK auth user; SASL password := secrets.externalKafkaPassword
+    # MSK often disables auto-create; topics are created at service startup by
+    # EnsureTopics when the IAM policy allows CreateTopic, otherwise pre-provision:
+    #   aws kafka create-topic --bootstrap-servers ... --topic omoikane.events
+    eventsTopic: omoikane.events
+    dlqTopic: omoikane.events.dlq
+  redis:
+    enabled: true
+    url: "redis://CHANGE-ME.cache.amazonaws.com:6379/0"   # ElastiCache primary endpoint
+    # No persistence needed (shared public-cache); TLS via redis:// with in-transit
+    # encryption enabled uses rediss:// — set REDIS_URL accordingly.
+
+# Ingress/TLS (optional): point a real domain at the gateway LoadBalancer.
+# ingress:
+#   enabled: true
+#   host: omoikane.example.com

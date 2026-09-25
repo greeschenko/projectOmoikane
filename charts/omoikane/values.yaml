@@ -10,11 +10,11 @@
 images:
   backend:
     repository: omoikane/backend
-    tag: phase35
+    tag: phase36
     pullPolicy: IfNotPresent
   frontend:
     repository: omoikane/frontend
-    tag: phase35
+    tag: phase36
     pullPolicy: IfNotPresent
 
 secrets:
@@ -27,6 +27,10 @@ secrets:
   # env values. Keep in sync with `.Values.auth.smtp*` when overriding.
   smtpPass: ""
   recaptchaSecret: ""
+  # SASL password for external/managed Kafka (Phase 36) — rendered into the
+  # Secret and consumed via secretKeyRef, so credentials never sit in a values
+  # file. Confluent Cloud API keys / MSK SCRAM passwords go here.
+  externalKafkaPassword: ""
   existingSecret: ""
 
 postgres:
@@ -46,6 +50,42 @@ kafka:
   bootstrap: kafka:29092    # single-node KRaft dual-listener, internal broker
   eventsTopic: omoikane.events
   dlqTopic: omoikane.events.dlq
+
+# Managed cloud services (Phase 36). Flip the matching `enabled` flag to bypass
+# the in-cluster Deployment/Service for that component and point the platform at
+# the external endpoint (RDS/CloudSQL/Azure DB, MSK/Confluent, ElastiCache/...
+# ). Runbooks: docs/cloud/{eks,gke,aks}.md. With all three disabled (default),
+# rendering is byte-identical to the pre-Phase-36 chart.
+external:
+  postgres:
+    enabled: false
+    host: ""            # managed endpoint, no scheme/port (e.g. mydb.cluster-xxx.rds.amazonaws.com)
+    port: 5432
+    user: ""
+    # Credential for the managed instance. Put real values in a gitignored
+    # drop-in values file or --set — never committed (same trust model as
+    # `.Values.postgres.password`).
+    password: ""
+    sslmode: require
+    # NOTE: both databases (omoikane + omoikane_audit) must exist on the
+    # managed instance; the platform maps services to them via
+    # `.Values.backend.databases` exactly as it does in-cluster.
+  kafka:
+    enabled: false
+    bootstrap: ""       # e.g. b-1.msk…:9098 or pkc-….confluent.cloud:9092
+    # "", "SSL" (TLS only) or "SASL_SSL" (TLS + SASL credentials). PLAINTEXT
+    # (in-VPC MSK) needs "" — leave mechanism/username empty.
+    securityProtocol: ""
+    # "PLAIN" (Confluent Cloud) | "SCRAM-SHA-256" | "SCRAM-SHA-512" (MSK).
+    saslMechanism: ""
+    saslUsername: ""    # the SASL password goes in `secrets.externalKafkaPassword`
+    # Override topic names on managed brokers (some providers pre-provision and
+    # restrict auto-create; KAFKA_AUTO_CREATE-style defaults still apply).
+    eventsTopic: omoikane.events
+    dlqTopic: omoikane.events.dlq
+  redis:
+    enabled: false
+    url: ""             # full redis:// / rediss:// URL (e.g. rediss://:pw@mycache…:6379/0)
 
 # Per-service catalog. `ports` is the source of truth: the range in
 # templates/backend.yaml emits one Deployment + one Service per entry.

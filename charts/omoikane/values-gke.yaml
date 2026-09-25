@@ -1,0 +1,50 @@
+# Google Cloud GKE runbook values (docs/cloud/gke.md — Phase 36).
+#
+# Replace every CHANGE-ME placeholder before install:
+#   * Cloud SQL  -> the PRIVATE IP of your PostgreSQL instance (connect via
+#     VPC peering / Private Service Connect; or use the public IP + authorized
+#     networks for demo only)
+#   * Confluent  -> bootstrap + API key/secret from the Confluent Cloud cluster
+#     (SASL_SSL/PLAIN); or a GCP-native managed Kafka is not offered — use
+#     Confluent Cloud, Aiven, Redpanda Cloud, or keep in-cluster KRaft
+#   * Memorystore -> the Redis endpoint (VPC peering required; connection
+#     string redis://<ip>:6379/0)
+#
+# Credentials never live in this file — pass at install via a gitignored
+# drop-in values file or --set (postgres.password, secrets.externalKafkaPassword,
+# secrets.jwtSecret, secrets.internalToken), or pre-create a Secret + set
+# secrets.existingSecret.
+
+external:
+  postgres:
+    enabled: true
+    host: "10.123.0.3"                     # Cloud SQL private IP
+    port: 5432
+    user: omoikane
+    password: ""                           # --set 'external.postgres.password=...'
+    sslmode: require                       # Cloud SQL default SSL mode
+    # Pre-create both databases: omoikane + omoikane_audit
+    #   gcloud sql databases create omoikane --instance=omoikane-sql
+  kafka:
+    enabled: true
+    bootstrap: pkc-xxxxx.us-east1.gcp.confluent.cloud:9092
+    securityProtocol: SASL_SSL
+    saslMechanism: PLAIN
+    saslUsername: CHANGE-ME-API-KEY        # Confluent API key
+    # SASL password := secrets.externalKafkaPassword (Confluent API secret).
+    # Confluent Cloud pre-provisions topics; EnsureTopics at service startup
+    # no-ops on already-existing names.
+    eventsTopic: omoikane.events
+    dlqTopic: omoikane.events.dlq
+  redis:
+    enabled: true
+    url: "redis://10.123.0.4:6379/0"       # Memorystore for Redis endpoint
+
+# gateway:
+#   serviceType: LoadBalancer              # default; GCP provisions an L4 LB
+
+# Ingress/TLS (optional): enable + point at your domain, then let cert-manager
+# issue a Google-managed cert.
+# ingress:
+#   enabled: true
+#   host: omoikane.example.com

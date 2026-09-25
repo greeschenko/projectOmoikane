@@ -35,6 +35,19 @@ type Config struct {
 	// the group has committed offsets. Defaults to FirstOffset.
 	ConsumerStartOffset int64
 
+	// SecurityProtocol is the broker security mode (Phase 36, managed brokers):
+	// "" (PLAINTEXT, default), "SSL" (TLS transport), or "SASL_SSL" (TLS +
+	// SASL credentials). Consumed from KAFKA_SECURITY_PROTOCOL.
+	SecurityProtocol string
+
+	// SASLMechanism + credentials when SecurityProtocol is SASL_SSL:
+	// "PLAIN", "SCRAM-SHA-256" or "SCRAM-SHA-512" (Confluent Cloud uses
+	// SASL_SSL/PLAIN; private MSK often SASL_SSL/SCRAM-SHA-512). Consumed
+	// from KAFKA_SASL_MECHANISM / KAFKA_SASL_USERNAME / KAFKA_SASL_PASSWORD.
+	SASLMechanism string
+	SASLUsername  string
+	SASLPassword  string
+
 	// RelayBatchSize is how many pending outbox rows the relay publishes per run.
 	RelayBatchSize int
 
@@ -83,6 +96,21 @@ func ConfigFromEnv() Config {
 	}
 	if v := os.Getenv("KAFKA_DLQ_TOPIC"); v != "" {
 		cfg.DLQTopic = v
+	}
+	// Managed-broker security (Phase 36): MSK/Confluent Cloud exposed via
+	// KAFKA_SECURITY_PROTOCOL / KAFKA_SASL_* — wired into the dialers in
+	// transport.go. Empty values keep the PLAINTEXT default.
+	if v := os.Getenv("KAFKA_SECURITY_PROTOCOL"); v != "" {
+		cfg.SecurityProtocol = v
+	}
+	if v := os.Getenv("KAFKA_SASL_MECHANISM"); v != "" {
+		cfg.SASLMechanism = v
+	}
+	if v := os.Getenv("KAFKA_SASL_USERNAME"); v != "" {
+		cfg.SASLUsername = v
+	}
+	if v := os.Getenv("KAFKA_SASL_PASSWORD"); v != "" {
+		cfg.SASLPassword = v
 	}
 	return cfg
 }

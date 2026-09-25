@@ -1,0 +1,207 @@
+# Omoikane Phase 36 — CI/CD pipeline.
+#
+# Pipeline (fail-loud, gates first):
+#   go-test  : Go suite against compose postgres+kafka (incl. the Kafka
+#              integration tests)         — local `make go-test`
+#   e2e      : full Playwright gate (desktop + mobile) against a kind cluster
+#              running the real chart     — local `make k8s-test K8S_DRIVER=kind`
+#   build-push: docker build/push to GHCR (sha-<commit> + phase36 tags)
+#   deploy   : workflow_dispatch only — helm upgrade against the kubeconfig +
+#              secrets overrides in repo secrets, then the FIRST-RESULT cloud
+#              smoke (scripts/cloud-smoke.sh).
+#
+# Local equivalents are exactly the gates used on this repo (make go-test,
+# make test, make k8s-test) — CI runs the same recipes, so a green push here
+# reproduces the local phase gates. See docs/cloud/overview.md.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Deploy target provider
+        required: true
+        default: eks
+        type: choice
+        options:
+          - eks
+          - gke
+          - aks
+      gateway_url:
+        description: >-
+          Public gateway URL of the cloud release (LoadBalancer host or Ingress
+          host), e.g. http://a1b2c3.us-east-1.elb.amazonaws.com — used by the
+          FIRST-RESULT smoke.
+        required: true
+        type: string
+
+# One pipeline at a time; never cancel an in-flight deploy mid-helm.
+concurrency:
+  group: omoikane
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  go-test:
+    name: Go tests (compose postgres + kafka)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache: true
+
+      - name: Start compose postgres + kafka
+        # Same services the local `make go-test` expects (ports 5432/9092
+        # published; compose healthchecks make `--wait` reliable).
+        run: docker compose -f docker/docker-compose.yml up -d --wait postgres kafka
+
+      - name: Create test database
+        run: |
+          docker compose -f docker/docker-compose.yml exec -T postgres \
+            psql -U omoikane -c "CREATE DATABASE omoikane_test;"
+
+      - name: make go-test
+        run: make go-test
+        timeout-minutes: 15
+
+  e2e:
+    name: Playwright gate (desktop + mobile, kind cluster)
+    needs: go-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.3.0
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Create kind cluster (omoikane)
+        uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: omoikane
+          config: .github/kind-config.yaml
+          wait: 180s
+
+      - name: Frontend deps + Playwright chromium
+        # PLAYWRIGHT_BROWSER= later switches k8s-test to this managed browser
+        # (the Makefile defaults to the system /usr/bin/chromium for dev).
+        run: |
+          cd frontend
+          npm ci --legacy-peer-deps
+          npx playwright install --with-deps chromium
+
+      - name: make k8s-test (kind driver)
+        run: make k8s-test K8S_DRIVER=kind PLAYWRIGHT_BROWSER=
+        env:
+          GATEWAY_PORT: "30080"
+        timeout-minutes: 45
+
+  build-push:
+    name: Build + push GHCR images
+    needs: go-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push backend
+        run: |
+          BASE=ghcr.io/${{ github.repository_owner }}/omoikane-backend
+          docker build -t "$BASE:sha-${GITHUB_SHA::12}" -t "$BASE:phase36" -f backend/Dockerfile backend
+          docker push --all-tags "$BASE"
+
+      - name: Build + push frontend
+        run: |
+          BASE=ghcr.io/${{ github.repository_owner }}/omoikane-frontend
+          docker build -t "$BASE:sha-${GITHUB_SHA::12}" -t "$BASE:phase36" -f frontend/Dockerfile frontend
+          docker push --all-tags "$BASE"
+
+  deploy:
+    name: Helm upgrade (${{ inputs.provider || 'eks' }})
+    needs: [go-test, e2e, build-push]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Gate the secrets (DEPLOY_KUBECONFIG / DEPLOY_VALUES) behind an
+    # environment. Add required reviewers for production discipline.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.3.0
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Write kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.DEPLOY_KUBECONFIG }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Write secret values overlay
+        # Provider values (values-<provider>.yaml) hold the endpoint skeletons;
+        # credentials (passwords, SASL secrets, jwt/internal tokens) arrive in
+        # this decoded overlay and are never committed.
+        run: |
+          echo "${{ secrets.DEPLOY_VALUES }}" | base64 -d > /tmp/deploy-values.yaml
+          test -s /tmp/deploy-values.yaml
+
+      - name: helm upgrade --install
+        run: |
+          helm upgrade --install omoikane charts/omoikane \
+            -f charts/omoikane/values-${{ inputs.provider }}.yaml \
+            -f /tmp/deploy-values.yaml \
+            --namespace omoikane --create-namespace \
+            --set images.backend.repository=ghcr.io/${{ github.repository_owner }}/omoikane-backend \
+            --set images.backend.tag=phase36 \
+            --set images.frontend.repository=ghcr.io/${{ github.repository_owner }}/omoikane-frontend \
+            --set images.frontend.tag=phase36 \
+            --wait --timeout 15m
+
+      - name: Rollout restart app deployments
+        # Same reason as k8s-up: a rebuilt image with an unchanged tag rolls no
+        # pods, so force a fresh rollout after the image-tag switch to GHCR.
+        run: |
+          kubectl rollout restart -n omoikane deployment \
+            auth-service content-service media-service messages-service \
+            settings-service trash-service dashboard-service docs-service \
+            audit-service webhooks-service webhook-sink frontend nginx
+          kubectl rollout status deployment -n omoikane --timeout=600s
+
+      - name: FIRST RESULT — cloud smoke
+        run: scripts/cloud-smoke.sh "${{ inputs.gateway_url }}"
+        timeout-minutes: 10

@@ -36,12 +36,21 @@ func NewProducer(cfg Config) (*KafkaProducer, error) {
 	if cfg.Topic == "" {
 		cfg.Topic = DefaultTopic
 	}
+	// Managed-broker security (Phase 36): TLS+SASL transport when configured.
+	if err := cfg.validateSecurity(); err != nil {
+		return nil, err
+	}
+	tr, err := cfg.newTransport()
+	if err != nil {
+		return nil, err
+	}
 	w := &kafka.Writer{
 		Addr:         kafka.TCP(cfg.Brokers...),
 		Topic:        cfg.Topic,
 		Balancer:     &kafka.Hash{}, // key = subject => same entity stays on one partition
 		RequiredAcks: kafka.RequireAll,
 		Async:        false,
+		Transport:    tr,
 		// Small batch window: the relay publishes events in a loop and wants
 		// low latency, not throughput batching (default is 1s per write).
 		BatchTimeout:           50 * time.Millisecond,
