@@ -18,6 +18,7 @@ services:
       - trash-service
       - dashboard-service
       - docs-service
+      - webhooks-service
 
   kafka:
     image: apache/kafka:3.9.0
@@ -75,6 +76,7 @@ services:
       - trash-service
       - dashboard-service
       - docs-service
+      - webhooks-service
 
   redis:
     image: redis:7-alpine
@@ -375,6 +377,63 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8081/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Phase 35 webhook module: subscription CRUD + delivery log (admin UI at
+  # /admin/webhooks) and the delivery pipeline. A Kafka consumer (group
+  # "webhooks") maps backbone CloudEvents -> pending WebhookDelivery rows
+  # (idempotent via unique (subscription, event) index); a pump worker POSTs
+  # each payload to the subscription URL (HMAC-SHA256 signed), retries with
+  # exponential backoff, then marks the delivery expired (DLQ-equivalent).
+  # Consumer-only service; owns the webhook_* tables in the shared omoikane
+  # store (7th MIGRATE_ONLY migration Job in the chart).
+  webhooks-service:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/webhooks
+    ports:
+      - "8090:8090"
+    environment:
+      - WEBHOOKS_PORT=8090
+      - WEBHOOKS_DATABASE_URL=host=postgres port=5432 user=omoikane password=omoikane dbname=omoikane sslmode=disable
+      - JWT_SECRET=dev-secret-change-in-production
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_EVENTS_TOPIC=omoikane.events
+      - KAFKA_DLQ_TOPIC=omoikane.events.dlq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      webhook-sink:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8090/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Phase 35 demo receiver: hermetic in-cluster HTTP target for webhook
+  # deliveries (records POSTs, exposes GET /requests). Exists so the e2e gate
+  # needs no third-party image. NOT gateway-facing.
+  webhook-sink:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../backend:/app
+    command: go run ./cmd/webhook-sink
+    ports:
+      - "8091:8091"
+    environment:
+      - SINK_PORT=8091
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8091/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10

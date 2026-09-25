@@ -432,10 +432,14 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] OTel tracing: skipped (documented as optional — not needed for the local k8s gate)
 - [x] **Gate:** zero-manual-step deploy — `helm install` runs all 6 migration Jobs (fix: `---` document separators per range-emitted hook doc — without them Helm v4 created only the LAST Job); `make go-test` + `make k8s-test` green; `docs/observability.md` added
 
-## 🔲 Phase 35: Webhook Module (Flagship Demo)
-- [ ] `cmd/webhooks`: subscription CRUD, admin UI, delivery worker (Kafka consumer)
-- [ ] Retries with exponential backoff, DLQ, delivery-log UI
-- [ ] **Gate:** e2e — publish post → webhook fires with CloudEvents payload; failing endpoint retries with backoff
+## ✅ Phase 35: Webhook Module (Flagship Demo)
+- [x] `cmd/webhooks` (:8090): subscription CRUD (event-type allow-list = the 7 live backbone types, validation on create/update), admin UI (`/admin/webhooks`)
+- [x] Kafka delivery worker: consumer group `webhooks` (`ConsumerStartOffset = kafka.LastOffset`), idempotent enqueue via unique `(subscription_id, event_id)` index, pump outside the consumer loop
+- [x] Retries with **exponential backoff** (1s base doubling, 60s cap, `WEBHOOKS_MAX_ATTEMPTS`=6 → terminal `expired` = DLQ-equivalent, visible in the delivery log with attempt/error trail)
+- [x] HMAC-SHA256 signing (`X-Omoikane-Signature: sha256=<hex>`), one-time secret reveal, `POST /webhooks/{id}/test` ping through the normal pump, delivery-log UI (filters + pagination)
+- [x] Demo sink `cmd/webhook-sink` (:8091, same Service name compose + k8s) + nginx `location /api/webhooks` + chart (7th migration Job `webhooks-migrate`, Deployment, values, `---` separator inherited) + Makefile (waits, scopes, K8S lists, IMAGE_TAG phase35)
+- [x] swag regeneration fix: dropped `--parseDependency` from `make swagger` (Go 1.26+/1.27 stdlib `math/rand/v2` generics broke swag v1.16.x; `--parseInternal` still captures handler annotations)
+- [x] **Gate:** `make go-test` 213/213 (13 new cmd/webhooks tests); full `make test` desktop + mobile green (new spec 30-webhooks + a11y scan of `/admin/webhooks`); full `make k8s-test` green on minikube; `docs/webhooks.md` added
 
 ## ⬜ Wave 3 — Cloud & Scale: Fast-Deploy Story
 

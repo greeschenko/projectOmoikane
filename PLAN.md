@@ -120,12 +120,16 @@ Flagship demo = webhook module. First result = working platform on a fresh clust
 - Migration `Jobs` (idempotent per-service schema via MIGRATE_ONLY=1), secrets via values/Secret (SMTP_PASS/RECAPTCHA_SECRET via secretKeyRef), HPA manifests (default off), resource requests/limits in chart
 - **Gate:** zero-manual-step deploy; failures visible in metrics/logs; restart-safe — `make go-test` + `make k8s-test` green
 
-#### Phase 35 — Webhook module (flagship demo)
+#### Phase 35 — Webhook module (flagship demo) (DONE)
 - `cmd/webhooks`: subscription CRUD (event type → URL, optional HMAC secret),
   admin UI page (`/admin/webhooks`), delivery worker (Kafka consumer),
   **retries with exponential backoff, DLQ for dead endpoints, delivery-log UI**
-- **Gate:** e2e — publish post → webhook fires with CloudEvents payload;
-  a failing endpoint retries with backoff; delivery log shows attempts
+- Demo sink `cmd/webhook-sink` + nginx location + 7th migration Job; swagger regen
+  fix (`--parseDependency` dropped — Go 1.27 stdlib generics broke swag v1.16.x)
+- **Gate:** e2e — publish post → webhook fires with CloudEvents payload (delivered,
+  `httpStatus 200`, payload contains title); a failing endpoint retries with
+  backoff (attempts ≥ 2, transport error recorded); test ping delivers — `make
+  go-test` (213) + `make test` + `make k8s-test` green; docs/webhooks.md added
 
 ### Wave 3 — Cloud & scale: the fast-deploy story
 

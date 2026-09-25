@@ -49,6 +49,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.ContactMessage{},
 		&models.AuditLog{},
 		&models.ApiToken{},
+		&models.WebhookSubscription{},
+		&models.WebhookDelivery{},
 	)
 	if err != nil {
 		return fmt.Errorf("AutoMigrate failed: %w", err)

@@ -19,6 +19,7 @@ const ADMIN_ROUTES: Route[] = [
   { path: "/admin/settings", name: "settings" },
   { path: "/admin/trash", name: "trash" },
   { path: "/admin/audit-logs", name: "audit logs" },
+  { path: "/admin/webhooks", name: "webhooks" },
 ];
 
 const BLOCKING_IMPACTS = ["critical", "serious"] as const;

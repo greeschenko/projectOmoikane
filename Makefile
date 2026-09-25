@@ -2,9 +2,14 @@
 
 SWAG := $(shell command -v swag 2>/dev/null || echo "$(HOME)/prodev/go/bin/swag")
 
+# NOTE: no `--parseDependency` here on purpose. swag walks the dependency
+# graph with that flag and hits Go 1.26+/1.27 stdlib source (math/rand/v2 uses
+# generics syntax swag v1.16.x cannot parse) -> "method must have no type
+# parameters". `--parseInternal` still captures the handler annotations, which
+# are all under backend/internal/.
 swagger:
-	cd backend && $(SWAG) init -g cmd/docs/main.go --output ./docs --parseDependency --parseInternal --exclude "cmd/audit,docs,cmd/audit/docs"
-	cd backend && $(SWAG) init -g cmd/audit/main.go --output ./cmd/audit/docs --parseDependency --parseInternal --exclude "internal,docs"
+	cd backend && $(SWAG) init -g cmd/docs/main.go --output ./docs --parseInternal --exclude "cmd/audit,docs,cmd/audit/docs"
+	cd backend && $(SWAG) init -g cmd/audit/main.go --output ./cmd/audit/docs --parseInternal --exclude "internal,docs"
 	@echo "Swagger docs generated"
 
 up:
@@ -85,6 +90,15 @@ up:
 		if [ $$i -eq 30 ]; then echo "Docs service not ready after 30s"; exit 1; fi; \
 		sleep 2; \
 	done
+	@echo "Waiting for webhooks service to be ready..."
+	@for i in $$(seq 1 30); do \
+		if curl -s http://localhost:8090/health 2>/dev/null | grep -q '"status":"ok"'; then \
+			echo "Webhooks service ready after $$i seconds"; \
+			break; \
+		fi; \
+		if [ $$i -eq 30 ]; then echo "Webhooks service not ready after 30s"; exit 1; fi; \
+		sleep 2; \
+	done
 	@echo "Waiting for frontend to be ready..."
 	@for i in $$(seq 1 60); do \
 		if curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null | grep -q "307\|200"; then \
@@ -110,6 +124,7 @@ db-reset: up
 	docker compose -f docker/docker-compose.yml stop media-service
 	docker compose -f docker/docker-compose.yml stop messages-service
 	docker compose -f docker/docker-compose.yml stop settings-service
+	docker compose -f docker/docker-compose.yml stop webhooks-service
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='omoikane' AND pid<>pg_backend_pid();"
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "DROP DATABASE IF EXISTS omoikane;"
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -d postgres -c "CREATE DATABASE omoikane;"
@@ -121,6 +136,7 @@ db-reset: up
 	docker compose -f docker/docker-compose.yml restart media-service
 	docker compose -f docker/docker-compose.yml restart messages-service
 	docker compose -f docker/docker-compose.yml restart settings-service
+	docker compose -f docker/docker-compose.yml start webhooks-service
 	@echo "Waiting for auth service to be ready..."
 	@for i in $$(seq 1 15); do \
 		if curl -s http://localhost:8082/health 2>/dev/null | grep -q '"status":"ok"'; then \
@@ -175,6 +191,15 @@ db-reset: up
 		if [ $$i -eq 15 ]; then echo "Audit service not ready after 15s"; exit 1; fi; \
 		sleep 2; \
 	done
+	@echo "Waiting for webhooks service to be ready..."
+	@for i in $$(seq 1 15); do \
+		if curl -s http://localhost:8090/health 2>/dev/null | grep -q '"status":"ok"'; then \
+			echo "Webhooks service ready after $$i seconds"; \
+			break; \
+		fi; \
+		if [ $$i -eq 15 ]; then echo "Webhooks service not ready after 15s"; exit 1; fi; \
+		sleep 2; \
+	done
 	@echo "Restarting frontend for clean state..."
 	docker compose -f docker/docker-compose.yml restart frontend
 	# Re-resolve upstream IPs (nginx caches hostnames at startup; a container
@@ -191,7 +216,7 @@ db-reset: up
 	done
 
 go-test:
-	cd backend && go test -p 1 ./internal/... ./cmd/auth/... ./cmd/content/... ./cmd/media/... ./cmd/messages/... ./cmd/settings/... ./cmd/trash/... ./cmd/dashboard/... ./cmd/docs/... ./cmd/audit/...
+	cd backend && go test -p 1 ./internal/... ./cmd/auth/... ./cmd/content/... ./cmd/media/... ./cmd/messages/... ./cmd/settings/... ./cmd/trash/... ./cmd/dashboard/... ./cmd/docs/... ./cmd/audit/... ./cmd/webhooks/...
 
 go-build:
 	cd backend && go build -o bin/auth ./cmd/auth
@@ -203,13 +228,15 @@ go-build:
 	cd backend && go build -o bin/dashboard ./cmd/dashboard
 	cd backend && go build -o bin/docs ./cmd/docs
 	cd backend && go build -o bin/audit ./cmd/audit
+	cd backend && go build -o bin/webhooks ./cmd/webhooks
+	cd backend && go build -o bin/webhook-sink ./cmd/webhook-sink
 
 test: up
 	@echo "Creating test database..."
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -c "DROP DATABASE IF EXISTS omoikane_test;" 2>/dev/null || true
 	docker compose -f docker/docker-compose.yml exec -T postgres psql -U omoikane -c "CREATE DATABASE omoikane_test;" 2>/dev/null || true
 	@echo "Running Go backend tests..."
-	cd backend && TEST_DATABASE_URL="host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane_test sslmode=disable" go test -p 1 ./internal/... ./cmd/auth/... ./cmd/content/... ./cmd/media/... ./cmd/messages/... ./cmd/settings/... ./cmd/trash/... ./cmd/dashboard/... ./cmd/docs/... ./cmd/audit/...
+	cd backend && TEST_DATABASE_URL="host=localhost port=5432 user=omoikane password=omoikane dbname=omoikane_test sslmode=disable" go test -p 1 ./internal/... ./cmd/auth/... ./cmd/content/... ./cmd/media/... ./cmd/messages/... ./cmd/settings/... ./cmd/trash/... ./cmd/dashboard/... ./cmd/docs/... ./cmd/audit/... ./cmd/webhooks/...
 	@echo "Resetting main database for desktop Playwright run..."
 	$(MAKE) db-reset
 	cd frontend && PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test --config=e2e/playwright.config.ts --project=desktop
@@ -224,17 +251,17 @@ K8S_NS ?= omoikane
 MINIKUBE_PROFILE ?= minikube
 K8S_CHART := charts/omoikane
 K8S_VALUES := $(K8S_CHART)/values-minikube.yaml
-IMAGE_TAG ?= phase34
+IMAGE_TAG ?= phase35
 K8S_IMAGE_BACKEND := omoikane/backend:$(IMAGE_TAG)
 K8S_IMAGE_FRONTEND := omoikane/frontend:$(IMAGE_TAG)
 GATEWAY_PORT ?= 30080
 # Services owning the `omoikane` (+ audit) databases — restart after a reset so
 # they re-run their startup migrations on the fresh DBs (mirrors compose).
-K8S_DB_SERVICES := auth-service content-service media-service messages-service settings-service audit-service
+K8S_DB_SERVICES := auth-service content-service media-service messages-service settings-service audit-service webhooks-service
 # App deployments running locally-built images (omoikane/backend:*, omoikane/frontend:*)
 # plus the nginx gateway (ConfigMap-mounted nginx.conf). Excludes postgres/redis/
 # kafka: stock images, never rebuilt — and restarting kafka risks the KRaft wedge.
-K8S_APP_SERVICES := auth-service content-service media-service messages-service settings-service trash-service dashboard-service docs-service audit-service frontend nginx
+K8S_APP_SERVICES := auth-service content-service media-service messages-service settings-service trash-service dashboard-service docs-service audit-service webhooks-service webhook-sink frontend nginx
 
 k8s-up:
 	minikube status -p $(MINIKUBE_PROFILE) >/dev/null 2>&1 || minikube start -p $(MINIKUBE_PROFILE) --driver=docker --cpus=6 --memory=6144 --disk-size=30g --container-runtime=containerd

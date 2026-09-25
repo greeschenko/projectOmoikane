@@ -15,6 +15,7 @@ Owners:
 - **audit** — audit log entries (existing microservice, later event-driven)
 - **trash** — cross-cutting soft-delete restore/hard-delete aggregator (see §2)
 - **dashboard** — aggregator over services, no direct DB (see §3)
+- **webhooks** — outbound event delivery (Kafka consumer + HTTP pump), owns `webhook_*` tables (see §9)
 
 ## 1. Route → service table
 
@@ -77,6 +78,14 @@ Owners:
 | Method(s) | Path | Notes |
 |---|---|---|
 | GET | `/dashboard`, `/dashboard/stats` | admin; aggregator over services |
+
+### Webhooks (Phase 35)
+| Method(s) | Path | Notes |
+|---|---|---|
+| GET/POST | `/webhooks` | admin; list / create (secret revealed once on create) |
+| GET/PUT/DELETE | `/webhooks/{id}` | admin; PUT rotates secret when non-empty secret sent |
+| POST | `/webhooks/{id}/test` | admin; enqueue a synthetic ping delivery through the normal pump |
+| GET | `/webhooks/deliveries` | admin; delivery log — filters `status`/`eventType`/`subscriptionId`, `limit`(≤500)/`offset` |
 
 ## 2. Trash: cross-cutting ownership decision
 
@@ -146,6 +155,7 @@ Unreachable owners fail loud (502). No shared-DB reads remain.
 | `/api/dashboard*` | **dashboard-service:8088** (Phase 31) |
 | `/api/swagger/` | **docs-service:8089** (Phase 31, monolith docs UI) |
 | `GET /api/audit-logs` | **audit-service:8081** directly (Phase 31; was monolith proxy) |
+| `/api/webhooks*` | **webhooks-service:8090** (Phase 35) — prefix covers `/webhooks`, `/webhooks/{id}`, `/test`, `/deliveries` |
 | `/api/*` (unmapped) | **`return 404` fail-loud** — unmapped routes surface instead of hitting a dead monolith |
 
 **Phase 31 status (Wave 3 — decomposition complete):** the monolith `cmd/api`
@@ -159,6 +169,13 @@ All of auth/content/media/messages/settings wire the events outbox
 (producer + relay + `EnsureTopics`, log-only on failure); no new emissions in
 this phase. `npm install` note: the frontend container is `API_URL=http://nginx`
 and enriches with `/api` — SSR now goes through the gateway too.
+
+**Phase 35 status (webhooks):** `webhooks-service` (8090) owns `/webhooks*`
+(admin-gated), a Kafka consumer (group `webhooks`, `kafka.LastOffset`,
+idempotent on the unique `(subscription_id, event_id)` delivery index) and a
+delivery pump with exponential-backoff retries and a terminal `expired` state.
+Demo sink `webhook-sink` (8091, own Deployment/Service name-identical in
+compose + chart) receives deliveries. Full writeup: [`webhooks.md`](./webhooks.md).
 
 **Internal-API layer (Phase 31):** owning services expose token-gated internal
 endpoints consumed by the trash + dashboard aggregators — `X-Internal-Token`
@@ -224,6 +241,9 @@ containers (the advertised address resolves to the container itself).
 - [x] Full Go + Playwright suites green on the frozen contract (Phase 31 gate)
 - [x] Audit rows arrive via the Kafka backbone, not HTTP (Phase 32 gate: post
       publish → `action=publish` row through the audit consumer)
+- [x] Webhook deliveries flow from the same single backbone write (Phase 35
+      gate: post publish → webhook pump delivers 200 via a separate consumer
+      group; dead endpoint retries with backoff; test ping delivers)
 
 ## 7. Event catalog
 
@@ -244,3 +264,13 @@ and resource requests/limits are documented in
 [`observability.md`](./observability.md). Every service registers `GET /metrics`
 inside its `newXxxMux` so cmd tests can assert it without booting a server; the
 production server wraps the mux in `observability.Middleware`.
+
+## 9. Webhooks (Phase 35)
+
+`webhooks-service` consumes the backbone (group `webhooks`) and delivers
+matching events to external HTTP endpoints — HMAC-signed when a secret is set,
+retried with exponential backoff, then `expired` (the DLQ-equivalent terminal
+state) after `WEBHOOKS_MAX_ATTEMPTS`. `POST /webhooks/{id}/test` runs a
+synthetic ping through the same pump. The module is **consumer-only** (no
+outbox, no emissions) and changed no producer code. Graph, lifecycle, config
+and verification: [`webhooks.md`](./webhooks.md).

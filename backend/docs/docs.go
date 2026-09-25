@@ -98,7 +98,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createApiTokenRequest"
+                            "$ref": "#/definitions/handlers.createApiTokenRequest"
                         }
                     }
                 ],
@@ -197,7 +197,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.forgotPasswordRequest"
+                            "$ref": "#/definitions/handlers.forgotPasswordRequest"
                         }
                     }
                 ],
@@ -241,7 +241,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.loginRequest"
+                            "$ref": "#/definitions/handlers.loginRequest"
                         }
                     }
                 ],
@@ -331,7 +331,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.registerRequest"
+                            "$ref": "#/definitions/handlers.registerRequest"
                         }
                     }
                 ],
@@ -375,7 +375,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.resetPasswordRequest"
+                            "$ref": "#/definitions/handlers.resetPasswordRequest"
                         }
                     }
                 ],
@@ -446,7 +446,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createCategoryRequest"
+                            "$ref": "#/definitions/handlers.createCategoryRequest"
                         }
                     }
                 ],
@@ -572,7 +572,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createPostRequest"
+                            "$ref": "#/definitions/handlers.createPostRequest"
                         }
                     }
                 ],
@@ -621,7 +621,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.batchRequest"
+                            "$ref": "#/definitions/handlers.batchRequest"
                         }
                     }
                 ],
@@ -764,7 +764,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updatePostRequest"
+                            "$ref": "#/definitions/handlers.updatePostRequest"
                         }
                     }
                 ],
@@ -950,7 +950,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createTagRequest"
+                            "$ref": "#/definitions/handlers.createTagRequest"
                         }
                     }
                 ],
@@ -1049,7 +1049,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.contactRequest"
+                            "$ref": "#/definitions/handlers.contactRequest"
                         }
                     }
                 ],
@@ -1381,7 +1381,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.TrashItem"
+                                "$ref": "#/definitions/handlers.TrashItem"
                             }
                         }
                     }
@@ -1654,7 +1654,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.batchRequest"
+                            "$ref": "#/definitions/handlers.batchRequest"
                         }
                     }
                 ],
@@ -1953,7 +1953,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createMessageRequest"
+                            "$ref": "#/definitions/handlers.createMessageRequest"
                         }
                     }
                 ],
@@ -2247,7 +2247,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createPageRequest"
+                            "$ref": "#/definitions/handlers.createPageRequest"
                         }
                     }
                 ],
@@ -2305,7 +2305,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.batchRequest"
+                            "$ref": "#/definitions/handlers.batchRequest"
                         }
                     }
                 ],
@@ -2356,7 +2356,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.reorderPagesRequest"
+                            "$ref": "#/definitions/handlers.reorderPagesRequest"
                         }
                     }
                 ],
@@ -2499,7 +2499,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updatePageRequest"
+                            "$ref": "#/definitions/handlers.updatePageRequest"
                         }
                     }
                 ],
@@ -2629,7 +2629,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateSettingsRequest"
+                            "$ref": "#/definitions/handlers.updateSettingsRequest"
                         }
                     }
                 ],
@@ -2678,7 +2678,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.changePasswordRequest"
+                            "$ref": "#/definitions/handlers.changePasswordRequest"
                         }
                     }
                 ],
@@ -2771,7 +2771,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateProfileRequest"
+                            "$ref": "#/definitions/handlers.updateProfileRequest"
                         }
                     }
                 ],
@@ -2824,7 +2824,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.setupRequest"
+                            "$ref": "#/definitions/handlers.setupRequest"
                         }
                     }
                 ],
@@ -2894,7 +2894,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.TrashItem"
+                                "$ref": "#/definitions/handlers.TrashItem"
                             }
                         }
                     }
@@ -3140,7 +3140,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createUserRequest"
+                            "$ref": "#/definitions/handlers.createUserRequest"
                         }
                     }
                 ],
@@ -3198,7 +3198,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.batchRequest"
+                            "$ref": "#/definitions/handlers.batchRequest"
                         }
                     }
                 ],
@@ -3256,7 +3256,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateUserRequest"
+                            "$ref": "#/definitions/handlers.updateUserRequest"
                         }
                     }
                 ],
@@ -3341,10 +3341,330 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/webhooks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all webhook subscriptions (event type, URL, active flag, timestamps). Secrets are never included.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "List webhook subscriptions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a subscription that delivers one event type to a URL. If no secret is supplied a random HMAC key is generated and returned only once.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Create webhook subscription",
+                "parameters": [
+                    {
+                        "description": "Event type, destination URL and optional HMAC secret",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.createWebhookRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/deliveries": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the delivery log (attempts, HTTP status, next retry). Filters: status, eventType, subscriptionId.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "List webhook deliveries",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by status (pending|delivered|failed|expired)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by event type",
+                        "name": "eventType",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by subscription",
+                        "name": "subscriptionId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max results (1-500, default 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pagination offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one subscription by id (event type, URL, active flag, timestamps).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Get webhook subscription",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subscription ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates event type, URL, active flag and optionally rotates the HMAC secret.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Update webhook subscription",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subscription ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.updateWebhookRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a webhook subscription; past delivery log rows are retained.",
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Delete webhook subscription",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subscription ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}/test": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Enqueues a synthetic smoke-test delivery to the subscription URL through the normal delivery pipeline.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Send test ping",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subscription ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "internal_handlers.TrashItem": {
+        "handlers.TrashItem": {
             "type": "object",
             "properties": {
                 "deletedAt": {
@@ -3361,7 +3681,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.batchRequest": {
+        "handlers.batchRequest": {
             "type": "object",
             "properties": {
                 "action": {
@@ -3376,7 +3696,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.changePasswordRequest": {
+        "handlers.changePasswordRequest": {
             "type": "object",
             "properties": {
                 "currentPassword": {
@@ -3387,7 +3707,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.contactRequest": {
+        "handlers.contactRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3407,7 +3727,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createApiTokenRequest": {
+        "handlers.createApiTokenRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3425,7 +3745,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createCategoryRequest": {
+        "handlers.createCategoryRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3439,7 +3759,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createMessageRequest": {
+        "handlers.createMessageRequest": {
             "type": "object",
             "properties": {
                 "content": {
@@ -3450,7 +3770,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createPageRequest": {
+        "handlers.createPageRequest": {
             "type": "object",
             "properties": {
                 "content": {
@@ -3482,7 +3802,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createPostRequest": {
+        "handlers.createPostRequest": {
             "type": "object",
             "properties": {
                 "categoryId": {
@@ -3514,7 +3834,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createTagRequest": {
+        "handlers.createTagRequest": {
             "type": "object",
             "properties": {
                 "name": {
@@ -3525,7 +3845,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createUserRequest": {
+        "handlers.createUserRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3545,7 +3865,25 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.forgotPasswordRequest": {
+        "handlers.createWebhookRequest": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "eventType": {
+                    "type": "string"
+                },
+                "secret": {
+                    "description": "Secret is optional: when omitted the service generates one (shown once).",
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.forgotPasswordRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3556,7 +3894,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.loginRequest": {
+        "handlers.loginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3567,7 +3905,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.registerRequest": {
+        "handlers.registerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3584,7 +3922,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.reorderPagesRequest": {
+        "handlers.reorderPagesRequest": {
             "type": "object",
             "properties": {
                 "pageIds": {
@@ -3595,7 +3933,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.resetPasswordRequest": {
+        "handlers.resetPasswordRequest": {
             "type": "object",
             "properties": {
                 "password": {
@@ -3606,7 +3944,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.setupRequest": {
+        "handlers.setupRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3617,7 +3955,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updatePageRequest": {
+        "handlers.updatePageRequest": {
             "type": "object",
             "properties": {
                 "content": {
@@ -3649,7 +3987,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updatePostRequest": {
+        "handlers.updatePostRequest": {
             "type": "object",
             "properties": {
                 "categoryId": {
@@ -3681,7 +4019,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateProfileRequest": {
+        "handlers.updateProfileRequest": {
             "type": "object",
             "properties": {
                 "avatar": {
@@ -3695,7 +4033,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateSettingsRequest": {
+        "handlers.updateSettingsRequest": {
             "type": "object",
             "properties": {
                 "blogEnabled": {
@@ -3721,7 +4059,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateUserRequest": {
+        "handlers.updateUserRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3737,6 +4075,24 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.updateWebhookRequest": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "eventType": {
+                    "type": "string"
+                },
+                "secret": {
+                    "description": "Secret, when set (even to \"\"), rotates the signing key.",
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }

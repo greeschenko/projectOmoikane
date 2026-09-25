@@ -1,6 +1,6 @@
 basePath: /api
 definitions:
-  internal_handlers.TrashItem:
+  handlers.TrashItem:
     properties:
       deletedAt:
         type: string
@@ -11,7 +11,7 @@ definitions:
       title:
         type: string
     type: object
-  internal_handlers.batchRequest:
+  handlers.batchRequest:
     properties:
       action:
         description: '"delete", "publish", "draft", "ban", "activate", "clear"'
@@ -21,14 +21,14 @@ definitions:
           type: integer
         type: array
     type: object
-  internal_handlers.changePasswordRequest:
+  handlers.changePasswordRequest:
     properties:
       currentPassword:
         type: string
       newPassword:
         type: string
     type: object
-  internal_handlers.contactRequest:
+  handlers.contactRequest:
     properties:
       email:
         type: string
@@ -41,7 +41,7 @@ definitions:
       subject:
         type: string
     type: object
-  internal_handlers.createApiTokenRequest:
+  handlers.createApiTokenRequest:
     properties:
       description:
         type: string
@@ -53,7 +53,7 @@ definitions:
       role:
         type: string
     type: object
-  internal_handlers.createCategoryRequest:
+  handlers.createCategoryRequest:
     properties:
       description:
         type: string
@@ -62,14 +62,14 @@ definitions:
       slug:
         type: string
     type: object
-  internal_handlers.createMessageRequest:
+  handlers.createMessageRequest:
     properties:
       content:
         type: string
       title:
         type: string
     type: object
-  internal_handlers.createPageRequest:
+  handlers.createPageRequest:
     properties:
       content:
         type: string
@@ -90,7 +90,7 @@ definitions:
       title:
         type: string
     type: object
-  internal_handlers.createPostRequest:
+  handlers.createPostRequest:
     properties:
       categoryId:
         type: integer
@@ -111,14 +111,14 @@ definitions:
       title:
         type: string
     type: object
-  internal_handlers.createTagRequest:
+  handlers.createTagRequest:
     properties:
       name:
         type: string
       slug:
         type: string
     type: object
-  internal_handlers.createUserRequest:
+  handlers.createUserRequest:
     properties:
       email:
         type: string
@@ -131,21 +131,34 @@ definitions:
       status:
         type: string
     type: object
-  internal_handlers.forgotPasswordRequest:
+  handlers.createWebhookRequest:
+    properties:
+      active:
+        type: boolean
+      eventType:
+        type: string
+      secret:
+        description: 'Secret is optional: when omitted the service generates one (shown
+          once).'
+        type: string
+      url:
+        type: string
+    type: object
+  handlers.forgotPasswordRequest:
     properties:
       email:
         type: string
       recaptchaToken:
         type: string
     type: object
-  internal_handlers.loginRequest:
+  handlers.loginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  internal_handlers.registerRequest:
+  handlers.registerRequest:
     properties:
       email:
         type: string
@@ -156,28 +169,28 @@ definitions:
       recaptchaToken:
         type: string
     type: object
-  internal_handlers.reorderPagesRequest:
+  handlers.reorderPagesRequest:
     properties:
       pageIds:
         items:
           type: integer
         type: array
     type: object
-  internal_handlers.resetPasswordRequest:
+  handlers.resetPasswordRequest:
     properties:
       password:
         type: string
       token:
         type: string
     type: object
-  internal_handlers.setupRequest:
+  handlers.setupRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  internal_handlers.updatePageRequest:
+  handlers.updatePageRequest:
     properties:
       content:
         type: string
@@ -198,7 +211,7 @@ definitions:
       title:
         type: string
     type: object
-  internal_handlers.updatePostRequest:
+  handlers.updatePostRequest:
     properties:
       categoryId:
         type: integer
@@ -219,7 +232,7 @@ definitions:
       title:
         type: string
     type: object
-  internal_handlers.updateProfileRequest:
+  handlers.updateProfileRequest:
     properties:
       avatar:
         type: string
@@ -228,7 +241,7 @@ definitions:
       name:
         type: string
     type: object
-  internal_handlers.updateSettingsRequest:
+  handlers.updateSettingsRequest:
     properties:
       blogEnabled:
         type: boolean
@@ -245,7 +258,7 @@ definitions:
       tagline:
         type: string
     type: object
-  internal_handlers.updateUserRequest:
+  handlers.updateUserRequest:
     properties:
       email:
         type: string
@@ -256,6 +269,18 @@ definitions:
       role:
         type: string
       status:
+        type: string
+    type: object
+  handlers.updateWebhookRequest:
+    properties:
+      active:
+        type: boolean
+      eventType:
+        type: string
+      secret:
+        description: Secret, when set (even to ""), rotates the signing key.
+        type: string
+      url:
         type: string
     type: object
 info:
@@ -314,7 +339,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.createApiTokenRequest'
+          $ref: '#/definitions/handlers.createApiTokenRequest'
       produces:
       - application/json
       responses:
@@ -381,7 +406,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.forgotPasswordRequest'
+          $ref: '#/definitions/handlers.forgotPasswordRequest'
       produces:
       - application/json
       responses:
@@ -411,7 +436,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.loginRequest'
+          $ref: '#/definitions/handlers.loginRequest'
       produces:
       - application/json
       responses:
@@ -471,7 +496,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.registerRequest'
+          $ref: '#/definitions/handlers.registerRequest'
       produces:
       - application/json
       responses:
@@ -500,7 +525,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.resetPasswordRequest'
+          $ref: '#/definitions/handlers.resetPasswordRequest'
       produces:
       - application/json
       responses:
@@ -545,7 +570,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.createCategoryRequest'
+          $ref: '#/definitions/handlers.createCategoryRequest'
       produces:
       - application/json
       responses:
@@ -627,7 +652,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.createPostRequest'
+          $ref: '#/definitions/handlers.createPostRequest'
       produces:
       - application/json
       responses:
@@ -729,7 +754,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.updatePostRequest'
+          $ref: '#/definitions/handlers.updatePostRequest'
       produces:
       - application/json
       responses:
@@ -801,7 +826,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.batchRequest'
+          $ref: '#/definitions/handlers.batchRequest'
       produces:
       - application/json
       responses:
@@ -875,7 +900,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.createTagRequest'
+          $ref: '#/definitions/handlers.createTagRequest'
       produces:
       - application/json
       responses:
@@ -942,7 +967,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.contactRequest'
+          $ref: '#/definitions/handlers.contactRequest'
       produces:
       - application/json
       responses:
@@ -1186,7 +1211,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_handlers.TrashItem'
+              $ref: '#/definitions/handlers.TrashItem'
             type: array
       summary: List owned trash items (internal)
       tags:
@@ -1454,7 +1479,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.batchRequest'
+          $ref: '#/definitions/handlers.batchRequest'
       produces:
       - application/json
       responses:
@@ -1553,7 +1578,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.createMessageRequest'
+          $ref: '#/definitions/handlers.createMessageRequest'
       produces:
       - application/json
       responses:
@@ -1726,7 +1751,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.createPageRequest'
+          $ref: '#/definitions/handlers.createPageRequest'
       produces:
       - application/json
       responses:
@@ -1833,7 +1858,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.updatePageRequest'
+          $ref: '#/definitions/handlers.updatePageRequest'
       produces:
       - application/json
       responses:
@@ -1870,7 +1895,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.batchRequest'
+          $ref: '#/definitions/handlers.batchRequest'
       produces:
       - application/json
       responses:
@@ -1902,7 +1927,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.reorderPagesRequest'
+          $ref: '#/definitions/handlers.reorderPagesRequest'
       produces:
       - application/json
       responses:
@@ -1975,7 +2000,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.updateSettingsRequest'
+          $ref: '#/definitions/handlers.updateSettingsRequest'
       produces:
       - application/json
       responses:
@@ -2007,7 +2032,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.changePasswordRequest'
+          $ref: '#/definitions/handlers.changePasswordRequest'
       produces:
       - application/json
       responses:
@@ -2067,7 +2092,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.updateProfileRequest'
+          $ref: '#/definitions/handlers.updateProfileRequest'
       produces:
       - application/json
       responses:
@@ -2105,7 +2130,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.setupRequest'
+          $ref: '#/definitions/handlers.setupRequest'
       produces:
       - application/json
       responses:
@@ -2180,7 +2205,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_handlers.TrashItem'
+              $ref: '#/definitions/handlers.TrashItem'
             type: array
       security:
       - BearerAuth: []
@@ -2310,7 +2335,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.createUserRequest'
+          $ref: '#/definitions/handlers.createUserRequest'
       produces:
       - application/json
       responses:
@@ -2387,7 +2412,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.updateUserRequest'
+          $ref: '#/definitions/handlers.updateUserRequest'
       produces:
       - application/json
       responses:
@@ -2424,7 +2449,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.batchRequest'
+          $ref: '#/definitions/handlers.batchRequest'
       produces:
       - application/json
       responses:
@@ -2445,6 +2470,215 @@ paths:
       summary: Batch user actions
       tags:
       - users
+  /webhooks:
+    get:
+      description: Returns all webhook subscriptions (event type, URL, active flag,
+        timestamps). Secrets are never included.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List webhook subscriptions
+      tags:
+      - webhooks
+    post:
+      consumes:
+      - application/json
+      description: Creates a subscription that delivers one event type to a URL. If
+        no secret is supplied a random HMAC key is generated and returned only once.
+      parameters:
+      - description: Event type, destination URL and optional HMAC secret
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createWebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create webhook subscription
+      tags:
+      - webhooks
+  /webhooks/{id}:
+    delete:
+      description: Deletes a webhook subscription; past delivery log rows are retained.
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete webhook subscription
+      tags:
+      - webhooks
+    get:
+      description: Returns one subscription by id (event type, URL, active flag, timestamps).
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get webhook subscription
+      tags:
+      - webhooks
+    put:
+      consumes:
+      - application/json
+      description: Updates event type, URL, active flag and optionally rotates the
+        HMAC secret.
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateWebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update webhook subscription
+      tags:
+      - webhooks
+  /webhooks/{id}/test:
+    post:
+      description: Enqueues a synthetic smoke-test delivery to the subscription URL
+        through the normal delivery pipeline.
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send test ping
+      tags:
+      - webhooks
+  /webhooks/deliveries:
+    get:
+      description: 'Returns the delivery log (attempts, HTTP status, next retry).
+        Filters: status, eventType, subscriptionId.'
+      parameters:
+      - description: Filter by status (pending|delivered|failed|expired)
+        in: query
+        name: status
+        type: string
+      - description: Filter by event type
+        in: query
+        name: eventType
+        type: string
+      - description: Filter by subscription
+        in: query
+        name: subscriptionId
+        type: integer
+      - description: Max results (1-500, default 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List webhook deliveries
+      tags:
+      - webhooks
 securityDefinitions:
   BearerAuth:
     in: header

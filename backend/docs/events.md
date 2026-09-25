@@ -4,8 +4,9 @@ The platform communicates domain facts over a **Kafka backbone** using the
 [CloudEvents 1.0](https://github.com/cloudevents/spec/blob/v1.0.1/cloudevents/spec.md)
 envelope (`internal/events` SDK). Events are **transactionally appended to an
 outbox** inside the business DB write, then a per-service **relay** publishes
-them to the `omoikane.events` topic. Consumers (the audit-service today,
-webhooks etc. later) read the same topic with their own consumer group.
+them to the `omoikane.events` topic. Consumers — the audit-service (group
+`audit`) and, since Phase 35, the webhook delivery service (group `webhooks`) —
+read the same topic with their own consumer group.
 
 ---
 
@@ -27,7 +28,10 @@ webhooks etc. later) read the same topic with their own consumer group.
   preserved.
 - **Delivery**: at-least-once, keyed by `subject` (so per-entity ordering is
   preserved). **Consumers must be idempotent** — the audit-service dedupes on
-  the CloudEvent `id` (unique index on `AuditLog.EventID`).
+  the CloudEvent `id` (unique index on `AuditLog.EventID`); the webhooks
+  service dedupes on the unique `(subscription_id, event_id)` delivery index.
+  A group's committed offsets persist in Kafka across DB resets, so neither
+  consumer re-ingests history after a reset.
 - **Brokers**: single-node KRaft. Services inside compose must use
   `KAFKA_BROKERS=kafka:29092` (the internal advertised listener); host tooling
   and integration tests use `localhost:9092`. Topics are provisioned
@@ -88,6 +92,22 @@ fine-grained CRUD events are deferred to a later phase.
   SIGINT/SIGTERM closes the consumer after the HTTP server drains.
 - The retired HTTP write path (`POST /events`, `internal/audit`) is gone —
   **Kafka is the single audit write path** since Phase 32.
+
+## Webhooks consumer (`cmd/webhooks`)
+
+- Consumer group **`webhooks`**, reading `omoikane.events`, handler
+  `webhookEventHandler` in `cmd/webhooks/consumer.go`.
+- **Match**: every **active** subscription whose `event_type` equals the event
+  type gets one `pending` `WebhookDelivery` row (no subscribers → fast ACK).
+- **Idempotency**: unique index `(subscription_id, event_id)`; a redelivered
+  event whose rows already exist is success (consumer commits, no DLQ).
+- **No replay**: `ConsumerStartOffset = kafka.LastOffset` for a fresh group;
+  committed offsets honored thereafter (survives DB resets — subscriptions
+  themselves live in the DB, so the e2e gate re-creates them after a reset and
+  publishes after subscribing).
+- **Delivery is decoupled**: the consumer only enqueues; the pump (`delivery.go`)
+  POSTs with HMAC-SHA256 signing, exponential backoff, and a terminal `expired`
+  state (the DLQ-equivalent). See [`webhooks.md`](./webhooks.md).
 
 ## Reading the log
 

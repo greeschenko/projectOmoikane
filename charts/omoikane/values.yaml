@@ -10,11 +10,11 @@
 images:
   backend:
     repository: omoikane/backend
-    tag: phase34
+    tag: phase35
     pullPolicy: IfNotPresent
   frontend:
     repository: omoikane/frontend
-    tag: phase34
+    tag: phase35
     pullPolicy: IfNotPresent
 
 secrets:
@@ -64,6 +64,7 @@ backend:
     dashboard: 8088
     docs: 8089
     audit: 8081
+    webhooks: 8090
   databases:
     auth: omoikane
     content: omoikane
@@ -71,6 +72,7 @@ backend:
     messages: omoikane
     settings: omoikane
     audit: omoikane_audit
+    webhooks: omoikane
   redis:
     - auth
     - content
@@ -82,6 +84,7 @@ backend:
     - messages
     - settings
     - audit
+    - webhooks
   internalToken:
     - auth
     - content

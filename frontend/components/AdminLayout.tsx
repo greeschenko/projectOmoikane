@@ -19,6 +19,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import HistoryIcon from "@mui/icons-material/History";
 import KeyIcon from "@mui/icons-material/Key";
+import WebhookIcon from "@mui/icons-material/Webhook";
 import AdminAppBar from "./AdminAppBar";
 
 const navItems = [
@@ -32,6 +33,7 @@ const navItems = [
   { label: "Trash", href: "/admin/trash", icon: <DeleteSweepIcon /> },
   { label: "Audit Log", href: "/admin/audit-logs", icon: <HistoryIcon /> },
   { label: "API Tokens", href: "/admin/api-tokens", icon: <KeyIcon /> },
+  { label: "Webhooks", href: "/admin/webhooks", icon: <WebhookIcon /> },
   { label: "Settings", href: "/admin/settings", icon: <SettingsIcon /> },
 ];
 
