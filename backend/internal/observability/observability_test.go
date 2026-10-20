@@ -116,6 +116,55 @@ func TestMiddleware_RecordsAndServesMetrics(t *testing.T) {
 	}
 }
 
+// TestStatusRecorder_SwallowsRepeatedWriteHeader is the Phase 37 regression for
+// a real production defect: the recorder used to forward EVERY WriteHeader to
+// the wrapped writer, so a handler that wrote a status twice made net/http log
+// `http: superfluous response.WriteHeader call` — visible in the auth-service
+// JSON logs. Only the first status must reach the client, and the recorded one
+// must be that first status (not the repeat).
+func TestStatusRecorder_SwallowsRepeatedWriteHeader(t *testing.T) {
+	var body bytes.Buffer
+	sr := &statusRecorder{ResponseWriter: &countingResponseWriter{buf: &body}}
+
+	sr.WriteHeader(http.StatusCreated)
+	sr.WriteHeader(http.StatusInternalServerError) // must be ignored
+	sr.Write([]byte("payload"))
+
+	if sr.status != http.StatusCreated {
+		t.Errorf("recorded status = %d, want 201 (the effective one)", sr.status)
+	}
+	if got := body.String(); got != "payload" {
+		t.Errorf("body = %q, want %q", got, "payload")
+	}
+}
+
+// countingResponseWriter is a minimal writer that records how many times
+// WriteHeader reached it — the defect was a repeat being forwarded.
+type countingResponseWriter struct {
+	buf      *bytes.Buffer
+	statuses []int
+}
+
+func (w *countingResponseWriter) Header() http.Header         { return http.Header{} }
+func (w *countingResponseWriter) WriteHeader(code int)        { w.statuses = append(w.statuses, code) }
+func (w *countingResponseWriter) Write(b []byte) (int, error) { return w.buf.Write(b) }
+
+// TestStatusRecorder_ImplicitOK — a handler that only writes a body never calls
+// WriteHeader; the effective status is 200 and must be recorded as such.
+func TestStatusRecorder_ImplicitOK(t *testing.T) {
+	var body bytes.Buffer
+	sr := &statusRecorder{ResponseWriter: &countingResponseWriter{buf: &body}}
+
+	sr.Write([]byte("implicit"))
+
+	if sr.status != http.StatusOK {
+		t.Errorf("recorded status = %d, want 200", sr.status)
+	}
+	if body.String() != "implicit" {
+		t.Errorf("body = %q", body.String())
+	}
+}
+
 func mustReadAll(t *testing.T, r io.Reader) []byte {
 	t.Helper()
 	b, err := io.ReadAll(r)
@@ -128,15 +177,15 @@ func mustReadAll(t *testing.T, r io.Reader) []byte {
 // TestRouteLabel verifies the cardinality-bounding normalization.
 func TestRouteLabel(t *testing.T) {
 	cases := map[string]string{
-		"/":                     "/",
-		"":                      "/",
-		"/health":               "/health",
-		"/users":                "/users",
-		"/users/5":              "/users",
-		"/users/5/restore":      "/users",
-		"/blog/posts/2":         "/blog/posts",
-		"/media/file/a.png":     "/media/file",
-		"/internal/trash/page":  "/internal/trash",
+		"/":                      "/",
+		"":                       "/",
+		"/health":                "/health",
+		"/users":                 "/users",
+		"/users/5":               "/users",
+		"/users/5/restore":       "/users",
+		"/blog/posts/2":          "/blog/posts",
+		"/media/file/a.png":      "/media/file",
+		"/internal/trash/page":   "/internal/trash",
 		"/internal/trash/page/5": "/internal/trash",
 	}
 	for in, want := range cases {

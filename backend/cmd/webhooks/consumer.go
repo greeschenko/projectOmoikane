@@ -10,6 +10,7 @@ import (
 	"omoikane-backend/internal/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // webhookEventHandler is the webhooks service's Kafka consumer handler
@@ -50,23 +51,13 @@ func (h *webhookEventHandler) Handle(ctx context.Context, ev events.CloudEvent) 
 			Status:         statusPending,
 			NextAttemptAt:  now,
 		}
-		if err := h.db.Create(&row).Error; err != nil {
-			if h.alreadyEnqueued(sub.ID, ev.ID) {
-				continue // at-least-once redelivery: row exists, treat as done
-			}
-			return fmt.Errorf("webhooks: enqueue delivery for %s event %s (sub %d): %w", ev.Type, ev.ID, sub.ID, err)
+		// Idempotent write: the unique (subscription_id, event_id) index makes
+		// a redelivered event a no-op (RowsAffected == 0) instead of a
+		// constraint violation, so the consumer commits rather than DLQ-ing.
+		res := h.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&row)
+		if res.Error != nil {
+			return fmt.Errorf("webhooks: enqueue delivery for %s event %s (sub %d): %w", ev.Type, ev.ID, sub.ID, res.Error)
 		}
 	}
 	return nil
-}
-
-// alreadyEnqueued reports whether a delivery row already exists for this
-// event+subscription (behind the unique index; used to distinguish a duplicate
-// from a real storage error).
-func (h *webhookEventHandler) alreadyEnqueued(subscriptionID uint, eventID string) bool {
-	var n int64
-	h.db.Model(&models.WebhookDelivery{}).
-		Where("subscription_id = ? AND event_id = ?", subscriptionID, eventID).
-		Count(&n)
-	return n > 0
 }

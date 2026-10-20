@@ -148,12 +148,38 @@ Flagship demo = webhook module. First result = working platform on a fresh clust
   `make go-test` (220) + `make k8s-test` + helm lint/template (default + all 3
   providers) gate green
 
-#### Phase 37 — (optional) Workflow/automation module
+#### Phase 37 — Full-component recheck (verification & hardening) (DONE)
+- `scripts/verify-components.sh` + `make verify`: a repeatable, black-box sweep
+  of every component through the gateway (infra, routing, health, auth, content,
+  media, messaging, aggregators, events, webhooks, observability); `--only`,
+  `--json`, `--list`, `--keep`
+- `backend/docs/verification.md`: component → automatic-check → manual-check
+  matrix + the hands-on UI/a11y checklist + the findings log + a results table
+- Permanent new assertions: Kafka **exactly-once on the wire** (per-run tail
+  watcher joins its own consumer group before the publish and counts the run's
+  unique slug), `/api/internal/*` → 404 (the internal API is never
+  gateway-exposed), and every service's logs must be JSON with a `service`
+  attribute (raw `net/http`/GORM stderr lines are a failure)
+- Findings are fixed **at source** (each with a test); gates never weakened.
+  Twelve in total. The material ones: the five relays shared ONE `outbox_events`
+  table with a plain `WHERE status='pending'` read, so two could publish the same
+  event — `Pending()` now claims atomically (`FOR UPDATE SKIP LOCKED` + `inflight`
+  + stale reclaim), correct under multi-relay *and* multi-replica HPA; and the
+  webhook delivery pump delivered a batch **sequentially**, so one dead subscriber
+  blocked every healthy delivery behind it — `RunOnce` now uses a bounded worker
+  pool. The last two (F11/F12) fixed the verify sweep's own stack detection and
+  its HMAC verifier (it must not trust the first slug match — several
+  subscriptions carry the same slug with different secrets)
+- **Gate:** `make verify` green on compose (**118/118**, three consecutive runs)
+  **and** minikube (**107/107**), plus `make go-test` (234), `make test`,
+  `make k8s-test`, helm lint/template, CI green
+
+#### Phase 38 — (optional) Workflow/automation module
 - Event → condition → action rules engine (e.g. `post.published` + tag=X → call URL / send email)
 - Admin UI for rules; e2e workflow tests
 - **Gate:** e2e workflow passes
 
-#### Phase 38 — (optional) Multi-tenancy & scale validation
+#### Phase 39 — (optional) Multi-tenancy & scale validation
 - Per-tenant schema separation, tenant scoping of events, HPA stress test,
   load test with N tenants stays green
 

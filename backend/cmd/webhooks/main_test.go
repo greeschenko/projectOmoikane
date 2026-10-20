@@ -521,6 +521,79 @@ func TestDeliveryPump_MissingSubscriptionExpires(t *testing.T) {
 	}
 }
 
+func TestDeliveryPump_SlowSubscriberDoesNotBlockOthers(t *testing.T) {
+	db := connectCleanTestDB(t)
+
+	// One subscriber whose endpoint blocks until we release it, and a healthy
+	// one. Delivered sequentially, the healthy row waits behind the slow row
+	// (head-of-line blocking) — the Phase 37 finding that made a healthy
+	// webhook "delivery" time out on Kubernetes whenever a dead subscriber's
+	// endpoint resolved-then-stalled for the client timeout.
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+		w.WriteHeader(http.StatusOK)
+	}))
+	// Register the release BEFORE slow.Close so it runs FIRST (defers are LIFO):
+	// an in-flight handler blocked on <-release must be let go before Close()
+	// waits for it, or the server never shuts down.
+	defer func() { releaseOnce.Do(func() { close(release) }) }()
+	defer slow.Close()
+
+	fastHit := make(chan struct{})
+	var fastOnce sync.Once
+	fast := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fastOnce.Do(func() { close(fastHit) })
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer fast.Close()
+
+	slowSub := models.WebhookSubscription{EventType: events.TypePostPublished, URL: slow.URL + "/hook", Active: true}
+	fastSub := models.WebhookSubscription{EventType: events.TypePostPublished, URL: fast.URL + "/hook", Active: true}
+	db.Create(&slowSub)
+	db.Create(&fastSub)
+	now := time.Now().UTC()
+	// slow is created first → lower id → it is the first row any sequential
+	// pump would attempt. The fast row can only be reached if they run
+	// concurrently.
+	for i, sid := range []uint{slowSub.ID, fastSub.ID} {
+		db.Create(&models.WebhookDelivery{
+			SubscriptionID: sid, EventID: fmt.Sprintf("ev-hol-%d", i), EventType: events.TypePostPublished,
+			Payload: `{"id":"ev-hol"}`, Status: statusPending, NextAttemptAt: now,
+		})
+	}
+
+	w := newDeliveryWorker(db)
+	done := make(chan struct{})
+	go func() {
+		_, _ = w.RunOnce(context.Background())
+		close(done)
+	}()
+
+	// The healthy row must be delivered WHILE the slow one is still blocked.
+	select {
+	case <-fastHit:
+		// good: no head-of-line blocking
+	case <-time.After(3 * time.Second):
+		t.Fatal("healthy subscriber was blocked behind the slow subscriber (head-of-line blocking)")
+	}
+
+	// Let the slow endpoint finish, then let the batch complete cleanly.
+	releaseOnce.Do(func() { close(release) })
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("RunOnce did not return after the slow endpoint was released")
+	}
+
+	var delivered int64
+	db.Model(&models.WebhookDelivery{}).Where("status = ?", statusDelivered).Count(&delivered)
+	if delivered != 2 {
+		t.Fatalf("expected 2 delivered rows, got %d", delivered)
+	}
+}
+
 func TestSignPayload(t *testing.T) {
 	got := signPayload("k", []byte("hello"))
 	want := "sha256=" + hex.EncodeToString(hmacKey("k", []byte("hello")))

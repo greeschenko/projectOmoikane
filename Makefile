@@ -1,4 +1,4 @@
-.PHONY: up down reset db-reset test go-test go-build swagger k8s-up k8s-images k8s-db-reset k8s-test k8s-down k8s-destroy cloud-smoke
+.PHONY: up down reset db-reset test go-test go-build swagger k8s-up k8s-images k8s-db-reset k8s-test k8s-down k8s-destroy cloud-smoke verify
 
 SWAG := $(shell command -v swag 2>/dev/null || echo "$(HOME)/prodev/go/bin/swag")
 
@@ -12,102 +12,70 @@ swagger:
 	cd backend && $(SWAG) init -g cmd/audit/main.go --output ./cmd/audit/docs --parseInternal --exclude "internal,docs"
 	@echo "Swagger docs generated"
 
+# ---------- Health-wait macros (used by `up` and `db-reset`) ----------
+# wait_health <label> <url> <tries> — poll a service /health endpoint until it
+# reports ok. Every service is confirmed answering BEFORE the gateway is
+# restarted, so a dead upstream can no longer hide behind a stale nginx table.
+define wait_health
+	@echo "Waiting for $(1) to be ready..."
+	@for i in $$(seq 1 $(3)); do \
+		if curl -s $(2) 2>/dev/null | grep -q '"status":"ok"'; then \
+			echo "$(1) ready after $$i tries"; \
+			break; \
+		fi; \
+		if [ $$i -eq $(3) ]; then echo "$(1) not ready after $$(( $(3) * 2 ))s"; exit 1; fi; \
+		sleep 2; \
+	done
+endef
+
+# wait_http <label> <url> <status-regex> <tries> — poll until the URL answers
+# with one of the expected HTTP status codes.
+define wait_http
+	@echo "Waiting for $(1)..."
+	@for i in $$(seq 1 $(4)); do \
+		code=$$(curl -s -o /dev/null -w "%{http_code}" $(2) 2>/dev/null); \
+		if echo "$$code" | grep -qE '^($(3))$$'; then \
+			echo "$(1) ready after $$i tries (HTTP $$code)"; \
+			break; \
+		fi; \
+		if [ $$i -eq $(4) ]; then echo "$(1) not ready after $$(( $(4) * 2 ))s (last status $$code)"; exit 1; fi; \
+		sleep 2; \
+	done
+endef
+
+# Gateway assertion: a real proxied route must answer 200 through nginx (502
+# means the upstream table is stale or a service is down). Two different
+# upstreams are probed — auth (`/api/setup/check`, always public) and docs
+# (`/api/swagger/`, the static Swagger UI).
+define assert_gateway
+	docker compose -f docker/docker-compose.yml restart nginx
+	$(call wait_http,gateway -> auth-service (GET /api/setup/check),http://localhost/api/setup/check,200,30)
+	# Swagger is served by docs-service. The bare trailing-slash URL is a
+	# deliberate 301 to index.html (nginx `return 301 $scheme://$http_host/...`
+	# — native so the Location keeps the NodePort port on minikube); the UI
+	# itself must answer 200.
+	$(call wait_http,gateway -> docs-service (GET /api/swagger/),http://localhost/api/swagger/,301,30)
+	$(call wait_http,gateway -> docs-service (GET /api/swagger/index.html),http://localhost/api/swagger/index.html,200,30)
+endef
+
 up:
 	docker compose -f docker/docker-compose.yml up -d --remove-orphans
-	# nginx resolves upstream hostnames once at startup; compose recreates
-	# containers (new IPs) whenever their config changes, so restart nginx
-	# after the stack is created to re-resolve them.
-	docker compose -f docker/docker-compose.yml restart nginx
-	@echo "Waiting for auth service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8082/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Auth service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Auth service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for content service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8083/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Content service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Content service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for media service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8084/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Media service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Media service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for messages service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8085/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Messages service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Messages service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for settings service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8086/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Settings service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Settings service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for trash service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8087/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Trash service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Trash service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for dashboard service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8088/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Dashboard service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Dashboard service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for docs service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8089/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Docs service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Docs service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for webhooks service to be ready..."
-	@for i in $$(seq 1 30); do \
-		if curl -s http://localhost:8090/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Webhooks service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 30 ]; then echo "Webhooks service not ready after 30s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for frontend to be ready..."
-	@for i in $$(seq 1 60); do \
-		if curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null | grep -q "307\|200"; then \
-			echo "Frontend ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 60 ]; then echo "Frontend not ready after 60s"; exit 1; fi; \
-		sleep 2; \
-	done
+	$(call wait_health,auth-service,http://localhost:8082/health,30)
+	$(call wait_health,content-service,http://localhost:8083/health,30)
+	$(call wait_health,media-service,http://localhost:8084/health,30)
+	$(call wait_health,messages-service,http://localhost:8085/health,30)
+	$(call wait_health,settings-service,http://localhost:8086/health,30)
+	$(call wait_health,trash-service,http://localhost:8087/health,30)
+	$(call wait_health,dashboard-service,http://localhost:8088/health,30)
+	$(call wait_health,docs-service,http://localhost:8089/health,30)
+	$(call wait_health,audit-service,http://localhost:8081/health,30)
+	$(call wait_health,webhooks-service,http://localhost:8090/health,30)
+	$(call wait_health,webhook-sink,http://localhost:8091/health,30)
+	# nginx resolves upstream hostnames once at startup; compose recreations
+	# (new IPs) invalidate them, so restart it only AFTER every service
+	# answers — then prove the gateway really routes.
+	$(call assert_gateway)
+	$(call wait_http,frontend (through the gateway),http://localhost/,307|200,60)
 	docker exec docker-frontend-1 npm install --legacy-peer-deps 2>/dev/null || true
 
 down:
@@ -137,83 +105,21 @@ db-reset: up
 	docker compose -f docker/docker-compose.yml restart messages-service
 	docker compose -f docker/docker-compose.yml restart settings-service
 	docker compose -f docker/docker-compose.yml start webhooks-service
-	@echo "Waiting for auth service to be ready..."
-	@for i in $$(seq 1 15); do \
-		if curl -s http://localhost:8082/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Auth service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 15 ]; then echo "Auth service not ready after 15s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for content service to be ready..."
-	@for i in $$(seq 1 15); do \
-		if curl -s http://localhost:8083/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Content service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 15 ]; then echo "Content service not ready after 15s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for media service to be ready..."
-	@for i in $$(seq 1 15); do \
-		if curl -s http://localhost:8084/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Media service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 15 ]; then echo "Media service not ready after 15s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for messages service to be ready..."
-	@for i in $$(seq 1 15); do \
-		if curl -s http://localhost:8085/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Messages service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 15 ]; then echo "Messages service not ready after 15s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for settings service to be ready..."
-	@for i in $$(seq 1 15); do \
-		if curl -s http://localhost:8086/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Settings service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 15 ]; then echo "Settings service not ready after 15s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for audit service to be ready..."
-	@for i in $$(seq 1 15); do \
-		if curl -s http://localhost:8081/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Audit service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 15 ]; then echo "Audit service not ready after 15s"; exit 1; fi; \
-		sleep 2; \
-	done
-	@echo "Waiting for webhooks service to be ready..."
-	@for i in $$(seq 1 15); do \
-		if curl -s http://localhost:8090/health 2>/dev/null | grep -q '"status":"ok"'; then \
-			echo "Webhooks service ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 15 ]; then echo "Webhooks service not ready after 15s"; exit 1; fi; \
-		sleep 2; \
-	done
+	$(call wait_health,auth-service,http://localhost:8082/health,15)
+	$(call wait_health,content-service,http://localhost:8083/health,15)
+	$(call wait_health,media-service,http://localhost:8084/health,15)
+	$(call wait_health,messages-service,http://localhost:8085/health,15)
+	$(call wait_health,settings-service,http://localhost:8086/health,15)
+	$(call wait_health,audit-service,http://localhost:8081/health,15)
+	$(call wait_health,webhooks-service,http://localhost:8090/health,15)
+	$(call wait_health,webhook-sink,http://localhost:8091/health,15)
 	@echo "Restarting frontend for clean state..."
 	docker compose -f docker/docker-compose.yml restart frontend
 	# Re-resolve upstream IPs (nginx caches hostnames at startup; a container
-	# recreation between phases can invalidate them).
-	docker compose -f docker/docker-compose.yml restart nginx
-	@echo "Waiting for frontend to be ready..."
-	@for i in $$(seq 1 60); do \
-		if curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null | grep -q "307\|200"; then \
-			echo "Frontend ready after $$i seconds"; \
-			break; \
-		fi; \
-		if [ $$i -eq 60 ]; then echo "Frontend not ready after 60s"; exit 1; fi; \
-		sleep 2; \
-	done
+	# recreation between phases can invalidate them) and prove the gateway
+	# still routes before Playwright starts hitting it.
+	$(call assert_gateway)
+	$(call wait_http,frontend (through the gateway),http://localhost/,307|200,60)
 
 go-test:
 	cd backend && go test -p 1 ./internal/... ./cmd/auth/... ./cmd/content/... ./cmd/media/... ./cmd/messages/... ./cmd/settings/... ./cmd/trash/... ./cmd/dashboard/... ./cmd/docs/... ./cmd/audit/... ./cmd/webhooks/...
@@ -260,7 +166,7 @@ MINIKUBE_PROFILE ?= minikube
 KIND_NAME ?= omoikane
 K8S_DRIVER ?= minikube
 K8S_CHART := charts/omoikane
-IMAGE_TAG ?= phase36
+IMAGE_TAG ?= phase37
 K8S_IMAGE_BACKEND := omoikane/backend:$(IMAGE_TAG)
 K8S_IMAGE_FRONTEND := omoikane/frontend:$(IMAGE_TAG)
 GATEWAY_PORT ?= 30080
@@ -359,3 +265,11 @@ endif
 CLOUD_SMOKE_URL ?= http://localhost
 cloud-smoke:
 	scripts/cloud-smoke.sh "$(CLOUD_SMOKE_URL)"
+
+# ---------- Phase 37: full-component recheck ----------
+# Read-only black-box sweep of every component through the gateway (see
+# backend/docs/verification.md). Compose (default): `make verify`. For the
+# minikube/kind gateway: `make verify VERIFY_URL=$(K8S_GATEWAY_URL)`.
+VERIFY_URL ?= http://localhost
+verify:
+	scripts/verify-components.sh "$(VERIFY_URL)"

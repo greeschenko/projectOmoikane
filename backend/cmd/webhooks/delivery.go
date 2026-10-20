@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"omoikane-backend/internal/models"
@@ -43,6 +44,13 @@ type deliveryWorker struct {
 
 	pollInterval time.Duration
 	batchSize    int
+	// concurrency bounds how many rows in a batch are delivered at once.
+	// Without it a single slow subscriber (e.g. a dead endpoint that hangs for
+	// the full client timeout) would block every other due row behind it —
+	// head-of-line blocking that made a healthy delivery wait minutes on
+	// Kubernetes, where a dead hostname resolves and then stalls instead of
+	// refusing instantly.
+	concurrency int
 	// maxAttempts is the total number of HTTP attempts before a row expires
 	// (1 initial + maxAttempts-1 retries).
 	maxAttempts int
@@ -59,6 +67,7 @@ func newDeliveryWorker(db *gorm.DB) *deliveryWorker {
 		client:       &http.Client{Timeout: 10 * time.Second},
 		pollInterval: 500 * time.Millisecond,
 		batchSize:    50,
+		concurrency:  8,
 		maxAttempts:  6,
 		baseBackoff:  time.Second,
 		backoffCap:   60 * time.Second,
@@ -83,7 +92,13 @@ func (w *deliveryWorker) Run(ctx context.Context) {
 }
 
 // RunOnce delivers one batch of due pending/failed rows. Returns the number of
-// rows attempted. Exposed for tests (deterministic pump steps without sleeping).
+// rows attempted. Exposed for tests (deterministic pump steps without
+// sleeping).
+//
+// Rows are delivered with bounded concurrency (w.concurrency): a slow or dead
+// subscriber must not serialize the whole batch behind it. All deliveries are
+// awaited before RunOnce returns, so callers (and tests) still observe a
+// complete step.
 func (w *deliveryWorker) RunOnce(ctx context.Context) (int, error) {
 	var due []models.WebhookDelivery
 	// pending = awaiting first delivery; failed = a past attempt failed and a
@@ -92,9 +107,31 @@ func (w *deliveryWorker) RunOnce(ctx context.Context) (int, error) {
 		Order("id asc").Limit(w.batchSize).Find(&due).Error; err != nil {
 		return 0, err
 	}
-	for i := range due {
-		w.deliver(ctx, &due[i])
+	if len(due) == 0 {
+		return 0, nil
 	}
+
+	workers := w.concurrency
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > len(due) {
+		workers = len(due)
+	}
+
+	sem := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	for i := range due {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(d *models.WebhookDelivery) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			w.deliver(ctx, d)
+		}(&due[i])
+	}
+	wg.Wait()
+
 	return len(due), nil
 }
 

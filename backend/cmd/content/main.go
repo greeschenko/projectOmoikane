@@ -55,7 +55,7 @@ func main() {
 
 	var err error
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
+		Logger: observability.GormLogger(logger.Warn), // structured JSON like every other line (Phase 37)
 	})
 	if err != nil {
 		log.Fatalf("content-service: failed to connect to database: %v", err)

@@ -93,9 +93,17 @@ pending ──▶ delivered            (HTTP 2xx; attempts, httpStatus, no error
 ```
 
 - **Pump defaults** (env-tunable): `pollInterval 500ms`, `batchSize 50`,
-  `maxAttempts 6` (`WEBHOOKS_MAX_ATTEMPTS`), `baseBackoff 1s`
+  `concurrency 8` (`WEBHOOKS_DELIVERY_CONCURRENCY`), `maxAttempts 6`
+  (`WEBHOOKS_MAX_ATTEMPTS`), `baseBackoff 1s`
   (`WEBHOOKS_BACKOFF_CAP_SECONDS` caps the doubling at 60s),
   `WEBHOOKS_POLL_INTERVAL_MS`.
+- **Bounded-concurrency fan-out** (Phase 37): a batch is delivered by up to
+  `concurrency` goroutines, so one slow or dead subscriber cannot serialize the
+  whole batch behind it. Before this, rows were delivered strictly in order and
+  a dead endpoint on Kubernetes (hostname resolves, connection then stalls for
+  the full client timeout) delayed healthy deliveries in the same batch by
+  minutes — head-of-line blocking. `RunOnce` still awaits every delivery before
+  returning, so a pump step is complete and deterministic.
 - **Backoff schedule**: attempt 1 (0s) → fail → retry at +1s → fail → retry at
   +2s → +4s → +8s → +16s → attempt 6 fails → **expired** (~31s to terminal
   for a permanently down endpoint). Every retry doubles the delay, capped.
@@ -164,6 +172,7 @@ name** (`webhook-sink`) in both, so e2e URLs are byte-identical across gates.
 | `WEBHOOKS_MAX_ATTEMPTS` | `6` | attempts before `expired` |
 | `WEBHOOKS_BACKOFF_CAP_SECONDS` | `60` | backoff cap |
 | `WEBHOOKS_POLL_INTERVAL_MS` | `500` | pump poll interval |
+| `WEBHOOKS_DELIVERY_CONCURRENCY` | `8` | max rows delivered in parallel per batch (head-of-line guard) |
 | `MIGRATE_ONLY` | — | `1` = migrate + exit (Helm migration Job) |
 | `SINK_PORT` (sink) | `8091` | webhook-sink port |
 

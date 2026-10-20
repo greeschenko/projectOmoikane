@@ -1,5 +1,15 @@
-import { test, expect } from "@playwright/test";
-import { loginAsAdmin } from "./helpers";
+import { test, expect, type Page } from "@playwright/test";
+import { loginAsAdmin, waitForHydration } from "./helpers";
+
+// Navigate to the users admin page and wait for React to hydrate it. The
+// table's sort headers, filter box, and row buttons all derive from client
+// state, so a click before hydration is silently swallowed (the click lands on
+// the server-rendered markup, no handler runs, and aria-sort never appears).
+// Phase 37: "sort column by status" fired exactly that race.
+async function gotoUsers(page: Page): Promise<void> {
+  await page.goto("/admin/users");
+  await waitForHydration(page, "table thead th");
+}
 
 test.describe("User Status", () => {
   test.beforeEach(async ({ page }) => {
@@ -7,14 +17,14 @@ test.describe("User Status", () => {
   });
 
   test("user table has a Status column header", async ({ page }) => {
-    await page.goto("/admin/users");
+    await gotoUsers(page);
     const headers = page.getByRole("columnheader");
     const headerTexts = await headers.allTextContents();
     expect(headerTexts.some((t) => /status/i.test(t))).toBeTruthy();
   });
 
   test("default status shows Active badge in each row", async ({ page }) => {
-    await page.goto("/admin/users");
+    await gotoUsers(page);
     const firstRow = page.locator("table tbody tr").first();
     await expect(firstRow).toContainText(/active/i);
   });
@@ -25,7 +35,7 @@ test.describe("User Status", () => {
     await page.request.post("/api/users", {
       data: { name: "Test User", email, password: "Password123!", role: "user", status: "active" },
     });
-    await page.goto("/admin/users");
+    await gotoUsers(page);
     const testRow = page.locator("table tbody tr", { hasText: email });
     await testRow.getByRole("button", { name: /edit|pencil/i }).click();
     const statusSelect = page.getByRole("dialog").getByText("Status").locator("..").getByRole("combobox");
@@ -57,7 +67,7 @@ test.describe("User Status", () => {
   });
 
   test("sort column by email", async ({ page }) => {
-    await page.goto("/admin/users");
+    await gotoUsers(page);
     const emailHeader = page.getByRole("columnheader", { name: /email/i });
     await emailHeader.click();
     await expect(emailHeader).toHaveAttribute("aria-sort", /ascending/i);
@@ -66,7 +76,7 @@ test.describe("User Status", () => {
   });
 
   test("sort column by role", async ({ page }) => {
-    await page.goto("/admin/users");
+    await gotoUsers(page);
     const roleHeader = page.getByRole("columnheader", { name: /role/i });
     await roleHeader.click();
     await expect(roleHeader).toHaveAttribute("aria-sort", /ascending/i);
@@ -75,7 +85,7 @@ test.describe("User Status", () => {
   });
 
   test("sort column by status", async ({ page }) => {
-    await page.goto("/admin/users");
+    await gotoUsers(page);
     const statusHeader = page.getByRole("columnheader", { name: /status/i });
     await statusHeader.click();
     await expect(statusHeader).toHaveAttribute("aria-sort", /ascending/i);
@@ -84,7 +94,7 @@ test.describe("User Status", () => {
   });
 
   test("filter input also filters by status", async ({ page }) => {
-    await page.goto("/admin/users");
+    await gotoUsers(page);
     await page.getByPlaceholder(/filter|search/i).fill("banned");
     // Should show empty state since no user name/email contains "banned"
     await expect(page.getByRole("table")).toContainText(/no users? found/i);

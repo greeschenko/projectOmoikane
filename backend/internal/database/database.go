@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"omoikane-backend/internal/models"
+	"omoikane-backend/internal/observability"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -15,7 +16,7 @@ var DB *gorm.DB
 
 func Connect(dsn string) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
+		Logger: observability.GormLogger(logger.Warn), // structured JSON like every other line (Phase 37)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)

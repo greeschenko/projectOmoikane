@@ -52,7 +52,7 @@ func main() {
 
 	var err error
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
+		Logger: observability.GormLogger(logger.Warn), // structured JSON like every other line (Phase 37)
 	})
 	if err != nil {
 		log.Fatalf("webhooks-service: failed to connect to database: %v", err)
@@ -152,6 +152,11 @@ func applyWorkerEnv(w *deliveryWorker) {
 	if v := os.Getenv("WEBHOOKS_POLL_INTERVAL_MS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			w.pollInterval = time.Duration(n) * time.Millisecond
+		}
+	}
+	if v := os.Getenv("WEBHOOKS_DELIVERY_CONCURRENCY"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			w.concurrency = n
 		}
 	}
 }

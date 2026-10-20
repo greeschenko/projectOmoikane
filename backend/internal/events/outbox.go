@@ -6,20 +6,34 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // OutboxStatus values.
 const (
-	OutboxPending = "pending" // awaiting relay publish
-	OutboxSent    = "sent"    // relay published to Kafka
-	OutboxFailed  = "failed"  // exhausted OutboxMaxAttempts; operator attention
+	OutboxPending  = "pending"  // awaiting relay publish
+	OutboxInflight = "inflight" // claimed by a relay; publish in progress
+	OutboxSent     = "sent"     // relay published to Kafka
+	OutboxFailed   = "failed"   // exhausted OutboxMaxAttempts; operator attention
 )
+
+// OutboxInflightTimeout is how long a claimed row may stay claimed before
+// another relay takes it back. A relay marks rows inflight while it publishes;
+// if its process dies mid-batch the rows would otherwise be stranded (events
+// silently lost). The window only has to outlast a single publish by a wide
+// margin (Kafka BatchTimeout 50ms + ack), so a crashed relay's batch is
+// recovered within this bound. Recovery is at-least-once: a row published just
+// before the crash goes out twice, which consumers tolerate by design.
+const OutboxInflightTimeout = 2 * time.Minute
 
 // OutboxEvent is the transactional-outbox row. Services append here IN THE
 // SAME DB TRANSACTION as the business write (GORM tx), giving atomicity:
 // either the business change and its event both commit, or neither does.
-// A relay worker polls pending rows and publishes them to Kafka, then marks
-// them sent. Consumers must tolerate at-least-once semantics.
+// A relay worker CLAIMS pending rows (pending -> inflight), publishes them to
+// Kafka, then marks them sent (or failed after OutboxMaxAttempts). Claiming is
+// what makes one shared outbox safe: several services relay the same table, so
+// without it every relay publishes every row (Phase 37 measured 26% of events
+// on the wire twice). Consumers must tolerate at-least-once semantics.
 type OutboxEvent struct {
 	ID        uint   `gorm:"primarykey"`
 	EventType string `gorm:"size:160;not null;index"`
@@ -44,7 +58,11 @@ type OutboxStore interface {
 	// atomicity). Returns the row ID.
 	Enqueue(ctx context.Context, ev CloudEvent) (uint, error)
 
-	// Pending returns up to limit rows still to be published (oldest first).
+	// Pending returns up to limit rows still to be published (oldest first),
+	// CLAIMING them so that no other relay can publish the same row. Claimed
+	// rows move to the inflight status until MarkSent/MarkAttempt releases
+	// them; rows stranded by a crashed relay are reclaimed after
+	// OutboxInflightTimeout.
 	Pending(ctx context.Context, limit int) ([]OutboxEvent, error)
 
 	// MarkSent records successful Kafka publish.
@@ -91,16 +109,52 @@ func (s *GormOutboxStore) Enqueue(ctx context.Context, ev CloudEvent) (uint, err
 	return row.ID, nil
 }
 
-// Pending implements OutboxStore.
+// Pending implements OutboxStore. It claims the rows it returns: they move
+// from pending to inflight inside one transaction, so two relays polling the
+// same table (every service shares the ONE omoikane outbox, and a service may
+// run more than one replica) can never publish the same row twice. Rows whose
+// relay died mid-batch are reclaimed once OutboxInflightTimeout elapses.
 func (s *GormOutboxStore) Pending(ctx context.Context, limit int) ([]OutboxEvent, error) {
+	db := s.DB.WithContext(ctx)
+
+	// Crash recovery: release claims that outlived their publisher.
+	cutoff := time.Now().Add(-OutboxInflightTimeout)
+	if err := db.Model(&OutboxEvent{}).
+		Where("status = ? AND updated_at < ?", OutboxInflight, cutoff).
+		Updates(map[string]any{"status": OutboxPending}).Error; err != nil {
+		return nil, fmt.Errorf("events: outbox reclaim: %w", err)
+	}
+
 	var rows []OutboxEvent
-	err := s.DB.WithContext(ctx).
-		Where("status = ?", OutboxPending).
-		Order("id ASC").
-		Limit(limit).
-		Find(&rows).Error
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// SKIP LOCKED: concurrent relays walk past each other's claimed rows
+		// instead of blocking or re-taking them.
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Where("status = ?", OutboxPending).
+			Order("id ASC").
+			Limit(limit).
+			Find(&rows).Error; err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return nil
+		}
+		ids := make([]uint, len(rows))
+		for i, row := range rows {
+			ids[i] = row.ID
+		}
+		if err := tx.Model(&OutboxEvent{}).
+			Where("id IN ?", ids).
+			Updates(map[string]any{"status": OutboxInflight}).Error; err != nil {
+			return err
+		}
+		for i := range rows {
+			rows[i].Status = OutboxInflight
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("events: outbox pending: %w", err)
+		return nil, fmt.Errorf("events: outbox claim: %w", err)
 	}
 	return rows, nil
 }

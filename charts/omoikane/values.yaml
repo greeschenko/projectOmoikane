@@ -10,11 +10,11 @@
 images:
   backend:
     repository: omoikane/backend
-    tag: phase36
+    tag: phase37
     pullPolicy: IfNotPresent
   frontend:
     repository: omoikane/frontend
-    tag: phase36
+    tag: phase37
     pullPolicy: IfNotPresent
 
 secrets:

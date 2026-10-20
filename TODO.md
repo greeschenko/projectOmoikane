@@ -452,10 +452,18 @@ The CMS (Phases 1–26) is complete. The project now evolves into a **modular, e
 - [x] **FIRST RESULT:** `scripts/cloud-smoke.sh` verified live against the minikube gateway — setup/login → create `post.published` webhook sub → publish post → outbox → Kafka → webhook `delivered` (httpStatus 200, attempts 1) → audit `publish` row → cleanup; ends `FIRST RESULT verified`
 - [x] **Gate:** `make go-test` 220/220 (`internal/events/transport_test.go` +7 → 220 with Kafka up); `helm lint` + `helm template` green for default + minikube + kind (45 kinds, in-cluster infra) and EKS/GKE/AKS (36 kinds, no in-cluster postgres/kafka/redis, external DSNs/bootstrap, 7 migration Jobs without wait); `make k8s-test` green on minikube
 
-## 🔲 Phase 37: (optional) Workflow/Automation Module
+## ✅ Phase 37: Full-Component Recheck (verification & hardening)
+- [x] `scripts/verify-components.sh` + `make verify` — black-box sweep of every component through the gateway (sections: infra, routing, health, auth, content, media, messaging, aggregators, events, webhooks, observability); `--only`/`--json`/`--list`/`--keep`; per-run unique slugs so it is idempotent and safe to re-run
+- [x] `backend/docs/verification.md` — component → automatic/manual check matrix + UI/a11y checklist + the findings log + results table
+- [x] Findings fixed **at source**, each with a regression test (F1 nginx-start order + missing health waits + gateway assertion; F2 `restart: unless-stopped`; F3 shared-outbox **atomic claim** — duplicate events on the wire; F4 `OnConflict{DoNothing}` consumer dedupe; F5 GORM → upstream `logger.NewSlogLogger` so DB errors stop escaping as raw ANSI; F6 e2e click-before-hydration; F7 `statusRecorder` superfluous `WriteHeader`; F8 verify-script shell bugs; F9 k8s webhook-retry poll budget; F10 webhook delivery **head-of-line blocking** → bounded-concurrency pump; F11 verify-script **DIRECT_MODE** gateway-derived stack detection; F12 verify-script HMAC verifier trusting the first slug match → false mismatch)
+- [x] New permanent assertions: Kafka **exactly-once on the wire** (per-run tail-watcher group), `/api/internal/*` → 404, service logs are JSON with a `service` attribute
+- [x] **Gate:** `make go-test` 234/234 (Phase 37 +14); `make verify` **118/118** on compose (3 consecutive green runs) + **107/107** on minikube; full `make test`; `make k8s-test`; helm lint/template; CI
+- [ ] Manual UI + a11y pass on compose (37c) — requires an interactive browser session
+
+## 🔲 Phase 38: (optional) Workflow/Automation Module
 - [ ] Event → condition → action rules engine; admin UI; e2e workflow tests
 
-## 🔲 Phase 38: (optional) Multi-Tenancy & Scale Validation
+## 🔲 Phase 39: (optional) Multi-Tenancy & Scale Validation
 - [ ] Per-tenant schema separation, tenant-scoped events, HPA stress test
 
 ## 📥 Backlog (parked, not scheduled)

@@ -9,6 +9,7 @@ import (
 	"omoikane-backend/internal/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // auditEventHandler is the audit service's Kafka consumer handler (Phase 32).
@@ -16,8 +17,9 @@ import (
 //
 // Delivery is at-least-once end to end, so Handle must be idempotent:
 // AuditLog.EventID (the CloudEvent id) is unique-indexed and a redelivered
-// event is skipped — the duplicate is treated as success so the consumer
-// commits the offset instead of DLQ-ing it.
+// event is absorbed by the insert itself (ON CONFLICT DO NOTHING) — the
+// duplicate is success so the consumer commits the offset instead of DLQ-ing
+// it, and no duplicate-key error is raised for an expected outcome.
 type auditEventHandler struct {
 	db *gorm.DB
 }
@@ -34,21 +36,13 @@ func (h *auditEventHandler) Handle(ctx context.Context, ev events.CloudEvent) er
 	if !mapped {
 		return nil
 	}
-	if err := h.db.Create(&entry).Error; err != nil {
-		if h.alreadyStored(entry.EventID) {
-			return nil
-		}
-		return fmt.Errorf("audit: store %s event %s: %w", ev.Type, ev.ID, err)
+	// Idempotent write: the unique index on event_id makes a redelivered
+	// event a no-op (RowsAffected == 0) instead of a constraint violation.
+	res := h.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&entry)
+	if res.Error != nil {
+		return fmt.Errorf("audit: store %s event %s: %w", ev.Type, ev.ID, res.Error)
 	}
 	return nil
-}
-
-// alreadyStored reports whether an event id already produced a row (at-least-
-// once redelivery guard behind the unique index).
-func (h *auditEventHandler) alreadyStored(eventID string) bool {
-	var n int64
-	h.db.Model(&models.AuditLog{}).Where("event_id = ?", eventID).Count(&n)
-	return n > 0
 }
 
 // Event payload contracts. These mirror internal/events/schemas/*.json; they

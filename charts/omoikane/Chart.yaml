@@ -6,8 +6,8 @@ description: >-
   nginx gateway, Postgres, Redis and Kafka (single-node KRaft in-cluster default;
   `external.*` switches each to managed cloud services — Phase 36).
 type: application
-version: 0.4.0
-appVersion: "36"
+version: 0.5.0
+appVersion: "37"
 keywords:
   - cms
   - kafka

@@ -29,7 +29,7 @@ type Metrics struct {
 func NewMetrics(service string) *Metrics {
 	reg := prometheus.NewRegistry()
 	m := &Metrics{
-		service: service,
+		service:  service,
 		registry: reg,
 		httpReqs: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "http_requests_total",
@@ -89,9 +89,14 @@ func (m *Metrics) Middleware(next http.Handler) http.Handler {
 		m.inFlight.WithLabelValues(m.service).Inc()
 		defer m.inFlight.WithLabelValues(m.service).Dec()
 
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		rec := &statusRecorder{ResponseWriter: w}
 		next.ServeHTTP(rec, r)
 
+		// The handler may also have sent an explicit status; prefer the first
+		// one it wrote (Go's convention), which rec.status already holds.
+		if rec.status == 0 {
+			rec.status = http.StatusOK
+		}
 		route := routeLabel(r.URL.Path)
 		m.httpReqs.WithLabelValues(m.service, r.Method, route, strconv.Itoa(rec.status)).Inc()
 		m.httpDur.WithLabelValues(m.service, r.Method, route).Observe(time.Since(start).Seconds())
@@ -99,14 +104,44 @@ func (m *Metrics) Middleware(next http.Handler) http.Handler {
 }
 
 // statusRecorder captures the response status code through WriteHeader.
+//
+// Only the FIRST WriteHeader reaches the wrapped ResponseWriter: re-sending a
+// status is invalid HTTP and net/http answers with "superfluous
+// response.WriteHeader call", which polluted the JSON log stream (Phase 37
+// caught it in the auth-service logs). Swallowing the repeat inside the
+// recorder keeps the misspelled-passthrough bug from ever reaching the server,
+// and the recorded status stays the effective one.
 type statusRecorder struct {
 	http.ResponseWriter
-	status int
+	status  int
+	written bool
 }
 
 func (r *statusRecorder) WriteHeader(code int) {
+	if r.written {
+		return
+	}
+	r.written = true
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// Write records an implicit 200 when a handler writes a body without calling
+// WriteHeader (Go sends 200 on the first Write).
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	if !r.written {
+		r.written = true
+		r.status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(b)
+}
+
+// Flush forwards to the wrapped writer when it supports flushing, so streaming
+// responses keep working through the recorder.
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // routeLabel reduces a request path to a bounded, cardinality-safe label.

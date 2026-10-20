@@ -6,9 +6,11 @@ import (
 	"time"
 )
 
-// Relay is the outbox publisher worker. It polls pending outbox rows on an
-// interval and publishes each via a Producer, then marks rows sent (or
-// failed after OutboxMaxAttempts). Runs in every service writing domain events.
+// Relay is the outbox publisher worker. It CLAIMS a batch of pending outbox
+// rows on an interval (see OutboxStore.Pending), publishes each via a
+// Producer, then marks rows sent (or failed after OutboxMaxAttempts). Runs in
+// every service writing domain events — all of them relay the SAME table, so
+// the claim is what keeps the publication single-writer.
 //
 // Design notes:
 //   - at-least-once: a crash between publish and MarkSent redelivers the same
@@ -51,10 +53,15 @@ func (r *Relay) RunOnce(ctx context.Context) (int, error) {
 	return attempted, nil
 }
 
-// publishRow publishes one outbox row.
+// publishRow publishes one outbox row and always releases the claim Pending
+// took on it (sent on success, attempt/retry on failure) — otherwise a claimed
+// row would sit inflight until the reclaim timeout.
 func (r *Relay) publishRow(ctx context.Context, row OutboxEvent) error {
 	if r.PublishOverride != nil {
-		return r.PublishOverride(ctx, row)
+		if err := r.PublishOverride(ctx, row); err != nil {
+			return r.store.MarkAttempt(ctx, row.ID, err, r.cfg.OutboxMaxAttempts)
+		}
+		return r.store.MarkSent(ctx, row.ID)
 	}
 	ev, err := UnmarshalCloudEvent([]byte(row.Payload))
 	if err != nil {
